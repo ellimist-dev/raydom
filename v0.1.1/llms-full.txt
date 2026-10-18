@@ -1,0 +1,1595 @@
+<!-- introduction.md -->
+
+# Introduction
+
+raydom is a retained-mode UI tree for [raylib](https://www.raylib.com/). An application builds a tree of nodes,
+assigns CSS-like styles, and attaches event listeners. raydom computes layout with flexbox and grid, shapes and wraps
+text, routes pointer and keyboard input, and draws the result with raylib. The core is C23; a header-only C++20 layer
+wraps it. Applications link it statically and ship as one binary.
+
+This book documents the version shown in the version menu. Each release tag has its own copy of the book, so the
+pages you read match the headers you compile against.
+
+## Model
+
+- **Context.** `rd_ctx` owns every node, style, class, font and listener. Destroying it frees all of them.
+- **Nodes.** `rd_node` is a small value handle. A handle to a destroyed node is stale; every call on it is a no-op.
+- **Styles.** A node's computed style merges defaults, inherited properties, classes, state variants, and the inline
+  style, in that order.
+- **Frame loop.** Each frame, `rd_update` feeds raylib's input and lays the tree out at the window size, and `rd_draw`
+  draws it.
+
+## How to read this book
+
+[Getting started](getting-started/installation.md) covers installation and a first window. The
+[guide](guide/tree.md) has one chapter per subsystem. The [reference](reference/properties.md) lists every
+style property with its type, default and inheritance.
+
+Every code sample in this book is a fragment of a program under `docs/examples/` in the repository. Those programs
+are compiled by the test suite, and the ones that don't open a window run as tests, so the samples compile and
+behave as described for this version.
+
+Agents and tools can read the book as plain Markdown; see [For AI agents](agents.md).
+
+
+<!-- getting-started/installation.md -->
+
+# Installation
+
+## Requirements
+
+- CMake 3.25 or newer.
+- A C23 compiler for C code that includes raydom (clang 18+, GCC 13+). A C++20 compiler for the C++ layer.
+- raylib 6.0. raydom downloads it when the project doesn't provide one.
+
+## FetchContent
+
+```cmake
+include(FetchContent)
+FetchContent_Declare(raydom
+    GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
+    GIT_TAG        v0.1.1)
+FetchContent_MakeAvailable(raydom)
+
+target_link_libraries(your_app PRIVATE raydom::raydom)
+```
+
+Link `raydom::extras` instead to get the [network view](../extras/graph.md); it links `raydom::raydom` for you.
+
+raylib is resolved in this order: an existing `raylib` target in the project, an installed raylib found with
+`find_package`, then a download. Set `RAYDOM_FETCH_RAYLIB=OFF` to require one of the first two.
+
+## Installed package
+
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRAYDOM_INSTALL=ON
+cmake --build build
+cmake --install build --prefix /your/prefix
+```
+
+```cmake
+find_package(raydom 0.1 CONFIG REQUIRED)
+target_link_libraries(your_app PRIVATE raydom::raydom)
+```
+
+The package's version check accepts any patch release of the requested minor version while raydom is below 1.0.
+After 1.0 it accepts any later release with the same major version.
+
+## Options
+
+| Option                  | Default        | Effect                                       |
+| ----------------------- | -------------- | -------------------------------------------- |
+| `RAYDOM_BUILD_EXTRAS`   | `ON`           | Build `raydom::extras`                       |
+| `RAYDOM_FETCH_RAYLIB`   | `ON`           | Download raylib when it can't be found       |
+| `RAYDOM_INSTALL`        | top-level only | Generate install rules and the CMake package |
+| `RAYDOM_BUILD_TESTS`    | top-level only | Build the test suite                         |
+| `RAYDOM_BUILD_EXAMPLES` | top-level only | Build the examples                           |
+| `RAYDOM_SANITIZE`       | `OFF`          | Build with AddressSanitizer and UBSan        |
+
+## Headers
+
+| Header                         | Contents                                   |
+| ------------------------------ | ------------------------------------------ |
+| `<raydom/raydom.h>`            | The whole C API                            |
+| `<raydom/raydom.hh>`           | The C++ layer; includes the C API          |
+| `<raydom/extras/graph.h>`      | Network view, C                            |
+| `<raydom/extras/graph.hh>`     | Network view, C++                          |
+| `<raydom/role.h>`              | Roles and the button, text and input constructors |
+| `<raydom/version.h>`           | `RD_VERSION_MAJOR`, `_MINOR`, `_PATCH` |
+
+
+<!-- getting-started/quickstart.md -->
+
+# Quickstart
+
+raydom has no built-in font. Load a TrueType or OpenType file before creating text; the first font loaded becomes
+the default for every node.
+
+## C
+
+```c
+#include <raydom/raydom.h>
+#include <raylib.h>
+
+int main(void) {
+  SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
+  InitWindow(800, 600, "hello");
+  rd_ctx* ctx = rd_ctx_create();
+  rd_font_load_file(ctx, FONT_PATH);  // any .ttf or .otf file
+
+  rd_node card = rd_node_create_text(ctx, "Hello from raydom", RD_TEXT_NUL);
+  rd_node_set_style(ctx, card,
+                    &(rd_style){
+                        .padding       = rd_edges_all(rd_px(16)),
+                        .border_radius = rd_corners_all(rd_px(8)),
+                        .background    = rd_hex(0x1a1f2b),
+                        .color         = rd_hex(0xe4e7ee),
+                    });
+  rd_node_append(ctx, rd_ctx_root(ctx), card);
+
+  while (!WindowShouldClose()) {
+    rd_update(ctx);  // input, then layout at the window size
+    BeginDrawing();
+    ClearBackground(BLACK);
+    rd_draw(ctx);
+    EndDrawing();
+  }
+  rd_ctx_destroy(ctx);  // before CloseWindow, so GPU resources are released
+  CloseWindow();
+}
+```
+
+## C++
+
+```cpp
+#include <raydom/raydom.hh>
+#include <raylib.h>
+
+#include <string>
+
+using namespace rd::literals;
+
+int main() {
+  SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
+  InitWindow(800, 600, "hello");
+  {
+    rd::Context ctx;
+    ctx.load_font_file(FONT_PATH);  // any .ttf or .otf file
+
+    rd::Class button_style = ctx.create_class(rd::Style()
+                                                  .padding(8_px, 16_px)
+                                                  .border_radius(8_px)
+                                                  .background(rd::hex(0x5b8cff))
+                                                  .color(rd::hex(0xffffff)));
+    button_style.on(RD_STATE_HOVER, rd::Style().background(rd::hex(0x7aa2ff)));
+
+    int      clicks = 0;
+    rd::Node label  = ctx.create_text("Clicked 0 times", rd::Style().color(rd::hex(0xe4e7ee)));
+    rd::Node button = ctx.create_button("Click me").add_class(button_style);  // Tab focuses it; Enter and Space click it
+    button.on_click([&] { label.text("Clicked " + std::to_string(++clicks) + " times"); });
+
+    ctx.root()
+        .style(rd::Style().padding(24_px).row_gap(12_px).align_items(RD_ALIGN_START))
+        .append(button)
+        .append(label);
+
+    while (!WindowShouldClose()) {
+      ctx.update();
+      BeginDrawing();
+      ClearBackground(BLACK);
+      ctx.draw();
+      EndDrawing();
+    }
+  }  // the context is destroyed here, before CloseWindow
+  CloseWindow();
+}
+```
+
+The C++ context is an RAII owner. It is scoped inside a block so it is destroyed before `CloseWindow`; raydom owns
+GPU textures and a shader that must be released while the window still exists.
+
+## Build
+
+```cmake
+cmake_minimum_required(VERSION 3.25)
+project(hello LANGUAGES C CXX)
+
+include(FetchContent)
+FetchContent_Declare(raydom
+    GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
+    GIT_TAG        v0.1.1)
+FetchContent_MakeAvailable(raydom)
+
+add_executable(hello main.cc)
+target_link_libraries(hello PRIVATE raydom::raydom)
+target_compile_definitions(hello PRIVATE FONT_PATH="${CMAKE_SOURCE_DIR}/font.ttf")
+```
+
+For a single binary with no files next to it, embed the font and use `rd_font_load(ctx, data, size, false)`. With
+C23 `#embed`:
+
+```c
+static const unsigned char font_data[] = {
+#embed "font.ttf"
+};
+rd_font_load(ctx, font_data, sizeof font_data, false);  // false: the data outlives the context
+```
+
+
+<!-- getting-started/frame-loop.md -->
+
+# The frame loop
+
+```c
+while (!WindowShouldClose()) {
+  rd_update(ctx);
+  BeginDrawing();
+  ClearBackground(BLACK);
+  rd_draw(ctx);
+  EndDrawing();
+}
+```
+
+`rd_update` does four things, in order:
+
+1. Sets the context clock from `GetTime()` (`rd_ctx_set_time`).
+2. Feeds raylib's keyboard and text input (`rd_ctx_key`, `rd_ctx_text`).
+3. Feeds the mouse position, buttons and wheel (`rd_ctx_pointer`). Listeners run here.
+4. Lays the tree out at the screen size (`rd_ctx_layout`).
+
+`rd_draw` builds a display list from the laid-out tree and executes it with raylib. It must be called between
+`BeginDrawing` and `EndDrawing`. Anything drawn with raylib after `rd_draw` appears on top of the UI.
+
+## Mutating the tree
+
+Tree and style changes are allowed at any time: in listeners, between frames, or from application logic. They are
+recorded as dirty flags; nothing is recomputed until the next layout. Several changes in one frame cost one layout.
+
+Geometry queries such as `rd_node_rect` return the result of the most recent layout. After changing the tree outside
+the frame loop, call `rd_ctx_layout` before reading geometry.
+
+## Without raylib input
+
+`rd_update` is a convenience. Applications with their own input handling, and tests, call the lower-level functions
+directly:
+
+```c
+rd_ctx_set_time(ctx, seconds);
+rd_ctx_pointer(ctx, x, y, RD_BUTTON_PRIMARY, 0, 0);  // position, held buttons, wheel
+rd_ctx_key(ctx, RD_KEY_TAB, true, false, 0);          // key, down, repeat, modifiers
+rd_ctx_text(ctx, 'a');                                // one codepoint
+rd_ctx_layout(ctx, width, height);
+```
+
+Nothing except `rd_update`, `rd_draw`, and paint callbacks touches raylib, so a context can be built, laid out and
+driven with input without a window. The headless examples behind the guide chapters run this way.
+
+## Lifetime
+
+Destroy the context before `CloseWindow`. `rd_ctx_destroy` frees every node and runs every destroy callback
+registered for userdata, listeners, measure and paint functions.
+
+
+<!-- guide/tree.md -->
+
+# Nodes and the tree
+
+A context starts with one node, the root, which is sized to the layout viewport. Every other node is created
+detached and becomes visible when it is attached under the root.
+
+```c
+rd_ctx* ctx  = rd_ctx_create();
+rd_node root = rd_ctx_root(ctx);
+
+rd_node list = rd_node_create(ctx);
+rd_node a = rd_node_create(ctx), b = rd_node_create(ctx), c = rd_node_create(ctx);
+rd_node_append(ctx, root, list);
+rd_node_append(ctx, list, a);
+rd_node_append(ctx, list, c);
+rd_node_insert_before(ctx, list, b, c);  // list: a, b, c
+```
+
+## Handles
+
+`rd_node` is `{index, gen}`. The context stores nodes in a slot array; `index` names a slot and `gen` counts how
+many times that slot has been reused. Destroying a node bumps its slot's generation, so old handles stop matching.
+
+Consequences:
+
+- Handles are plain values. Copy them, store them in structs, compare them with `rd_node_eq`.
+- A stale handle is safe. Every function checks it and returns `false`, a null node, or does nothing.
+- `rd_node_is_null` tests for the zero handle, which functions return on failure. It doesn't test liveness; use
+  `rd_node_alive` for that.
+
+## Walking
+
+```c
+for (rd_node n = rd_node_first_child(ctx, list); !rd_node_is_null(n); n = rd_node_next_sibling(ctx, n)) {
+  // visit n
+}
+```
+
+C++ offers `for (rd::Node child : node.children())`. Neither form is stable if the loop body adds or removes siblings
+of the node being visited; collect the nodes first in that case.
+
+## Moving and detaching
+
+```c
+rd_node_append(ctx, root, b);  // moving: b leaves list and becomes root's last child
+rd_node_detach(ctx, c);        // c stays alive, owned by the context, outside the tree
+rd_node_append(ctx, list, c);  // and can be attached again later
+```
+
+`rd_node_append` and `rd_node_insert_before` move a node that already has a parent. They fail, returning `false`,
+when the move would create a cycle, or when either handle is stale. A detached node keeps its subtree, styles and
+listeners. It isn't laid out, drawn or hit-tested.
+
+## Userdata
+
+Each node carries one `void*` and an optional destroy callback that runs when the node is destroyed or the userdata
+is replaced.
+
+```c
+typedef struct item {
+  int id;
+} item;
+
+static void free_item(void* data) { free(data); }
+```
+
+```c
+item* data = malloc(sizeof *data);
+data->id   = 7;
+rd_node_set_userdata(ctx, a, data, free_item);
+item* back = rd_node_userdata(ctx, a);
+```
+
+C++: `node.emplace_userdata<T>(args...)` allocates a `T` owned by the node, and `node.userdata<T>()` returns it.
+
+## Destroying
+
+```c
+rd_node_destroy(ctx, list);         // destroys list, a and c; a's userdata is freed
+bool alive = rd_node_alive(ctx, a);  // false: the handle is stale, and every call on it is a no-op
+```
+
+`rd_node_destroy` destroys the subtree, depth first, and runs its destroy callbacks. The root can't be destroyed.
+Destroying a node from inside one of its own listeners is allowed; see [Events](events.md#mutating-during-dispatch).
+
+
+<!-- guide/styles.md -->
+
+# Styles and classes
+
+`rd_style` is a struct with one field per property. Every field type reserves zero for "unset", so a
+compound literal names only the properties it sets. The [property reference](../reference/properties.md) lists them
+all.
+
+## Inline styles
+
+```c
+rd_node_set_style(ctx, node,
+                  &(rd_style){
+                      .width         = rd_px(240),
+                      .padding       = rd_edges_vh(rd_px(8), rd_px(12)),  // vertical, horizontal
+                      .border_width  = rd_edges_all(rd_px(1)),
+                      .border_color  = rd_hex(0x272d3a),
+                      .border_radius = rd_corners_all(rd_px(6)),
+                      .background    = rd_hex(0x1a1f2b),
+                  });
+rd_node_merge_style(ctx, node, &(rd_style){.padding.left = rd_px(20)});  // only the left side changes
+```
+
+`rd_node_set_style` replaces the inline style. `rd_node_merge_style` copies the set fields over it and leaves the
+rest. Passing `NULL` to `rd_node_set_style` clears it.
+
+Value constructors: `rd_px`, `rd_pct`, `rd_num`, `rd_fr`, `rd_auto()`, `rd_min_content()`, `rd_max_content()`.
+Colors: `rd_hex(0xRRGGBB)`, `rd_rgb`, `rd_rgba`. Box sides: `rd_edges_all`, `rd_edges_vh`, or designated
+`.padding.left`. See [Values and units](../reference/values.md).
+
+## Classes
+
+A class is a reusable style with optional variants per state. Classes live until the context is destroyed;
+`rd_class_set` replaces a class's base style and restyles every node that uses it.
+
+```c
+rd_class button_style = rd_class_create(ctx, &(rd_style){.padding    = rd_edges_vh(rd_px(6), rd_px(14)),
+                                                        .background = rd_hex(0x1d2230)});
+rd_class primary      = rd_class_create(ctx, &(rd_style){.background = rd_hex(0x5b8cff)});
+rd_class_set_state(ctx, button_style, RD_STATE_HOVER, &(rd_style){.background = rd_hex(0x252c3d)});
+rd_class_set_state(ctx, button_style, RD_STATE_DISABLED, &(rd_style){.opacity = rd_num(0.4f)});
+
+rd_node ok = rd_node_create(ctx);
+rd_node_append(ctx, root, ok);
+rd_node_add_class(ctx, ok, button_style);
+rd_node_add_class(ctx, ok, primary);  // later classes win: the background is primary's
+```
+
+```c
+const rd_style* s = rd_node_computed_style(ctx, ok);
+// background from primary (the later class), padding from button_style (primary doesn't set it)
+```
+
+## Precedence
+
+For each property, the last of these that sets it wins:
+
+1. Defaults (the reference's Default column).
+2. The parent's computed value, for inherited properties.
+3. Class base styles, in the order the classes were added.
+4. Class state variants for the node's current states, ordered by state: `hover`, `focus_within`, `focus`,
+   `focus_visible`, `active`, `disabled`. Within one state, later classes win.
+5. The inline style.
+
+Inline styles beat every class and every state variant. Put anything that should change on hover in a class, not
+inline.
+
+## States
+
+raydom sets `hover`, `active`, `focus`, `focus_visible` and `focus_within` from input. `disabled` is set only by the
+application.
+
+```c
+rd_node_set_states(ctx, ok, RD_STATE_HOVER, true);
+// the hover variant of button_style now beats primary's base background
+```
+
+A disabled node and its descendants receive no pointer down, up or click events and can't be focused. Hover and
+pointer move still apply.
+
+`focus_visible` is set when focus came from the keyboard, or when the focused node is a text input. Use it, not
+`focus`, for focus rings.
+
+## Inheritance
+
+```c
+rd_node child = rd_node_create(ctx);
+rd_node_append(ctx, node, child);
+rd_node_merge_style(ctx, node, &(rd_style){.color = rd_hex(0xe4e7ee), .font_size = rd_px(18)});
+// child's computed color and font_size come from node; its background doesn't
+```
+
+Inherited properties: `color`, `font`, `font_size`, `line_height`, `white_space`, `user_select`, `pointer_events`,
+`caret_color`, `selection_color`, `text_align`. The rest start from the default on every node.
+
+## Computed styles
+
+`rd_node_computed_style` returns the fully resolved style, with every field set. It computes styles if they are
+dirty. The pointer is valid until the next node is created.
+
+
+<!-- guide/layout.md -->
+
+# Layout
+
+Every node is a flex container by default, with `flex_direction: column`, `align_items: stretch`, and
+`flex_shrink: 0`. Children stack vertically and fill the width. Set `display` to `RD_DISPLAY_GRID` for grid, or
+`RD_DISPLAY_NONE` to remove a node from layout, drawing and hit-testing.
+
+Sizes are border-box: `width` includes padding and border.
+
+## Flexbox
+
+```c
+// A toolbar: fixed-width side items and a flexible middle.
+rd_node bar = add(ctx, root,
+                  (rd_style){.flex_direction = RD_FLEX_ROW,
+                             .align_items    = RD_ALIGN_CENTER,
+                             .column_gap     = rd_px(8),
+                             .padding        = rd_edges_all(rd_px(8)),
+                             .height         = rd_px(48)});
+rd_node left   = add(ctx, bar, (rd_style){.width = rd_px(80), .height = rd_px(32)});
+rd_node middle = add(ctx, bar, (rd_style){.flex_grow = rd_num(1), .flex_basis = rd_px(0), .height = rd_px(32)});
+rd_node right  = add(ctx, bar, (rd_style){.width = rd_px(80), .height = rd_px(32)});
+```
+
+The algorithm follows [CSS Flexible Box Layout §9](https://www.w3.org/TR/css-flexbox-1/#layout-algorithm), with
+these differences:
+
+- `flex_shrink` defaults to 0. Items keep their size and overflow unless they opt in to shrinking.
+- `flex_direction` defaults to column.
+- `min_width` and `min_height` `auto` resolve to 0, not to the content size. An item is never smaller than its
+  padding plus border.
+
+`flex_basis: 0` with `flex_grow: 1` splits free space without regard to content, which is the common "fill the rest"
+pattern.
+
+## Grid
+
+```c
+rd_track  cols[3] = {rd_track_of(rd_px(200)), rd_track_of(rd_fr(1)), rd_track_of(rd_fr(2))};
+rd_node   grid    = add(ctx, root,
+                        (rd_style){.display               = RD_DISPLAY_GRID,
+                                   .grid_template_columns = rd_tracks_create(ctx, cols, 3),
+                                   .grid_auto_rows        = rd_track_of(rd_px(40)),
+                                   .column_gap            = rd_px(10),
+                                   .row_gap               = rd_px(10)});
+rd_node header = add(ctx, grid, (rd_style){.grid_column_start = rd_line(1), .grid_column_end = rd_line(-1)});
+for (int i = 0; i < 6; i++) add(ctx, grid, (rd_style){0});  // auto-placed, row by row
+```
+
+Track lists are interned: `rd_tracks_create` copies the array into the context and returns a handle that styles
+refer to. The list lives until the context is destroyed. C++ builds them with
+`ctx.tracks({200_px, 1_fr, 2_fr})` and `rd::repeat(3, {1_fr})`.
+
+A track is `{min, max}`. `rd_track_of(v)` uses `v` for both, except `fr`, which becomes `minmax(auto, fr)` as in
+CSS. `rd_track_minmax` builds any other pair.
+
+Placement uses `grid_{column,row}_{start,end}`: `rd_line(n)` is a 1-based line, negative from the end of the
+explicit grid; `rd_span(n)` spans tracks. Items without placement are auto-placed in `grid_auto_flow` order into
+implicit tracks sized by `grid_auto_rows` and `grid_auto_columns`.
+
+The algorithm follows [CSS Grid §11](https://www.w3.org/TR/css-grid-1/#layout-algorithm). Named lines, named areas
+and `dense` packing are not implemented.
+
+## Running layout and reading geometry
+
+```c
+rd_ctx_layout(ctx, 800, 600);  // rd_update does this for you in a raylib app
+rd_rect m = rd_node_rect(ctx, middle);    // relative to the parent's border box
+rd_rect h = rd_node_bounds(ctx, header);  // relative to the root, after scrolling
+```
+
+| Function               | Returns                                                        |
+| ---------------------- | -------------------------------------------------------------- |
+| `rd_node_rect`         | Border box relative to the parent's border box, before scroll |
+| `rd_node_bounds`       | Border box in root coordinates, after scroll offsets           |
+| `rd_node_box`          | Resolved margin, border and padding insets                     |
+| `rd_node_content_size` | Extent of the padding box and children's margin boxes          |
+| `rd_node_baseline`     | First baseline from the top of the border box, or NaN          |
+
+Layout results are cached per node and reused when neither the node nor its inputs changed.
+
+## Absolute positioning
+
+```c
+rd_node badge = add(ctx, bar,
+                    (rd_style){.position = RD_POSITION_ABSOLUTE,
+                               .inset    = {.top = rd_px(-6), .right = rd_px(-6)},
+                               .width    = rd_px(12),
+                               .height   = rd_px(12)});
+```
+
+An absolute node is positioned against its parent's padding box using `inset`. With both insets on an axis and
+no size, it stretches between them. It takes no space in the parent's
+flex or grid layout.
+
+## Scrolling
+
+```c
+rd_node list = add(ctx, root, (rd_style){.height = rd_px(200), .overflow_y = RD_OVERFLOW_SCROLL});
+for (int i = 0; i < 50; i++) add(ctx, list, (rd_style){.height = rd_px(24)});
+rd_ctx_layout(ctx, 800, 600);
+rd_node_set_scroll(ctx, list, 0, 300);  // clamped to the content: at most 50 * 24 - 200
+```
+
+`overflow_x` and `overflow_y` set to `RD_OVERFLOW_HIDDEN` clip children; `RD_OVERFLOW_SCROLL` also makes the node
+scroll with the wheel. The wheel scrolls the nearest scroll container under the pointer that can move in the gesture's
+direction; once a gesture starts, it stays with that container until the wheel pauses.
+
+## Custom measurement
+
+A leaf node can report its own size with `rd_node_set_measure`. The callback receives a width and height, each with
+a mode:
+
+| Mode                     | Meaning                                       |
+| ------------------------ | --------------------------------------------- |
+| `RD_MEASURE_EXACTLY`     | The size is fixed; return it                  |
+| `RD_MEASURE_AT_MOST`     | Return any size up to the value               |
+| `RD_MEASURE_UNDEFINED`   | Size freely (max-content); the value is NaN   |
+| `RD_MEASURE_MIN_CONTENT` | Return the smallest size without overflow; NaN |
+
+Sizes are content-box. The callback must not change the tree. When the content it measures changes, call
+`rd_node_mark_layout_dirty`.
+
+
+<!-- guide/text.md -->
+
+# Text and fonts
+
+## Fonts
+
+```c
+rd_font body = rd_font_load_file(ctx, FONT_PATH);  // the first font loaded is the default
+rd_font mono = rd_font_load_file(ctx, FONT_PATH);  // stands in for a second font file
+if (body.id == 0) return 1;                        // a null handle means the file couldn't be loaded
+
+rd_node code = rd_node_create(ctx);
+rd_node_set_style(ctx, code, &(rd_style){.font = mono, .font_size = rd_px(13)});  // inherited by the text inside
+rd_node_append(ctx, root, code);
+```
+
+`rd_font_load` takes TrueType or OpenType data in memory. With `copy = false` the data must outlive the context;
+with `true` raydom copies it. `rd_font_load_file` reads and copies a file. Both return a null handle (`id == 0`) on
+failure. The first font loaded becomes the default; `rd_ctx_set_default_font` changes it. In a style,
+`(rd_font){0, true}` means "the default font".
+
+`font` and `font_size` are inherited, so setting them on a container applies them to all the text inside it.
+Glyphs are rasterized on demand into an atlas per font size and display scale.
+
+## Text nodes
+
+```c
+rd_node para = add_text(ctx, root, (rd_style){.color = rd_hex(0xe4e7ee), .line_height = rd_num(1.4f)},
+                        "Text wraps on spaces to the width its container gives it.");
+rd_node_set_text(ctx, para, "New text; the next layout re-measures it.", RD_TEXT_NUL);
+size_t      len;
+const char* now = rd_node_text(ctx, para, &len);
+```
+
+`rd_node_set_text` makes the node a text leaf and copies the UTF-8 string. Pass a length, or `RD_TEXT_NUL` for a
+NUL-terminated string. A text node's size comes from its text; it lays out no children. `rd_node_text` returns the
+stored text, or `NULL` for a node that isn't a text leaf.
+
+`line_height` accepts `rd_num` (a multiple of `font_size`), `rd_px`, or `rd_pct` (of `font_size`).
+
+## Wrapping and overflow
+
+```c
+rd_node log_line = add_text(ctx, root,
+                            (rd_style){.white_space   = RD_WHITE_SPACE_NOWRAP,
+                                       .text_overflow = RD_TEXT_OVERFLOW_ELLIPSIS},
+                            "a single long line that is cut with an ellipsis when it doesn't fit");
+rd_node summary  = add_text(ctx, root,
+                            (rd_style){.line_clamp    = rd_num(3),
+                                       .text_overflow = RD_TEXT_OVERFLOW_ELLIPSIS},
+                            "A paragraph that shows at most three lines and ends the third with an ellipsis.");
+```
+
+| `white_space` | Spaces and newlines | Wraps |
+| ------------- | ------------------- | ----- |
+| `NORMAL`      | Collapsed           | Yes   |
+| `NOWRAP`      | Collapsed           | No    |
+| `PRE`         | Preserved           | No    |
+| `PRE_WRAP`    | Preserved           | Yes   |
+
+Lines break at spaces, and between CJK characters. A word longer than the line isn't broken; it overflows, and
+`text_overflow: ellipsis` cuts it. `text_overflow: ellipsis` replaces
+the end of a line that doesn't fit with "…". With `line_clamp: n`, at most `n` lines are shown, and with ellipsis
+the last shown line ends with "…" when text was cut.
+
+`text_align` aligns each line within the node's content box: `START`, `CENTER` or `END`.
+
+## Highlights
+
+```c
+rd_highlight marks[] = {
+    {.start = 0, .end = 3, .background = rd_hex(0xffd84d), .color = rd_hex(0x15171c)},  // "New"
+};
+rd_node_set_highlights(ctx, para, marks, 1);
+```
+
+Highlights are byte ranges with a background and an optional text color (alpha 0 keeps the node's color). They are
+copied, kept across `rd_node_set_text`, and clamped to the text when drawn. Passing `NULL, 0` clears them. Use them
+for search results or syntax marks; the user's selection is separate.
+
+## Measuring
+
+```c
+float           w = rd_font_measure(ctx, (rd_font){0, true}, 16, "Hello", RD_TEXT_NUL);  // default font
+rd_font_metrics m = rd_font_get_metrics(ctx, body, 16);
+```
+
+`rd_font_measure` returns the advance width of one unwrapped line. `rd_font_get_metrics` returns ascent, descent
+(positive, below the baseline) and line gap in pixels. Both work without layout.
+
+## Selection
+
+Dragging over text whose `user_select` is `auto` (the default) selects it across text nodes, in tree order. The
+selection is also settable from code:
+
+```c
+rd_ctx_select(ctx, para, 0, para, 8);
+char   buf[64];
+size_t n = rd_ctx_selection_text(ctx, buf, sizeof buf);  // "New text"
+```
+
+Offsets are bytes. `rd_ctx_selection_text` writes the selected text, one line per text node, and returns its full
+length, so a first call with `buf = NULL` sizes the buffer. `RD_EVENT_SELECTION_CHANGE` fires on the root when the
+selection changes. Set `user_select: none` on buttons and labels that shouldn't start a selection.
+
+
+<!-- guide/events.md -->
+
+# Events
+
+## Listeners
+
+```cpp
+item.on_click([&] { log.push_back("item"); });                                  // bubble phase, target
+list.on(RD_EVENT_CLICK, [&](rd::Event&) { log.push_back("list bubble"); });     // after the target
+list.on(RD_EVENT_CLICK, [&](rd::Event&) { log.push_back("list capture"); }, true);  // before the target
+```
+
+The C form is:
+
+```c
+rd_listener l = rd_node_on(ctx, node, RD_EVENT_CLICK, on_click, data, free_data, 0);  // or RD_LISTEN_CAPTURE
+rd_node_off(ctx, l);                                                                   // runs free_data
+```
+
+`fn(ctx, ev, data)` receives the event. `destroy(data)` runs when the listener is removed, or when its node is
+destroyed. C++ listeners take `rd::Event&` or nothing; the callable is owned by the listener.
+
+## Propagation
+
+Dispatch follows the DOM. The path from the root to the target is fixed when dispatch starts. Capture listeners run
+from the root down to the target's parent, then the target's listeners run (its capture listeners
+first), then bubble listeners run from the parent up to the root. `ev->phase` says which phase is running; `ev->current` is the node whose listener is running
+and `ev->target` is the node the event is for.
+
+| Call                                  | Effect                                                         |
+| ------------------------------------- | -------------------------------------------------------------- |
+| `rd_event_stop_propagation`           | Finish the current node's listeners, then stop                 |
+| `rd_event_stop_immediate_propagation` | Stop now; later listeners on the same node don't run           |
+| `rd_event_prevent_default`            | Skip raydom's default action (scroll, focus, editing, click)   |
+
+```cpp
+rd::Node row = ctx.create(rd::Style().height(30_px));
+row.on_click([](rd::Event& e) {
+  e.stop_propagation();       // no bubble listeners run; capture listeners already have
+  e.current().destroy();      // safe during dispatch: freed when dispatch ends
+});
+list.append(row);
+```
+
+Stopping at the target doesn't undo capture listeners that already ran on ancestors.
+
+## Event types
+
+| Type                         | Target                     | Bubbles | Default action                     |
+| ---------------------------- | -------------------------- | ------- | ---------------------------------- |
+| `POINTER_DOWN`, `_UP`, `_MOVE` | Node under the pointer, or the capturing node | Yes | Down: focus, start selection |
+| `POINTER_ENTER`, `_LEAVE`    | Each node entered or left  | No      |                                    |
+| `CLICK`                      | Common ancestor of the press and release targets | Yes | |
+| `WHEEL`                      | Node under the pointer     | Yes     | Scroll the nearest scroll container |
+| `KEY_DOWN`, `KEY_UP`         | Focused node, or the root  | Yes     | Down: Tab focus, Enter/Space click, editing |
+| `TEXT`                       | Focused node, or the root  | Yes     | Insert into a focused input        |
+| `FOCUS`, `BLUR`              | The node gaining or losing focus | No |                                  |
+| `FOCUS_IN`, `FOCUS_OUT`      | Same                       | Yes     |                                    |
+| `INPUT`                      | The input                  | Yes     |                                    |
+| `CHANGE`                     | The input                  | Yes     |                                    |
+| `SELECTION_CHANGE`           | The root                   | No      |                                    |
+
+Event fields: `x`, `y` in root coordinates; `local_x`, `local_y` relative to `current`'s border box; `wheel_x`,
+`wheel_y` in notches; `button` (the button that changed) and `buttons` (held mask); `key`, `mods`, `repeat`;
+`codepoint` for text; `related` for focus events.
+
+`CLICK` fires for the primary button only.
+
+## Pointer capture
+
+```cpp
+rd::Node handle = ctx.create(rd::Style().width(20_px).height(20_px));
+float    dragged = 0;
+handle.on(RD_EVENT_POINTER_DOWN, [](rd::Event& e) { e.current().capture_pointer(); });
+handle.on(RD_EVENT_POINTER_MOVE, [&](rd::Event& e) {
+  if (e.buttons() & RD_BUTTON_PRIMARY) dragged = e.local_x();  // keeps arriving outside the handle
+});
+```
+
+While a node holds the capture, every pointer event goes to it, wherever the pointer is, until all buttons are
+released or `rd_node_release_pointer_capture` is called. Use it for drags, sliders and splitters.
+
+## Overriding defaults
+
+```cpp
+rd::Node canvas = ctx.create(rd::Style().height(100_px).overflow_y(RD_OVERFLOW_SCROLL));
+canvas.on(RD_EVENT_WHEEL, [](rd::Event& e) { e.prevent_default(); });  // handle the wheel yourself, no scrolling
+```
+
+## Hit-testing
+
+`rd_node_at(ctx, x, y)` returns the topmost node under a point after layout. Nodes with `pointer_events: none` are
+skipped, and children inherit it unless they set `auto`. Use `none` for overlays and decorative layers that
+shouldn't take the pointer.
+
+## Mutating during dispatch
+
+Listeners may create, move and destroy nodes, including the target and the current node. A node destroyed during
+dispatch is detached at once and freed when dispatch ends, so `ev->current` stays valid until the listener returns.
+A listener added to a node while that node's listeners are running doesn't run for the current event.
+
+
+<!-- guide/input.md -->
+
+# Focus, keyboard and text input
+
+## Focus
+
+A node can take focus when its `focusable` is `TAB` (pointer, code and Tab) or `POINTER` (pointer and code). Inputs
+and nodes with an interactive [role](roles.md), such as buttons from `rd_node_create_button`, are focusable without
+the style. Pressing the primary button focuses the target or its nearest focusable ancestor, and clears focus if there is
+none. A listener that calls `rd_event_prevent_default` on `POINTER_DOWN` keeps focus where it was.
+
+```cpp
+rd::Class button_style = ctx.create_class(rd::Style().padding(6_px, 12_px));
+button_style.on(RD_STATE_FOCUS_VISIBLE, rd::Style().box_shadow(0, 0, 0, rd::rgba(91, 140, 255, 200), 2));
+rd::Node save  = ctx.create_button("Save").add_class(button_style);  // focusable by role
+rd::Node badge = ctx.create(rd::Style().focusable(RD_FOCUSABLE_TAB));  // any node, by style
+int      saves = 0;
+save.on_click([&] { ++saves; });  // also fires on Enter or Space while focused
+```
+
+Tab and Shift+Tab move through `TAB` nodes in tree order, wrapping, skipping hidden and disabled subtrees.
+`rd_node_focus(ctx, node)` focuses from code; a null node clears focus. `rd_ctx_focus_next` steps like Tab. A focus
+change fires `BLUR`, `FOCUS_OUT`, `FOCUS`, `FOCUS_IN`, in that order.
+
+Enter and Space on a focused node that isn't an input fire `CLICK`, so keyboard users can activate buttons without
+extra code.
+
+## Keyboard
+
+```cpp
+ctx.root().on(RD_EVENT_KEY_DOWN, [&](rd::Event& e) {
+  if (e.key() == RD_KEY_ESCAPE) ctx.blur();
+});
+```
+
+Keys go to the focused node, or the root when nothing has focus, and bubble. `ev->mods` is a mask of
+`RD_MOD_SHIFT`, `RD_MOD_CTRL`, `RD_MOD_ALT`, `RD_MOD_SUPER`. Calling `rd_event_prevent_default` in a `KEY_DOWN`
+listener suppresses Tab navigation, activation, and editing for that key.
+
+## Text inputs
+
+```cpp
+rd::Node name  = ctx.create_input(false, rd::Style().width(240_px)).placeholder("Your name");
+rd::Node notes = ctx.create_input(/*multiline=*/true, rd::Style().min_height(80_px));
+
+std::string value;
+name.on(RD_EVENT_INPUT, [&](rd::Event& e) { value = std::string(e.target().text()); });  // every edit
+name.on(RD_EVENT_CHANGE, [&] { /* Enter, or leaving the field after editing */ });
+```
+
+`rd_node_create_input` creates an input, and `rd_node_make_input` turns an existing node into one: an editable text
+leaf. A single-line input scrolls horizontally; a multi-line
+input (`RD_INPUT_MULTILINE`) wraps and grows. `rd_node_text` reads the value and `rd_node_set_text` replaces it.
+`rd_input_select` and `rd_input_selection` set and read the selection as byte offsets; the caret is the moving end.
+
+`INPUT` fires after every edit. `CHANGE` fires when edits are committed: Enter in a single-line input, or blur after
+an edit.
+
+Editing keys, with Shortcut meaning Cmd on macOS and Ctrl elsewhere, and Word meaning Option on macOS and Ctrl
+elsewhere:
+
+| Keys                        | Action                                  |
+| --------------------------- | --------------------------------------- |
+| Arrows, Home, End           | Move; Shift extends the selection       |
+| Word + Left/Right           | Move by word                            |
+| Shortcut + Home/End         | Start or end of the value               |
+| Backspace, Delete           | Delete; Word deletes a word; on macOS, Cmd deletes to the line edge |
+| Shortcut + A                | Select all                              |
+| Shortcut + C, X, V          | Copy, cut, paste                        |
+| Shortcut + Z                | Undo; with Shift, redo                  |
+| Shortcut + Y                | Redo                                    |
+| Enter                       | Newline in multi-line; `CHANGE` in single-line |
+
+Consecutive typed characters form one undo step.
+
+## Clipboard
+
+Inputs use an in-memory clipboard by default. `rd_update` installs raylib's system clipboard. Without raylib, provide
+one:
+
+```c
+rd_ctx_set_clipboard(ctx, get_text, set_text, data);
+```
+
+## Driving input in tests
+
+The C++ context has `press(key)` and `type(utf8)` helpers over `rd_ctx_key` and `rd_ctx_text`:
+
+```cpp
+ctx.press(RD_KEY_TAB);  // focus moves to the first focusable node: name
+ctx.type("Ada");        // text events, one per codepoint
+ctx.press(RD_KEY_TAB);  // notes
+ctx.press(RD_KEY_TAB);  // save
+ctx.press(RD_KEY_ENTER);
+```
+
+
+<!-- guide/roles.md -->
+
+# Roles
+
+A role says what a node is: a button, a heading, a text input. raydom doesn't draw or behave differently by role,
+with one exception below. Roles exist so a future accessibility backend can describe the tree to screen readers
+without every application revisiting its controls. Set them now and that work becomes a backend change only.
+
+## Constructors
+
+The direct way to get a role is to create the node with one:
+
+| C                               | C++                              | Role                                  |
+| ------------------------------- | -------------------------------- | ------------------------------------- |
+| `rd_node_create_text(ctx, s, n)`| `ctx.create_text(s, style)`      | text                                  |
+| `rd_node_create_button(ctx, s, n)` | `ctx.create_button(s, style)` | button, with a text label            |
+| `rd_node_create_button(ctx, NULL, 0)` | `ctx.create_button(style)` | button, empty, for icon or composite content |
+| `rd_node_create_input(ctx, flags)` | `ctx.create_input(multiline, style)` | text input or multi-line text input |
+
+```cpp
+#include <raydom/raydom.hh>
+#include <raylib.h>
+
+#include <string>
+
+using namespace rd::literals;
+
+int main() {
+  SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
+  InitWindow(800, 600, "hello");
+  {
+    rd::Context ctx;
+    ctx.load_font_file(FONT_PATH);  // any .ttf or .otf file
+
+    rd::Class button_style = ctx.create_class(rd::Style()
+                                                  .padding(8_px, 16_px)
+                                                  .border_radius(8_px)
+                                                  .background(rd::hex(0x5b8cff))
+                                                  .color(rd::hex(0xffffff)));
+    button_style.on(RD_STATE_HOVER, rd::Style().background(rd::hex(0x7aa2ff)));
+
+    int      clicks = 0;
+    rd::Node label  = ctx.create_text("Clicked 0 times", rd::Style().color(rd::hex(0xe4e7ee)));
+    rd::Node button = ctx.create_button("Click me").add_class(button_style);  // Tab focuses it; Enter and Space click it
+    button.on_click([&] { label.text("Clicked " + std::to_string(++clicks) + " times"); });
+
+    ctx.root()
+        .style(rd::Style().padding(24_px).row_gap(12_px).align_items(RD_ALIGN_START))
+        .append(button)
+        .append(label);
+
+    while (!WindowShouldClose()) {
+      ctx.update();
+      BeginDrawing();
+      ClearBackground(BLACK);
+      ctx.draw();
+      EndDrawing();
+    }
+  }  // the context is destroyed here, before CloseWindow
+  CloseWindow();
+}
+```
+
+Each returns a detached node, or a null node on allocation failure.
+
+## Setting a role
+
+```c
+rd_node_set_role(ctx, title, RD_ROLE_HEADING);
+rd_node_set_role(ctx, menu, RD_ROLE_LIST);
+rd_role r = rd_node_role(ctx, node);
+```
+
+`RD_ROLE_AUTO`, the default, derives the role from the node: multi-line or single-line text input for inputs, text
+for other text leaves, canvas for nodes with a paint callback, and generic otherwise. `rd_node_role` returns the
+resolved role. Setting `RD_ROLE_AUTO` returns a node to its derived role.
+
+The roles are a subset of [AccessKit](https://accesskit.dev/)'s: generic, group, button, link, checkbox, radio
+button, text, label, heading, text input, multi-line text input, list, list item, image, canvas. More can be added
+in a minor release.
+
+## Focus
+
+Interactive roles (button, link, checkbox, radio button) take focus without a `focusable` style, as inputs do:
+
+- Tab reaches them, unless their `focusable` is `POINTER`, which keeps pointer focus and skips Tab.
+- Enter and Space on a focused one fire `CLICK`, as for any focused node that isn't an input.
+- To take one out of focus and pointer input, set `RD_STATE_DISABLED` on it.
+
+Roles carry no other behavior. A checkbox doesn't toggle itself; the application tracks its state and styles it.
+
+
+<!-- guide/canvas.md -->
+
+# Canvases
+
+A paint callback lets a node draw with raylib directly. The node is laid out and styled as usual; the callback draws
+inside its content box.
+
+```c
+typedef struct chart {
+  float values[5];
+} chart;
+
+static void paint_chart(rd_ctx* ctx, const rd_paint_info* info, void* data) {
+  (void)ctx;
+  const chart* c = data;
+  rd_rect      r = info->content;  // screen coordinates, already scrolled
+  rd_paint_scissor(info);          // clip to the visible part of the node
+  float bar = r.width / 5;
+  for (int i = 0; i < 5; i++) {
+    float h = r.height * c->values[i];
+    DrawRectangleRec((Rectangle){r.x + bar * (float)i + 4, r.y + r.height - h, bar - 8, h}, SKYBLUE);
+  }
+}
+```
+
+```c
+static chart data = {{0.2f, 0.5f, 0.9f, 0.4f, 0.7f}};
+rd_node      plot = rd_node_create(ctx);
+rd_node_set_style(ctx, plot, &(rd_style){.height = rd_px(240), .margin = rd_edges_all(rd_px(20))});
+rd_node_set_paint(ctx, plot, paint_chart, &data, NULL);  // NULL: nothing to free when the node goes away
+rd_node_append(ctx, rd_ctx_root(ctx), plot);
+```
+
+The callback runs inside `rd_draw`, after the node's background and border and before its children, so children
+draw on top. raydom flushes raylib's batch before the call, with no scissor or shader active.
+
+`rd_paint_info` has:
+
+| Field     | Meaning                                                            |
+| --------- | ------------------------------------------------------------------ |
+| `content` | The node's content box in screen coordinates, after scrolling      |
+| `clip`    | The part of the screen left visible by enclosing overflow containers |
+| `dpi`     | Device pixels per logical pixel                                    |
+
+`rd_paint_scissor(info)` clips raylib drawing to the content box within `clip`; raydom ends the scissor after the
+callback. Restore any other raylib state you change. Rendering to a texture with `BeginTextureMode` inside the
+callback is safe.
+
+C++: `node.paint([](const rd_paint_info& info) { ... })`, with the callable owned by the node.
+
+Pair a canvas with listeners on the same node for interaction: pointer events carry `local_x` and `local_y`
+relative to the node's border box. Use the paint callback for drawing only; it must not change the tree.
+
+The [network view](../extras/graph.md) is built on this.
+
+
+<!-- cpp/overview.md -->
+
+# The C++ layer
+
+`<raydom/raydom.hh>` wraps the C API in namespace `rd`. It is header-only, needs C++20, and doesn't throw. Failures
+are reported the same way as in C: null handles and `false`.
+
+| C++               | C                    | Ownership                                     |
+| ----------------- | -------------------- | --------------------------------------------- |
+| `rd::Context`     | `rd_ctx*`            | Owns the context; move-only; destroys it      |
+| `rd::Node`        | `rd_ctx*` + `rd_node`| Non-owning value, like the C handle           |
+| `rd::Class`       | `rd_ctx*` + `rd_class` | Non-owning                                  |
+| `rd::Style`       | `rd_style`           | Value; builder methods                        |
+| `rd::Event`       | `rd_event*`          | Valid only inside the listener                |
+
+`get()` and `handle()` return the C values, so C and C++ calls can be mixed freely on one context.
+
+## Styles
+
+`rd::Style` has one chainable setter per property, named as in the [reference](../reference/properties.md), plus
+overloads for common shapes:
+
+```cpp
+using namespace rd::literals;
+
+rd::Style()
+    .padding(8_px, 16_px)                             // vertical, horizontal; also (all) and (t, r, b, l)
+    .border_radius(6_px)                              // all corners
+    .box_shadow(0, 4, 12, rd::rgba(0, 0, 0, 120))     // x, y, blur, color, spread = 0
+    .grid_auto_rows(40_px)                            // any rd_val becomes a track
+    .gap(8_px)                                        // row_gap and column_gap
+    .flex(1);                                         // grow 1, shrink 1, basis 0
+```
+
+Literals: `_px`, `_pct`, `_fr`. Functions: `rd::px`, `rd::pct`, `rd::num`, `rd::fr`, `rd::hex`, `rd::rgb`,
+`rd::rgba`, `rd::line`, `rd::span`, `rd::minmax`, `rd::repeat`. Constants: `rd::auto_`, `rd::min_content`,
+`rd::max_content`. `-5_px` works for negative offsets.
+
+## Callbacks
+
+`node.on(type, f, capture)`, `node.on_click(f)`, `node.paint(f)` and `node.measure(f)` take any callable. The
+callable is moved into a heap allocation owned by raydom and deleted when the listener is removed or the node is
+destroyed. Captured references must outlive the node, or the listener must be removed first.
+
+`node.emplace_userdata<T>(args...)` constructs a `T` owned by the node; `node.userdata<T>()` returns it.
+
+## The quickstart, annotated
+
+```cpp
+#include <raydom/raydom.hh>
+#include <raylib.h>
+
+#include <string>
+
+using namespace rd::literals;
+
+int main() {
+  SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
+  InitWindow(800, 600, "hello");
+  {
+    rd::Context ctx;
+    ctx.load_font_file(FONT_PATH);  // any .ttf or .otf file
+
+    rd::Class button_style = ctx.create_class(rd::Style()
+                                                  .padding(8_px, 16_px)
+                                                  .border_radius(8_px)
+                                                  .background(rd::hex(0x5b8cff))
+                                                  .color(rd::hex(0xffffff)));
+    button_style.on(RD_STATE_HOVER, rd::Style().background(rd::hex(0x7aa2ff)));
+
+    int      clicks = 0;
+    rd::Node label  = ctx.create_text("Clicked 0 times", rd::Style().color(rd::hex(0xe4e7ee)));
+    rd::Node button = ctx.create_button("Click me").add_class(button_style);  // Tab focuses it; Enter and Space click it
+    button.on_click([&] { label.text("Clicked " + std::to_string(++clicks) + " times"); });
+
+    ctx.root()
+        .style(rd::Style().padding(24_px).row_gap(12_px).align_items(RD_ALIGN_START))
+        .append(button)
+        .append(label);
+
+    while (!WindowShouldClose()) {
+      ctx.update();
+      BeginDrawing();
+      ClearBackground(BLACK);
+      ctx.draw();
+      EndDrawing();
+    }
+  }  // the context is destroyed here, before CloseWindow
+  CloseWindow();
+}
+```
+
+- `button_style` is an `rd::Class`: a shared style, not a node. `button_style.on(RD_STATE_HOVER, ...)` is the C++
+  form of `rd_class_set_state`.
+- `create_text(s, style)` creates a text node. `create_button(s, style)` does the same with the button
+  [role](../guide/roles.md), which makes it focusable and activatable with Enter and Space.
+- `append` returns the parent, so a subtree builds in one expression.
+- The lambda captures `label` by reference; both live in the same scope as the context.
+
+
+<!-- extras/graph.md -->
+
+# Network view
+
+`raydom::extras` provides `rdx_graph`, a view of nodes and edges for simulators and tools: lit 3D spheres, straight
+edges with optional arrows and labels, and messages drawn in flight. It is built on a [canvas](../guide/canvas.md)
+and lives in its own library so the core stays free of widgets.
+
+```cmake
+target_link_libraries(your_app PRIVATE raydom::extras)
+```
+
+```cpp
+#include <raydom/extras/graph.hh>  // or graph.h for C
+```
+
+## Creating a view
+
+```cpp
+rd::Node   canvas = ctx.create(rd::Style().flex(1));
+rdx::Graph graph  = rdx::Graph::create(canvas);
+graph.background(rd::hex(0x0b0d12));
+graph.label_class().set(rd::Style().font_size(12_px).color(rd::hex(0xe4e7ee)));
+ctx.root().append(canvas);
+```
+
+`rdx_graph_create(ctx, host)` turns `host` into the view. The graph lives until the host node is destroyed; there is
+no separate destroy call. Node labels are text nodes under the host, styled with the class returned by
+`label_class()`.
+
+## Nodes and edges
+
+```cpp
+std::vector<rdx_node> nodes;
+for (const char* name : {"A", "B", "C", "D", "E"}) nodes.push_back(graph.add_node({0, 0}, rd::hex(0x6c7385), name));
+graph.layout_circle(nodes, {0, 0}, 160);
+for (std::size_t i = 0; i < nodes.size(); i++)
+  graph.connect(nodes[i], nodes[(i + 1) % nodes.size()], {.color = rd::hex(0x2a3142), .width = 1.5f});
+graph.fit(60);
+```
+
+Positions are world units on a plane, y down. `rdx_node` and `rdx_edge` are generational handles, like `rd_node`.
+Removing a node removes its edges. `fit(padding)` frames every node; `view(center, zoom)` sets the camera.
+
+Defaults: node radius 20 world units, edge width 2 screen pixels, message radius 6 world units.
+
+## Interaction
+
+Dragging the background pans, and the wheel zooms about the pointer, between 0.1x and 10x. With
+`RDX_GRAPH_DRAG_NODES`, dragging a node moves it. `RDX_GRAPH_NO_GRID` hides the background grid.
+
+```cpp
+graph.on([&](rdx_graph_event ev, rdx_node n) {
+  if (ev == RDX_EVENT_NODE_CLICK) graph.select(n);
+});
+```
+
+| Event                   | When                                                   |
+| ----------------------- | ------------------------------------------------------ |
+| `RDX_EVENT_NODE_ENTER`  | Pointer moves onto a node                              |
+| `RDX_EVENT_NODE_LEAVE`  | Pointer leaves a node                                  |
+| `RDX_EVENT_NODE_CLICK`  | Press and release on the same node without dragging    |
+| `RDX_EVENT_NODE_DRAG`   | A node moved, with `RDX_GRAPH_DRAG_NODES`              |
+| `RDX_EVENT_VIEW`        | The view panned or zoomed                              |
+
+## Messages
+
+The graph has no clock. Each frame, pass the messages in flight with their progress from 0 (at `from`) to 1 (at
+`to`); the call replaces the previous set.
+
+```cpp
+float progress = t - static_cast<float>(static_cast<int>(t));  // your simulation decides this
+graph.messages({{nodes[0], nodes[1], progress, rd::hex(0x5b8cff), 6}});
+```
+
+The `network` example in the repository is a Paxos simulator built this way.
+
+
+<!-- reference/properties.md -->
+
+# Style properties
+
+Every field of `rd_style`, generated from the `RD_STYLE_PROPS` X-macro in `include/raydom/style.h` and the defaults
+in `src/style.c` at this version.
+
+- **Default** is the value a node has when nothing sets the property and it isn't inherited.
+- *inherited* properties take the parent's computed value when unset.
+- *paint only* properties change drawing without triggering layout. All others trigger relayout when they change.
+
+In C++, each property is a setter of the same name on `rd::Style`. Enumerated values are written in full in C, for
+example `RD_DISPLAY_GRID`.
+
+## Box model
+
+| Property | Default | Description |
+| -------- | ------- | ----------- |
+| `display` | `FLEX` | Layout mode of the node's children; `NONE` removes the node from layout, drawing and hit-testing.<br>*[`rd_display`](#rd-display)* |
+| `position` | `RELATIVE` | `ABSOLUTE` takes the node out of flow and places it against the parent's padding box with `inset`.<br>*[`rd_position`](#rd-position)* |
+| `width` | `auto` | Border-box width.<br>*`rd_val`* |
+| `height` | `auto` | Border-box height.<br>*`rd_val`* |
+| `min_width` | `auto` | Lower bound on width. `auto` is 0.<br>*`rd_val`* |
+| `min_height` | `auto` | Lower bound on height. `auto` is 0.<br>*`rd_val`* |
+| `max_width` | `auto` | Upper bound on width. `auto` is none.<br>*`rd_val`* |
+| `max_height` | `auto` | Upper bound on height. `auto` is none.<br>*`rd_val`* |
+| `margin` | `0px` | Outer spacing. `auto` margins absorb free space in flex layout.<br>*`rd_edges`* |
+| `padding` | `0px` | Inner spacing. Percentages resolve against the containing block's width.<br>*`rd_edges`* |
+| `border_width` | `0px` | Border thickness per side, in pixels.<br>*`rd_edges`* |
+| `inset` | `auto` | Offsets from the containing block for absolute nodes; relative offsets otherwise.<br>*`rd_edges`* |
+| `overflow_x` | `VISIBLE` | `HIDDEN` clips children horizontally; `SCROLL` clips and scrolls.<br>*[`rd_overflow`](#rd-overflow)* |
+| `overflow_y` | `VISIBLE` | `HIDDEN` clips children vertically; `SCROLL` clips and scrolls.<br>*[`rd_overflow`](#rd-overflow)* |
+
+## Flexbox
+
+| Property | Default | Description |
+| -------- | ------- | ----------- |
+| `flex_direction` | `COLUMN` | Main axis of a flex container.<br>*[`rd_flex_direction`](#rd-flex-direction)* |
+| `flex_wrap` | `NOWRAP` | Whether flex items wrap onto several lines.<br>*[`rd_flex_wrap`](#rd-flex-wrap)* |
+| `flex_grow` | `0` | Share of positive free space, as `rd_num`.<br>*`rd_val`* |
+| `flex_shrink` | `0` | Share of negative free space, weighted by basis, as `rd_num`. Default 0: items don't shrink.<br>*`rd_val`* |
+| `flex_basis` | `auto` | Main size before free space is distributed.<br>*`rd_val`* |
+
+## Alignment and gaps
+
+| Property | Default | Description |
+| -------- | ------- | ----------- |
+| `justify_content` | `NORMAL` | Distribution of items along the main axis (flex) or of tracks along the row axis (grid).<br>*[`rd_align`](#rd-align)* |
+| `align_items` | `STRETCH` | Default cross-axis alignment of the children.<br>*[`rd_align`](#rd-align)* |
+| `align_self` | `AUTO` | Cross-axis alignment of this item; `AUTO` uses the parent's `align_items`.<br>*[`rd_align`](#rd-align)* |
+| `align_content` | `NORMAL` | Distribution of flex lines or grid rows along the cross axis.<br>*[`rd_align`](#rd-align)* |
+| `justify_items` | `STRETCH` | Grid: default inline-axis alignment of items in their areas.<br>*[`rd_align`](#rd-align)* |
+| `justify_self` | `AUTO` | Grid: inline-axis alignment of this item; `AUTO` uses the parent's `justify_items`.<br>*[`rd_align`](#rd-align)* |
+| `row_gap` | `0px` | Space between rows, or between items in a column flex container.<br>*`rd_val`* |
+| `column_gap` | `0px` | Space between columns, or between items in a row flex container.<br>*`rd_val`* |
+
+## Grid
+
+| Property | Default | Description |
+| -------- | ------- | ----------- |
+| `grid_template_columns` | none | Explicit column tracks, from `rd_tracks_create`.<br>*`rd_tracks`* |
+| `grid_template_rows` | none | Explicit row tracks, from `rd_tracks_create`.<br>*`rd_tracks`* |
+| `grid_auto_columns` | `auto` | Size of implicitly created columns.<br>*`rd_track`* |
+| `grid_auto_rows` | `auto` | Size of implicitly created rows.<br>*`rd_track`* |
+| `grid_auto_flow` | `ROW` | Whether auto-placement fills rows or columns first.<br>*[`rd_grid_flow`](#rd-grid-flow)* |
+| `grid_column_start` | `auto` | Start line or span of the item's columns.<br>*`rd_grid_line`* |
+| `grid_column_end` | `auto` | End line or span of the item's columns.<br>*`rd_grid_line`* |
+| `grid_row_start` | `auto` | Start line or span of the item's rows.<br>*`rd_grid_line`* |
+| `grid_row_end` | `auto` | End line or span of the item's rows.<br>*`rd_grid_line`* |
+
+## Paint
+
+| Property | Default | Description |
+| -------- | ------- | ----------- |
+| `background` | transparent | Fill of the border box, inside the rounded corners.<br>*`rd_color`, paint only* |
+| `border_color` | transparent | Color of the border.<br>*`rd_color`, paint only* |
+| `border_radius` | `0px` | Corner radii.<br>*`rd_corners`, paint only* |
+| `opacity` | `1` | Opacity of the node and its subtree, 0 to 1, as `rd_num`.<br>*`rd_val`, paint only* |
+| `box_shadow` | none | Outer shadow: offset, blur, spread and color.<br>*`rd_shadow`, paint only* |
+
+## Text
+
+| Property | Default | Description |
+| -------- | ------- | ----------- |
+| `color` | `rgba(0, 0, 0, 255)` | Text color.<br>*`rd_color`, inherited, paint only* |
+| `font` | default font | Font handle from `rd_font_load`; `{0, true}` is the default font.<br>*`rd_font`, inherited* |
+| `font_size` | `16px` | Text size in pixels.<br>*`rd_val`, inherited* |
+| `line_height` | `1.2` | Line box height: `rd_num` times `font_size`, `rd_px`, or `rd_pct` of `font_size`.<br>*`rd_val`, inherited* |
+| `white_space` | `NORMAL` | Collapsing of spaces and newlines, and whether lines wrap.<br>*[`rd_white_space`](#rd-white-space), inherited* |
+| `text_overflow` | `CLIP` | Treatment of text cut by the box or by `line_clamp`.<br>*[`rd_text_overflow`](#rd-text-overflow), paint only* |
+| `line_clamp` | `0` | Maximum number of lines shown, as `rd_num`; 0 is unlimited.<br>*`rd_val`* |
+| `text_align` | `START` | Horizontal alignment of each line in the content box.<br>*[`rd_text_align`](#rd-text-align), inherited, paint only* |
+| `user_select` | `AUTO` | Whether dragging over the text selects it.<br>*[`rd_user_select`](#rd-user-select), inherited, paint only* |
+| `caret_color` | transparent | Input caret color; transparent uses `color`.<br>*`rd_color`, inherited, paint only* |
+| `selection_color` | `rgba(91, 140, 255, 90)` | Background of selected text.<br>*`rd_color`, inherited, paint only* |
+
+## Interaction
+
+| Property | Default | Description |
+| -------- | ------- | ----------- |
+| `pointer_events` | `AUTO` | `NONE` makes the node invisible to hit-testing.<br>*[`rd_pointer_events`](#rd-pointer-events), inherited, paint only* |
+| `focusable` | `NONE` | Whether the node takes focus, and whether Tab reaches it.<br>*[`rd_focusable`](#rd-focusable), paint only* |
+
+## Enumerations
+
+### rd_display
+
+`RD_DISPLAY_*`: `FLEX`, `GRID`, `NONE`
+
+### rd_position
+
+`RD_POSITION_*`: `RELATIVE`, `ABSOLUTE`
+
+### rd_overflow
+
+`RD_OVERFLOW_*`: `VISIBLE`, `HIDDEN`, `SCROLL`
+
+### rd_flex_direction
+
+`RD_FLEX_*`: `ROW`, `COLUMN`, `ROW_REVERSE`, `COLUMN_REVERSE`
+
+### rd_flex_wrap
+
+`RD_FLEX_*`: `NOWRAP`, `WRAP`, `WRAP_REVERSE`
+
+### rd_align
+
+`RD_ALIGN_*`: `AUTO`, `NORMAL`, `START`, `END`, `CENTER`, `STRETCH`, `BASELINE`, `SPACE_BETWEEN`, `SPACE_AROUND`, `SPACE_EVENLY`
+
+### rd_grid_flow
+
+`RD_GRID_FLOW_*`: `ROW`, `COLUMN`
+
+### rd_white_space
+
+`RD_WHITE_SPACE_*`: `NORMAL`, `NOWRAP`, `PRE`, `PRE_WRAP`
+
+### rd_text_overflow
+
+`RD_TEXT_OVERFLOW_*`: `CLIP`, `ELLIPSIS`
+
+### rd_text_align
+
+`RD_TEXT_ALIGN_*`: `START`, `CENTER`, `END`
+
+### rd_user_select
+
+`RD_USER_SELECT_*`: `AUTO`, `NONE`
+
+### rd_pointer_events
+
+`RD_POINTER_EVENTS_*`: `AUTO`, `NONE`
+
+### rd_focusable
+
+`RD_FOCUSABLE_*`: `NONE`, `TAB`, `POINTER`
+
+
+<!-- reference/values.md -->
+
+# Values and units
+
+## Lengths: `rd_val`
+
+| Constructor          | C++               | Meaning                                    |
+| -------------------- | ----------------- | ------------------------------------------ |
+| `rd_px(v)`           | `v_px`            | Logical pixels                             |
+| `rd_pct(v)`          | `v_pct`           | Percent of the containing block            |
+| `rd_num(v)`          | `rd::num(v)`      | Unitless: flex factors, opacity, line height multiple, line clamp |
+| `rd_fr(v)`           | `v_fr`            | Grid fraction of free space                |
+| `rd_auto()`          | `rd::auto_`       | Automatic                                  |
+| `rd_min_content()`   | `rd::min_content` | Grid tracks: smallest size without overflow |
+| `rd_max_content()`   | `rd::max_content` | Grid tracks: size without wrapping          |
+
+Percentages of width resolve against the containing block's width. Percentages of height resolve against its height
+when that is definite, and are treated as `auto` otherwise. Padding and margin percentages resolve against the
+width on every side, as in CSS.
+
+Logical pixels are scaled by raylib's DPI scale when drawn; layout never sees device pixels.
+
+## Colors: `rd_color`
+
+`rd_hex(0xRRGGBB)` (opaque), `rd_rgb(r, g, b)`, `rd_rgba(r, g, b, a)`. A zero `rd_color` is unset. Transparent is
+`rd_rgba(0, 0, 0, 0)`, which is set.
+
+## Edges and corners
+
+`rd_edges` is `{top, right, bottom, left}`; `rd_edges_all(v)` and `rd_edges_vh(vertical, horizontal)` build it.
+`rd_corners` is `{top_left, top_right, bottom_right, bottom_left}`; `rd_corners_all(v)` builds it. Each side is an
+independent `rd_val`, so `.padding.left = rd_px(4)` sets one side and leaves the others unset.
+
+## Shadows
+
+`rd_shadow` is `{x, y, blur, spread, color}`. `rd_shadow_of(x, y, blur, color)` builds one with zero spread.
+
+## Grid
+
+| Constructor                | Meaning                                       |
+| -------------------------- | --------------------------------------------- |
+| `rd_track_of(v)`           | A track sized `v`; `fr` becomes `minmax(auto, fr)` |
+| `rd_track_minmax(min, max)`| A track between two sizes                     |
+| `rd_tracks_create(ctx, a, n)` | Interns a track list; returns a handle     |
+| `rd_tracks_none()`         | No explicit tracks                            |
+| `rd_line(n)`               | A grid line, 1-based; negative from the end   |
+| `rd_span(n)`               | Span `n` tracks                               |
+| `rd_line_auto()`           | Auto placement                                |
+
+## Unset
+
+Zero means unset for every style type. That is what makes `&(rd_style){.width = rd_px(10)}` set only the width,
+and it is why `rd_node_merge_style` can tell which fields to copy.
+
+
+<!-- reference/limits.md -->
+
+# Limits
+
+What raydom doesn't do in this version. Behavior outside these limits is unspecified.
+
+## Layout
+
+- No `display: block` or `inline`; every container is flex or grid. Text nodes are leaves.
+- Grid: no named lines, no named areas, no `dense` auto-flow, no `repeat(auto-fill)`.
+- No `position: fixed` or `sticky`.
+- No `z-index`; children draw in tree order, later siblings on top.
+- No `aspect_ratio`, no `transform`.
+- `min_width`/`min_height` `auto` is 0, not the content size.
+
+## Text
+
+- One font per text node. No rich text inside a node; use several text nodes in a row.
+- No shaping: no ligatures, no contextual forms, no bidirectional text. Pair kerning from the font is applied. Latin, Cyrillic,
+  Greek and CJK display; Arabic and Indic scripts don't shape correctly.
+- No hyphenation. Words longer than the line overflow.
+- No double- or triple-click word or line selection.
+
+## Input
+
+- No IME composition events. Text input is one codepoint at a time from raylib.
+- No touch or gesture input beyond what raylib reports as the mouse.
+- No accessibility tree.
+
+## Rendering
+
+- No images or textures as node backgrounds; use a canvas.
+- Shadows are outer box shadows only.
+- No gradients.
+
+## Threads
+
+A context is single-threaded. Separate contexts on separate threads don't share state, but raylib drawing must
+happen on the thread that owns the window.
+
+
+<!-- agents.md -->
+
+# For AI agents
+
+This page is for coding agents and the tools that feed them. It states the facts an agent needs to write correct
+raydom code, in a form that is cheap to retrieve.
+
+## Machine-readable copies
+
+Every published version of this book has, next to its HTML:
+
+| Path              | Contents                                                       |
+| ----------------- | -------------------------------------------------------------- |
+| `llms.txt`        | Index of pages with one-line descriptions, per [llmstxt.org](https://llmstxt.org/) |
+| `llms-full.txt`   | The whole book as one Markdown file, code samples inlined      |
+| `<page>.md`       | Each page as Markdown, at the HTML page's path with `.md`      |
+
+Use the copy under the version that matches the project's `GIT_TAG` or `find_package` version, for example
+`/v0.1.1/llms-full.txt`. `/latest/` follows the newest release; `/dev/` follows the main branch and may
+describe unreleased API.
+
+The headers are the ground truth. `include/raydom/*.h` documents every function in a comment above it, and
+`include/raydom/style.h` defines every style property in the `RD_STYLE_PROPS` X-macro.
+
+## Rules
+
+1. Create the context after `InitWindow` and destroy it before `CloseWindow`. In C++, scope `rd::Context` in a block
+   that ends before `CloseWindow`.
+2. Load a font before creating text. There is no built-in font.
+3. Call `rd_update` before `BeginDrawing` and `rd_draw` between `BeginDrawing` and `EndDrawing`, once per frame.
+4. A new node is detached. Append it under `rd_ctx_root(ctx)` or a descendant, or it isn't drawn.
+5. `rd_style` fields left out are unset, and unset fields fall through to classes, inheritance and defaults.
+   Write `&(rd_style){.width = rd_px(100)}`. Never pass a computed style as an inline style: it sets every
+   property and overrides all classes.
+6. The default `flex_direction` is column and the default `flex_shrink` is 0. Set `flex_direction = RD_FLEX_ROW`
+   for rows. Set `flex_shrink` explicitly if items must shrink.
+7. Inline styles beat class state variants. Put hover, focus and active styling in classes.
+8. Lengths need units: `rd_px(8)`, not `8`. Unitless values (`flex_grow`, `opacity`, `line_clamp`, multiplier
+   `line_height`) use `rd_num`.
+9. Grid track lists are handles: build them with `rd_tracks_create` (C) or `ctx.tracks({...})` (C++).
+10. Handles are values. Store `rd_node`, not pointers. Check `rd_node_alive` when a node may have been destroyed.
+11. Listeners may mutate and destroy nodes, including their own node. A destroyed node is freed when dispatch
+    ends.
+12. Geometry (`rd_node_rect`, `rd_node_bounds`) reflects the last layout. After building or changing the tree
+    outside the frame loop, call `rd_ctx_layout` before reading it.
+13. The C++ layer doesn't throw. Check returned handles and `bool` results where failure matters.
+14. raydom doesn't own the main loop, the window, or time. The application drives all three.
+15. Create controls with their role: `rd_node_create_button` / `ctx.create_button` for buttons, `rd_node_create_input`
+    / `ctx.create_input` for inputs, `rd_node_set_role` for headings, lists, links and checkboxes. Don't build a
+    button from a plain node and a click listener; it gets no role and no default focus.
+
+## Minimal program
+
+```c
+#include <raydom/raydom.h>
+#include <raylib.h>
+
+int main(void) {
+  SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
+  InitWindow(800, 600, "hello");
+  rd_ctx* ctx = rd_ctx_create();
+  rd_font_load_file(ctx, FONT_PATH);  // any .ttf or .otf file
+
+  rd_node card = rd_node_create_text(ctx, "Hello from raydom", RD_TEXT_NUL);
+  rd_node_set_style(ctx, card,
+                    &(rd_style){
+                        .padding       = rd_edges_all(rd_px(16)),
+                        .border_radius = rd_corners_all(rd_px(8)),
+                        .background    = rd_hex(0x1a1f2b),
+                        .color         = rd_hex(0xe4e7ee),
+                    });
+  rd_node_append(ctx, rd_ctx_root(ctx), card);
+
+  while (!WindowShouldClose()) {
+    rd_update(ctx);  // input, then layout at the window size
+    BeginDrawing();
+    ClearBackground(BLACK);
+    rd_draw(ctx);
+    EndDrawing();
+  }
+  rd_ctx_destroy(ctx);  // before CloseWindow, so GPU resources are released
+  CloseWindow();
+}
+```
+
+## Verifying generated code
+
+Headless programs can drive input and assert on results without a window; see
+[The frame loop](getting-started/frame-loop.md#without-raylib-input). The repository's `docs/examples/` holds
+programs of this kind for each chapter.
+
+
+<!-- versioning.md -->
+
+# Versioning
+
+raydom follows [semantic versioning](https://semver.org/). Before 1.0, a minor release may break the API; a patch
+release doesn't. From 1.0, only a major release may break it.
+
+## Documentation versions
+
+Every release tag publishes its own copy of this book, built from the sources at that tag, under `/<tag>/`. A
+published copy is never rebuilt by later releases, so it keeps describing the version it was built from. The
+version menu in the top bar switches between them and keeps the current page when it exists in the target version.
+
+| Path        | Built from                     |
+| ----------- | ------------------------------ |
+| `/vX.Y.Z/`  | The tag `vX.Y.Z`               |
+| `/latest/`  | The newest release tag         |
+| `/dev/`     | The `main` branch              |
+
+The book's code samples are compiled, and the headless ones run, by the test suite at each tag, so a version's
+samples match that version's API.
+
+## Checking a version in code
+
+```c
+#include <raydom/version.h>
+
+#if RD_VERSION_MAJOR == 0 && RD_VERSION_MINOR < 2
+// ...
+#endif
+```
+
+`RD_VERSION_STRING` holds the full version.

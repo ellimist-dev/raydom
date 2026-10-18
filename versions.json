@@ -1,4 +1,6 @@
 {
-  "latest": null,
-  "versions": []
+  "latest": "v0.1.1",
+  "versions": [
+    "v0.1.1"
+  ]
 }

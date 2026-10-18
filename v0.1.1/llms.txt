@@ -1,0 +1,45 @@
+# raydom
+
+> A retained-mode UI tree for raylib, in C23 with a C++20 layer: flexbox and grid layout, CSS-like styles, text, input and drawing.
+
+Each page below is Markdown. `llms-full.txt` is the whole book in one file. Read `agents.md` first.
+
+## Start here
+
+- [Introduction](introduction.md): What raydom is and the context/node/style/frame-loop model.
+- [For AI agents](agents.md): Rules for generating correct raydom code, and where the machine-readable docs are.
+
+## Getting started
+
+- [Installation](getting-started/installation.md): CMake FetchContent and find_package setup, build options, headers.
+- [Quickstart](getting-started/quickstart.md): Complete C and C++ programs that open a window and show styled, clickable text.
+- [The frame loop](getting-started/frame-loop.md): What rd_update and rd_draw do each frame; driving input and layout without raylib.
+
+## Guide
+
+- [Nodes and the tree](guide/tree.md): Creating, moving, walking and destroying nodes; generational handles; userdata.
+- [Styles and classes](guide/styles.md): Inline styles, classes, state variants, precedence order, inheritance, computed styles.
+- [Layout](guide/layout.md): Flexbox and grid, geometry queries, absolute positioning, scrolling, custom measurement.
+- [Text and fonts](guide/text.md): Fonts, text nodes, wrapping, ellipsis, line clamping, highlights, measuring, selection.
+- [Events](guide/events.md): Listeners, capture and bubble, event types and fields, pointer capture, default actions.
+- [Focus, keyboard and text input](guide/input.md): Focus and Tab order, keyboard events, text inputs and their editing keys, clipboard.
+- [Roles](guide/roles.md): Semantic roles and the button/text/input constructors; how roles affect focus.
+- [Canvases](guide/canvas.md): Custom raylib drawing inside a node with paint callbacks.
+
+## C++
+
+- [The C++ layer](cpp/overview.md): The rd:: C++ wrapper: ownership, Style builder, literals, callable listeners.
+
+## Extras
+
+- [Network view](extras/graph.md): rdx_graph network view: nodes, edges, messages, pan/zoom, graph events.
+
+## Reference
+
+- [Style properties](reference/properties.md): Every rd_style property with type, default, inheritance and enum values.
+- [Values and units](reference/values.md): rd_val units, colors, edges, corners, shadows, grid tracks and lines.
+- [Limits](reference/limits.md): Features raydom does not implement in this version.
+
+## Optional
+
+- [Versioning](versioning.md): Semver policy, per-tag documentation paths, version macros.
