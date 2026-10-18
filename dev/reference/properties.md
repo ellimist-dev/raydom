@@ -26,8 +26,6 @@ example `RD_DISPLAY_GRID`.
 | `padding` | `0px` | Inner spacing. Percentages resolve against the containing block's width.<br>*`rd_edges`* |
 | `border_width` | `0px` | Border thickness per side, in pixels.<br>*`rd_edges`* |
 | `inset` | `auto` | Offsets from the containing block for absolute nodes; relative offsets otherwise.<br>*`rd_edges`* |
-| `overflow_x` | `VISIBLE` | `HIDDEN` clips children horizontally; `SCROLL` clips and scrolls.<br>*[`rd_overflow`](#rd-overflow)* |
-| `overflow_y` | `VISIBLE` | `HIDDEN` clips children vertically; `SCROLL` clips and scrolls.<br>*[`rd_overflow`](#rd-overflow)* |
 
 ## Flexbox
 
@@ -75,6 +73,7 @@ example `RD_DISPLAY_GRID`.
 | `border_radius` | `0px` | Corner radii.<br>*`rd_corners`, paint only* |
 | `opacity` | `1` | Opacity of the node and its subtree, 0 to 1, as `rd_num`.<br>*`rd_val`, paint only* |
 | `box_shadow` | none | Outer shadow: offset, blur, spread and color.<br>*`rd_shadow`, paint only* |
+| `object_fit` | `FILL` | How an image node's image fills its content box: stretched, contained, covering, natural size, or scaled down.<br>*[`rd_object_fit`](#rd-object-fit), paint only* |
 
 ## Text
 
@@ -92,12 +91,32 @@ example `RD_DISPLAY_GRID`.
 | `caret_color` | transparent | Input caret color; transparent uses `color`.<br>*`rd_color`, inherited, paint only* |
 | `selection_color` | `rgba(91, 140, 255, 90)` | Background of selected text.<br>*`rd_color`, inherited, paint only* |
 
+## Scrolling
+
+| Property | Default | Description |
+| -------- | ------- | ----------- |
+| `overflow_x` | `VISIBLE` | `HIDDEN` clips children horizontally; `SCROLL` clips and scrolls.<br>*[`rd_overflow`](#rd-overflow)* |
+| `overflow_y` | `VISIBLE` | `HIDDEN` clips children vertically; `SCROLL` clips and scrolls.<br>*[`rd_overflow`](#rd-overflow)* |
+| `scrollbar_width` | `8px` | Thickness of the scrollbars on a `SCROLL` axis; `0px` hides them. They draw over the content edge and take no layout space.<br>*`rd_val`, paint only* |
+| `scrollbar_color` | `rgba(128, 128, 128, 120)` | Scrollbar thumb color; brighter while hovered or dragged.<br>*`rd_color`, inherited, paint only* |
+| `scrollbar_track_color` | transparent | Color behind the thumb; transparent by default.<br>*`rd_color`, inherited, paint only* |
+
 ## Interaction
 
 | Property | Default | Description |
 | -------- | ------- | ----------- |
 | `pointer_events` | `AUTO` | `NONE` makes the node invisible to hit-testing.<br>*[`rd_pointer_events`](#rd-pointer-events), inherited, paint only* |
 | `focusable` | `NONE` | Whether the node takes focus, and whether Tab reaches it.<br>*[`rd_focusable`](#rd-focusable), paint only* |
+| `cursor` | `AUTO` | Mouse cursor over the node. `AUTO` is text over selectable text and inputs, pointer over links, default elsewhere. Set it in an active variant for a drag cursor.<br>*[`rd_cursor`](#rd-cursor), inherited, paint only* |
+
+## Transitions
+
+| Property | Default | Description |
+| -------- | ------- | ----------- |
+| `transition_duration` | `0` | How long changes to this node's style animate, in seconds (`rd_ms(150)`, `rd_s(0.2)`); 0 changes at once.<br>*`rd_val`, paint only* |
+| `transition_delay` | `0` | Seconds to wait before a change starts animating.<br>*`rd_val`, paint only* |
+| `transition_easing` | `EASE` | The timing curve of transitions.<br>*[`rd_easing`](#rd-easing), paint only* |
+| `transition_properties` | `ALL` | Which groups of properties transition, as a mask of `RD_TRANSITION_*` flags.<br>*[`rd_transition`](#rd-transition), paint only* |
 
 ## Enumerations
 
@@ -108,10 +127,6 @@ example `RD_DISPLAY_GRID`.
 ### rd_position
 
 `RD_POSITION_*`: `RELATIVE`, `ABSOLUTE`
-
-### rd_overflow
-
-`RD_OVERFLOW_*`: `VISIBLE`, `HIDDEN`, `SCROLL`
 
 ### rd_flex_direction
 
@@ -129,6 +144,10 @@ example `RD_DISPLAY_GRID`.
 
 `RD_GRID_FLOW_*`: `ROW`, `COLUMN`
 
+### rd_object_fit
+
+`RD_OBJECT_FIT_*`: `FILL`, `CONTAIN`, `COVER`, `NONE`, `SCALE_DOWN`
+
 ### rd_white_space
 
 `RD_WHITE_SPACE_*`: `NORMAL`, `NOWRAP`, `PRE`, `PRE_WRAP`
@@ -145,6 +164,10 @@ example `RD_DISPLAY_GRID`.
 
 `RD_USER_SELECT_*`: `AUTO`, `NONE`
 
+### rd_overflow
+
+`RD_OVERFLOW_*`: `VISIBLE`, `HIDDEN`, `SCROLL`
+
 ### rd_pointer_events
 
 `RD_POINTER_EVENTS_*`: `AUTO`, `NONE`
@@ -152,4 +175,16 @@ example `RD_DISPLAY_GRID`.
 ### rd_focusable
 
 `RD_FOCUSABLE_*`: `NONE`, `TAB`, `POINTER`
+
+### rd_cursor
+
+`RD_CURSOR_*`: `AUTO`, `DEFAULT`, `POINTER`, `TEXT`, `CROSSHAIR`, `MOVE`, `NOT_ALLOWED`, `EW_RESIZE`, `NS_RESIZE`, `NWSE_RESIZE`, `NESW_RESIZE`, `NONE`
+
+### rd_easing
+
+`RD_EASING_*`: `LINEAR`, `EASE`, `EASE_IN`, `EASE_OUT`, `EASE_IN_OUT`
+
+### rd_transition
+
+`RD_TRANSITION_*`: `COLOR`, `OPACITY`, `SHADOW`, `RADIUS`, `SIZE`, `SPACING`, `INSET`, `TEXT`, `ALL`
 

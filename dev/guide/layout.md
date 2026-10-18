@@ -105,6 +105,33 @@ rd_node_set_scroll(ctx, list, 0, 300);  // clamped to the content: at most 50 * 
 scroll with the wheel. The wheel scrolls the nearest scroll container under the pointer that can move in the gesture's
 direction; once a gesture starts, it stays with that container until the wheel pauses.
 
+A `SCROLL` axis whose content overflows shows a scrollbar. Bars draw over the content's edge, inside the padding
+box, and take no layout space, so content doesn't reflow when one appears. Dragging the thumb scrolls; pressing the
+track pages toward the pointer. Presses on a bar never reach the content under it.
+
+```c
+rd_node_merge_style(ctx, list, &(rd_style){
+    .scrollbar_width = rd_px(6),                     // 0px hides the bars; scrolling still works
+    .scrollbar_color = rd_rgba(255, 255, 255, 60),   // inherited, so set it once on the root for a theme
+});
+```
+
+Leave room with `padding` if content shouldn't sit under the bar.
+
+## Layout hooks
+
+`rd_ctx_on_layout(ctx, fn, data, destroy)` runs `fn` after every layout, with that layout's geometry and scroll
+offsets. It's for content that depends on its own geometry: a virtualized list binding the rows that scrolled into
+view, a chat log staying scrolled to its end. If hooks change the tree, layout runs once more before
+`rd_ctx_layout` returns, so the change shows in the same frame; hooks don't run for that second pass.
+
+```c
+static void stick_to_bottom(rd_ctx* ctx, void* data) {
+  rd_node log = *(rd_node*)data;
+  rd_node_set_scroll(ctx, log, 0, 1e9f);  // clamped to the content just laid out
+}
+```
+
 ## Custom measurement
 
 A leaf node can report its own size with `rd_node_set_measure`. The callback receives a width and height, each with

@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-ae0ea313.js";
+            window.path_to_searchindex_js = "../searchindex-a8891df0.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-3d3667e3.js"></script>
+        <script src="../toc-c393df87.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -222,15 +222,15 @@ rd_node_add_class(ctx, ok, primary);  // later classes win: the background is pr
 <li>Defaults (the reference’s Default column).</li>
 <li>The parent’s computed value, for inherited properties.</li>
 <li>Class base styles, in the order the classes were added.</li>
-<li>Class state variants for the node’s current states, ordered by state: <code>hover</code>, <code>focus_within</code>, <code>focus</code>,
-<code>focus_visible</code>, <code>active</code>, <code>disabled</code>. Within one state, later classes win.</li>
+<li>Class state variants for the node’s current states, ordered by state: <code>hover</code>, <code>checked</code>, <code>focus_within</code>,
+<code>focus</code>, <code>focus_visible</code>, <code>active</code>, <code>disabled</code>. Within one state, later classes win.</li>
 <li>The inline style.</li>
 </ol>
 <p>Inline styles beat every class and every state variant. Put anything that should change on hover in a class, not
 inline.</p>
 <h2 id="states"><a class="header" href="#states">States</a></h2>
-<p>raydom sets <code>hover</code>, <code>active</code>, <code>focus</code>, <code>focus_visible</code> and <code>focus_within</code> from input. <code>disabled</code> is set only by the
-application.</p>
+<p>raydom sets <code>hover</code>, <code>active</code>, <code>focus</code>, <code>focus_visible</code> and <code>focus_within</code> from input. <code>checked</code> and <code>disabled</code> are
+set by the application, or by a control such as an extras checkbox.</p>
 <pre><code class="language-c">rd_node_set_states(ctx, ok, RD_STATE_HOVER, true);
 // the hover variant of button_style now beats primary's base background
 </code></pre>
@@ -238,6 +238,15 @@ application.</p>
 pointer move still apply.</p>
 <p><code>focus_visible</code> is set when focus came from the keyboard, or when the focused node is a text input. Use it, not
 <code>focus</code>, for focus rings.</p>
+<h2 id="shared-states"><a class="header" href="#shared-states">Shared states</a></h2>
+<p>A control is usually several nodes: a checkbox is a row holding a box and a label. Its box should look hovered while
+the pointer is anywhere on the row, like CSS’s <code>.row:hover .box</code>. <code>rd_node_set_share_states</code> does that: the node’s
+class variants also apply for its parent’s states, and the sharing chains through parents that share too.</p>
+<pre><code class="language-c">rd_node_set_share_states(ctx, box, true);   // box variants see the row's hover, checked, focus...
+rd_node_set_share_states(ctx, mark, true);  // and the mark inside the box, through it
+rd_node_set_states(ctx, row, RD_STATE_CHECKED, true);
+</code></pre>
+<p>Only class variants see shared states; <code>rd_node_states</code> still returns the node’s own.</p>
 <h2 id="inheritance"><a class="header" href="#inheritance">Inheritance</a></h2>
 <pre><code class="language-c">rd_node child = rd_node_create(ctx);
 rd_node_append(ctx, node, child);

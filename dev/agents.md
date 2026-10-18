@@ -42,10 +42,20 @@ The headers are the ground truth. `include/raydom/*.h` documents every function 
 12. Geometry (`rd_node_rect`, `rd_node_bounds`) reflects the last layout. After building or changing the tree
     outside the frame loop, call `rd_ctx_layout` before reading it.
 13. The C++ layer doesn't throw. Check returned handles and `bool` results where failure matters.
-14. raydom doesn't own the main loop, the window, or time. The application drives all three.
+14. raydom doesn't own the main loop or the window. Time comes from `rd_ctx_set_time`, which `rd_update` calls; use
+    `rd_ctx_set_timer` for delays, and `rd_set_event_waiting` rather than raylib's `EnableEventWaiting`.
 15. Create controls with their role: `rd_node_create_button` / `ctx.create_button` for buttons, `rd_node_create_input`
     / `ctx.create_input` for inputs, `rd_node_set_role` for headings, lists, links and checkboxes. Don't build a
     button from a plain node and a click listener; it gets no role and no default focus.
+16. Put menus, popovers, tooltips and modals in `rd_ctx_overlay(ctx)` with `position: absolute`, and position them
+    with `rd_node_set_anchor`. Don't place them inside the trigger's subtree, where overflow containers clip them.
+17. For checkboxes, switches, radio groups, sliders, toasts, menus, selects, modals, tooltips, tabs, splitters,
+    lists, tables and trees, use the extras components (`rdx_checkbox_create`, `rdx_menu_open`, `rdx_list_create`,
+    ...). Listen for `RD_EVENT_CHANGE`; restyle through `rdx_theme(ctx)`. For more than a few hundred rows use
+    `rdx_list_create` or `rdx_table_create`, which only create the rows in view. Build custom popups on the overlay
+    only when the extras don't fit.
+18. Animate with `transition_duration` on a class (it animates every style change, layout properties and
+    `height: auto` included) or `rd_node_animate` for one-off motion. Don't drive animations from timers by hand.
 
 ## Minimal program
 

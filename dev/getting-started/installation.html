@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-ae0ea313.js";
+            window.path_to_searchindex_js = "../searchindex-a8891df0.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-3d3667e3.js"></script>
+        <script src="../toc-c393df87.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -194,7 +194,8 @@ FetchContent_MakeAvailable(raydom)
 
 target_link_libraries(your_app PRIVATE raydom::raydom)
 </code></pre>
-<p>Link <code>raydom::extras</code> instead to get the <a href="../extras/graph.html">network view</a>; it links <code>raydom::raydom</code> for you.</p>
+<p>Link <code>raydom::extras</code> instead to get the <a href="../extras/graph.html">network view</a> and <a href="../extras/dialog.html">file dialogs</a>;
+it links <code>raydom::raydom</code> for you.</p>
 <p>raylib is resolved in this order: an existing <code>raylib</code> target in the project, an installed raylib found with
 <code>find_package</code>, then a download. Set <code>RAYDOM_FETCH_RAYLIB=OFF</code> to require one of the first two.</p>
 <h2 id="installed-package"><a class="header" href="#installed-package">Installed package</a></h2>
@@ -215,6 +216,7 @@ After 1.0 it accepts any later release with the same major version.</p>
 </thead>
 <tbody>
 <tr><td><code>RAYDOM_BUILD_EXTRAS</code></td><td><code>ON</code></td><td>Build <code>raydom::extras</code></td></tr>
+<tr><td><code>RAYDOM_FILE_DIALOG</code></td><td><code>ON</code></td><td>Native <a href="../extras/dialog.html">file dialogs</a> in extras; needs libdbus on Linux</td></tr>
 <tr><td><code>RAYDOM_FETCH_RAYLIB</code></td><td><code>ON</code></td><td>Download raylib when it can’t be found</td></tr>
 <tr><td><code>RAYDOM_INSTALL</code></td><td>top-level only</td><td>Generate install rules and the CMake package</td></tr>
 <tr><td><code>RAYDOM_BUILD_TESTS</code></td><td>top-level only</td><td>Build the test suite</td></tr>
@@ -234,6 +236,20 @@ After 1.0 it accepts any later release with the same major version.</p>
 <tr><td><code>&lt;raydom/raydom.hh&gt;</code></td><td>The C++ layer; includes the C API</td></tr>
 <tr><td><code>&lt;raydom/extras/graph.h&gt;</code></td><td>Network view, C</td></tr>
 <tr><td><code>&lt;raydom/extras/graph.hh&gt;</code></td><td>Network view, C++</td></tr>
+<tr><td><code>&lt;raydom/extras/controls.h&gt;</code></td><td>Checkbox, switch, radio, slider, C</td></tr>
+<tr><td><code>&lt;raydom/extras/toast.h&gt;</code></td><td>Toasts, C</td></tr>
+<tr><td><code>&lt;raydom/extras/popups.h&gt;</code></td><td>Menus, selects, modals, tooltips, C</td></tr>
+<tr><td><code>&lt;raydom/extras/popups.hh&gt;</code></td><td>Menus, selects, modals, tooltips, C++</td></tr>
+<tr><td><code>&lt;raydom/extras/views.h&gt;</code></td><td>Tabs, splitter, list, table, tree, C</td></tr>
+<tr><td><code>&lt;raydom/extras/views.hh&gt;</code></td><td>Tabs, splitter, list, table, tree, C++</td></tr>
+<tr><td><code>&lt;raydom/extras/theme.h&gt;</code></td><td>Classes behind the controls and toasts</td></tr>
+<tr><td><code>&lt;raydom/extras/controls.hh&gt;</code></td><td>Controls and toasts, C++</td></tr>
+<tr><td><code>&lt;raydom/extras/dialog.h&gt;</code></td><td>File dialogs, C</td></tr>
+<tr><td><code>&lt;raydom/extras/dialog.hh&gt;</code></td><td>File dialogs, C++</td></tr>
+<tr><td><code>&lt;raydom/image.h&gt;</code></td><td>Images and image nodes</td></tr>
+<tr><td><code>&lt;raydom/overlay.h&gt;</code></td><td>The overlay layer and anchored positioning</td></tr>
+<tr><td><code>&lt;raydom/animate.h&gt;</code></td><td>Explicit animations; transitions are style properties</td></tr>
+<tr><td><code>&lt;raydom/timer.h&gt;</code></td><td>Timers</td></tr>
 <tr><td><code>&lt;raydom/role.h&gt;</code></td><td>Roles and the button, text and input constructors</td></tr>
 <tr><td><code>&lt;raydom/version.h&gt;</code></td><td><code>RD_VERSION_MAJOR</code>, <code>_MINOR</code>, <code>_PATCH</code></td></tr>
 </tbody>

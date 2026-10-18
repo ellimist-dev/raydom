@@ -74,12 +74,13 @@ for other text leaves, canvas for nodes with a paint callback, and generic other
 resolved role. Setting `RD_ROLE_AUTO` returns a node to its derived role.
 
 The roles are a subset of [AccessKit](https://accesskit.dev/)'s: generic, group, button, link, checkbox, radio
-button, text, label, heading, text input, multi-line text input, list, list item, image, canvas. More can be added
+button, radio group, switch, slider, text, label, heading, text input, multi-line text input, list, list item, image,
+canvas, menu, menu item, combo box, dialog, tooltip. More can be added
 in a minor release.
 
 ## Focus
 
-Interactive roles (button, link, checkbox, radio button) take focus without a `focusable` style, as inputs do:
+Interactive roles (button, link, checkbox, radio button, switch, slider, menu item, combo box) take focus without a `focusable` style, as inputs do:
 
 - Tab reaches them, unless their `focusable` is `POINTER`, which keeps pointer focus and skips Tab.
 - Enter and Space on a focused one fire `CLICK`, as for any focused node that isn't an input.
