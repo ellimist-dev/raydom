@@ -5,6 +5,7 @@
 #include <raydom/input.h>
 #include <raydom/layout.h>
 #include <raydom/render.h>
+#include <raydom/role.h>
 #include <raydom/style.h>
 #include <raydom/text.h>
 #include <raydom/version.h>

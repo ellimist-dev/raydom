@@ -1,0 +1,80 @@
+# Publishes the book to the gh-pages branch: each tag vX.Y.Z to /vX.Y.Z/, main to /dev/, and the newest
+# tag also to /latest/. Folders from earlier tags are never rebuilt.
+name: docs
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: docs-deploy
+  cancel-in-progress: false
+
+env:
+  MDBOOK_VERSION: v0.5.4
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mdbook
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sSL "https://github.com/rust-lang/mdBook/releases/download/${MDBOOK_VERSION}/mdbook-${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+            | tar -xz -C "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build
+        run: |
+          mdbook build docs
+          python3 docs/tools/llms.py
+
+      - name: Check out gh-pages
+        run: |
+          if git ls-remote --exit-code --heads origin gh-pages >/dev/null; then
+            git fetch --depth 1 origin gh-pages
+            git worktree add site FETCH_HEAD
+          else
+            git worktree add --detach site
+            git -C site checkout --orphan gh-pages
+            git -C site rm -rfq .
+          fi
+
+      - name: Publish
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          name=$([ "$REF_TYPE" = tag ] && echo "$REF_NAME" || echo dev)
+          rm -rf "site/$name" && cp -R docs/book/html "site/$name"
+
+          newest=$(ls site | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          if [ "$REF_TYPE" = tag ] && [ "$name" = "$newest" ]; then
+            rm -rf site/latest && cp -R "site/$name" site/latest
+          fi
+
+          python3 - "$newest" <<'PY'
+          import json, os, re, sys
+          tags = [d for d in os.listdir("site") if re.fullmatch(r"v\d+\.\d+\.\d+", d)]
+          tags.sort(key=lambda t: tuple(int(x) for x in t[1:].split(".")), reverse=True)
+          json.dump({"latest": sys.argv[1] or None, "versions": tags}, open("site/versions.json", "w"), indent=2)
+          target = "latest/" if sys.argv[1] else "dev/"
+          open("site/index.html", "w").write(
+              f'<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0; url={target}">'
+              f'<link rel="canonical" href="{target}"><a href="{target}">{target}</a>\n')
+          PY
+          touch site/.nojekyll
+
+          cd site
+          git add -A
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "docs: $name"
+          git push origin HEAD:gh-pages

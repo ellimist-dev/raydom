@@ -32,7 +32,7 @@ patch versions don't.
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.1.0)
+    GIT_TAG        v0.1.1)
 FetchContent_MakeAvailable(raydom)
 
 target_link_libraries(your_app PRIVATE raydom::raydom)   # or raydom::extras
@@ -119,22 +119,21 @@ int main() {
     rd::Context ctx;
     ctx.load_font_file("font.ttf");
 
-    auto button = ctx.create_class(rd::Style()
-                                       .padding(8_px, 16_px)
-                                       .border_radius(8_px)
-                                       .background(rd::hex(0x5b8cff))
-                                       .color(rd::hex(0xffffff))
-                                       .focusable(RD_FOCUSABLE_TAB));
-    button.on(RD_STATE_HOVER, rd::Style().background(rd::hex(0x7aa2ff)));
+    rd::Class button_style = ctx.create_class(rd::Style()
+                                                  .padding(8_px, 16_px)
+                                                  .border_radius(8_px)
+                                                  .background(rd::hex(0x5b8cff))
+                                                  .color(rd::hex(0xffffff)));
+    button_style.on(RD_STATE_HOVER, rd::Style().background(rd::hex(0x7aa2ff)));
 
-    int  clicks = 0;
-    auto label  = ctx.create_text("Clicked 0 times", rd::Style().color(rd::hex(0xe4e7ee)));
-    auto press  = ctx.create_text("Click me").add_class(button);
-    press.on_click([&] { label.text("Clicked " + std::to_string(++clicks) + " times"); });
+    int      clicks = 0;
+    rd::Node label  = ctx.create_text("Clicked 0 times", rd::Style().color(rd::hex(0xe4e7ee)));
+    rd::Node button = ctx.create_button("Click me").add_class(button_style);  // Tab focuses it; Enter and Space click it
+    button.on_click([&] { label.text("Clicked " + std::to_string(++clicks) + " times"); });
 
     ctx.root()
         .style(rd::Style().padding(24_px).row_gap(12_px).align_items(RD_ALIGN_START))
-        .append(press)
+        .append(button)
         .append(label);
 
     while (!WindowShouldClose()) {

@@ -16,6 +16,14 @@ test: build
 build-web:
     emcmake cmake -DPLATFORM=Web -S . -B build-web && cmake --build build-web
 
+# Serves the book at http://localhost:3000 and opens it; rebuilds on save. Needs mdbook (brew install mdbook).
+docs:
+    mdbook serve docs --open
+
+# Builds the book as published, with llms.txt and Markdown copies, into docs/book/html.
+docs-build:
+    mdbook build docs && python3 docs/tools/llms.py
+
 lint: build
     /opt/homebrew/opt/llvm/bin/clang-tidy -p build src/*.c tests/*.c tests/*.cc
 
@@ -25,7 +33,7 @@ clean:
 
 # Removes the build directories entirely; the next build re-downloads raylib.
 distclean:
-    rm -rf build build-web
+    rm -rf build build-web docs/book
 
 # Builds tests/consumer against raydom through FetchContent and through an installed package.
 consumer:

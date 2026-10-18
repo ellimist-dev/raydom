@@ -1,0 +1,25 @@
+[book]
+title = "raydom"
+description = "A retained-mode UI tree for raylib, in C with a C++ layer."
+authors = ["ellimist-dev"]
+language = "en"
+src = "src"
+
+[build]
+build-dir = "book"
+create-missing = false
+
+[output.html]
+git-repository-url = "https://github.com/ellimist-dev/raydom"
+additional-js = ["theme/version-switcher.js"]
+additional-css = ["theme/version-switcher.css"]
+
+[output.html.fold]
+enable = true
+level = 1
+
+[preprocessor.raydom]
+command = "python3 tools/preprocess.py"
+after = ["links"]
+
+[output.markdown]

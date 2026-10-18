@@ -381,6 +381,12 @@ public:
     rd_input_select(ctx_, handle_, anchor, caret);
     return *this;
   }
+  Node& role(rd_role r) {
+    rd_node_set_role(ctx_, handle_, r);
+    return *this;
+  }
+  rd_role role() const { return rd_node_role(ctx_, handle_); }
+
   // False if the node can't take focus.
   bool focus() { return rd_node_focus(ctx_, handle_); }
   bool focused() const { return alive() && rd_node_eq(rd_ctx_focused(ctx_), handle_); }
@@ -479,6 +485,14 @@ public:
   Node create() const { return {ctx_, rd_node_create(ctx_)}; }
   Node create(const Style& s) const { return create().style(s); }
   Node create_text(std::string_view s, const Style& style = {}) const { return create(style).text(s); }
+  // A focusable node with the button role; with text, a text leaf, otherwise empty for children.
+  Node create_button(std::string_view label, const Style& style = {}) const {
+    return create_text(label, style).role(RD_ROLE_BUTTON);
+  }
+  Node create_button(const Style& style = {}) const { return create(style).role(RD_ROLE_BUTTON); }
+  Node create_input(bool multiline = false, const Style& style = {}) const {
+    return create(style).make_input(multiline);
+  }
 
   // Null font on failure. Without copy, data must outlive the context.
   rd_font load_font(const void* data, std::size_t size, bool copy = true) const {

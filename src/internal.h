@@ -22,6 +22,7 @@ typedef struct rd_slot {
   uint32_t      child_count;
   void*         userdata;
   rd_destroy_fn destroy;
+  rd_role       role;
 } rd_slot;
 
 typedef struct rd_node_style {
@@ -182,5 +183,6 @@ void     rd__scroll_into_view(rd_ctx* ctx, uint32_t i);
 void     rd__events_slot_free(rd_ctx* ctx, uint32_t i);
 void     rd__events_ctx_free(rd_ctx* ctx);
 bool     rd__chain_push(rd__chain* c, rd_node n);
+bool     rd__role_interactive(const rd_ctx* ctx, uint32_t i);
 
 #endif

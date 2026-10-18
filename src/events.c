@@ -237,6 +237,7 @@ static bool can_focus(const rd_ctx* ctx, rd_node n, bool tab) {
   if (!rd__slot(ctx, n) || !displayed(ctx, n.index) || disabled(ctx, n)) return false;
   if (rd_node_is_input(ctx, n)) return true;
   rd_focusable f = ctx->styles[n.index].computed.focusable;
+  if (rd__role_interactive(ctx, n.index)) return !tab || f != RD_FOCUSABLE_POINTER;
   return f == RD_FOCUSABLE_TAB || (!tab && f == RD_FOCUSABLE_POINTER);
 }
 

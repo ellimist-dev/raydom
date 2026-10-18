@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(raydom VERSION 0.1.0 LANGUAGES C CXX)
+project(raydom VERSION 0.1.1 LANGUAGES C CXX)
 
 option(RAYDOM_FETCH_RAYLIB "Download raylib when find_package can't find it" ON)
 option(RAYDOM_BUILD_EXTRAS "Build raydom::extras" ON)
@@ -32,6 +32,7 @@ add_library(raydom STATIC
     src/input.c
     src/selection.c
     src/render.c
+    src/role.c
 )
 add_library(raydom::raydom ALIAS raydom)
 target_include_directories(raydom
@@ -67,7 +68,7 @@ if (RAYDOM_BUILD_TESTS AND NOT EMSCRIPTEN)
         set(font "${raylib_SOURCE_DIR}/examples/text/resources/anonymous_pro_bold.ttf")
         foreach (t test_tree test_tree_cpp test_style test_style_cpp test_layout test_layout_cpp test_grid
                    test_grid_cpp test_text test_text_cpp test_render test_events test_events_cpp test_input
-                   test_input_cpp test_selection test_graph)
+                   test_input_cpp test_selection test_role test_graph)
             file(GLOB src tests/${t}.c tests/${t}.cc)
             add_executable(${t} ${src})
             target_link_libraries(${t} $<IF:$<TARGET_EXISTS:raydom_extras>,raydom_extras,raydom>)
@@ -76,6 +77,26 @@ if (RAYDOM_BUILD_TESTS AND NOT EMSCRIPTEN)
                                                 $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>)
             target_compile_definitions(${t} PRIVATE "RAYDOM_TEST_FONT=\"${font}\"")
             add_test(NAME ${t} COMMAND ${t})
+        endforeach ()
+
+        # Programs quoted by the docs. All of them compile; the ones that don't open a window also run.
+        file(GLOB doc_sources docs/examples/*.c docs/examples/*.cc)
+        foreach (f ${doc_sources})
+            file(READ ${f} content)
+            if (content MATCHES "raydom/extras" AND NOT TARGET raydom_extras)
+                continue()
+            endif ()
+            get_filename_component(name ${f} NAME_WE)
+            get_filename_component(ext ${f} LAST_EXT)
+            string(REPLACE "." "" ext ${ext})
+            set(t doc_${name}_${ext})
+            add_executable(${t} ${f})
+            target_link_libraries(${t} $<IF:$<TARGET_EXISTS:raydom_extras>,raydom_extras,raydom>)
+            target_compile_options(${t} PRIVATE ${RAYDOM_WARNINGS} ${RAYDOM_SANITIZERS})
+            target_compile_definitions(${t} PRIVATE "FONT_PATH=\"${font}\"")
+            if (NOT content MATCHES "InitWindow")
+                add_test(NAME ${t} COMMAND ${t})
+            endif ()
         endforeach ()
     endif ()
 endif ()
