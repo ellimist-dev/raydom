@@ -71,4 +71,4 @@ float progress = t - static_cast<float>(static_cast<int>(t));  // your simulatio
 graph.messages({{nodes[0], nodes[1], progress, rd::hex(0x5b8cff), 6}});
 ```
 
-The `network` example in the repository is a Paxos simulator built this way.
+The showcase's Network tab is a Paxos simulator built this way (`examples/showcase/network.cc`).

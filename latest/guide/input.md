@@ -20,6 +20,9 @@ Tab and Shift+Tab move through `TAB` nodes in tree order, wrapping, skipping hid
 `rd_node_focus(ctx, node)` focuses from code; a null node clears focus. `rd_ctx_focus_next` steps like Tab. A focus
 change fires `BLUR`, `FOCUS_OUT`, `FOCUS`, `FOCUS_IN`, in that order.
 
+`rd_ctx_set_focus_scope(ctx, node)` keeps Tab and Shift+Tab inside a subtree, as a modal dialog needs; null
+restores the whole tree, and so does destroying the scope node. Pointer and programmatic focus aren't restricted.
+
 Enter and Space on a focused node that isn't an input fire `CLICK`, so keyboard users can activate buttons without
 extra code.
 

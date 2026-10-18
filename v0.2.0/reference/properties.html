@@ -1,0 +1,437 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Style properties - raydom</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="A retained-mode UI tree for raylib, in C with a C++ layer.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="../theme/version-switcher-ed80a069.css">
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-a8891df0.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-c393df87.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">raydom</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/ellimist-dev/raydom" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="style-properties"><a class="header" href="#style-properties">Style properties</a></h1>
+<p>Every field of <code>rd_style</code>, generated from the <code>RD_STYLE_PROPS</code> X-macro in <code>include/raydom/style.h</code> and the defaults
+in <code>src/style.c</code> at this version.</p>
+<ul>
+<li><strong>Default</strong> is the value a node has when nothing sets the property and it isn’t inherited.</li>
+<li><em>inherited</em> properties take the parent’s computed value when unset.</li>
+<li><em>paint only</em> properties change drawing without triggering layout. All others trigger relayout when they change.</li>
+</ul>
+<p>In C++, each property is a setter of the same name on <code>rd::Style</code>. Enumerated values are written in full in C, for
+example <code>RD_DISPLAY_GRID</code>.</p>
+<h2 id="box-model"><a class="header" href="#box-model">Box model</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>display</code></td><td><code>FLEX</code></td><td>Layout mode of the node’s children; <code>NONE</code> removes the node from layout, drawing and hit-testing.<br><em><a href="#rd-display"><code>rd_display</code></a></em></td></tr>
+<tr><td><code>position</code></td><td><code>RELATIVE</code></td><td><code>ABSOLUTE</code> takes the node out of flow and places it against the parent’s padding box with <code>inset</code>.<br><em><a href="#rd-position"><code>rd_position</code></a></em></td></tr>
+<tr><td><code>width</code></td><td><code>auto</code></td><td>Border-box width.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>height</code></td><td><code>auto</code></td><td>Border-box height.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>min_width</code></td><td><code>auto</code></td><td>Lower bound on width. <code>auto</code> is 0.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>min_height</code></td><td><code>auto</code></td><td>Lower bound on height. <code>auto</code> is 0.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>max_width</code></td><td><code>auto</code></td><td>Upper bound on width. <code>auto</code> is none.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>max_height</code></td><td><code>auto</code></td><td>Upper bound on height. <code>auto</code> is none.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>margin</code></td><td><code>0px</code></td><td>Outer spacing. <code>auto</code> margins absorb free space in flex layout.<br><em><code>rd_edges</code></em></td></tr>
+<tr><td><code>padding</code></td><td><code>0px</code></td><td>Inner spacing. Percentages resolve against the containing block’s width.<br><em><code>rd_edges</code></em></td></tr>
+<tr><td><code>border_width</code></td><td><code>0px</code></td><td>Border thickness per side, in pixels.<br><em><code>rd_edges</code></em></td></tr>
+<tr><td><code>inset</code></td><td><code>auto</code></td><td>Offsets from the containing block for absolute nodes; relative offsets otherwise.<br><em><code>rd_edges</code></em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="flexbox"><a class="header" href="#flexbox">Flexbox</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>flex_direction</code></td><td><code>COLUMN</code></td><td>Main axis of a flex container.<br><em><a href="#rd-flex-direction"><code>rd_flex_direction</code></a></em></td></tr>
+<tr><td><code>flex_wrap</code></td><td><code>NOWRAP</code></td><td>Whether flex items wrap onto several lines.<br><em><a href="#rd-flex-wrap"><code>rd_flex_wrap</code></a></em></td></tr>
+<tr><td><code>flex_grow</code></td><td><code>0</code></td><td>Share of positive free space, as <code>rd_num</code>.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>flex_shrink</code></td><td><code>0</code></td><td>Share of negative free space, weighted by basis, as <code>rd_num</code>. Default 0: items don’t shrink.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>flex_basis</code></td><td><code>auto</code></td><td>Main size before free space is distributed.<br><em><code>rd_val</code></em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="alignment-and-gaps"><a class="header" href="#alignment-and-gaps">Alignment and gaps</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>justify_content</code></td><td><code>NORMAL</code></td><td>Distribution of items along the main axis (flex) or of tracks along the row axis (grid).<br><em><a href="#rd-align"><code>rd_align</code></a></em></td></tr>
+<tr><td><code>align_items</code></td><td><code>STRETCH</code></td><td>Default cross-axis alignment of the children.<br><em><a href="#rd-align"><code>rd_align</code></a></em></td></tr>
+<tr><td><code>align_self</code></td><td><code>AUTO</code></td><td>Cross-axis alignment of this item; <code>AUTO</code> uses the parent’s <code>align_items</code>.<br><em><a href="#rd-align"><code>rd_align</code></a></em></td></tr>
+<tr><td><code>align_content</code></td><td><code>NORMAL</code></td><td>Distribution of flex lines or grid rows along the cross axis.<br><em><a href="#rd-align"><code>rd_align</code></a></em></td></tr>
+<tr><td><code>justify_items</code></td><td><code>STRETCH</code></td><td>Grid: default inline-axis alignment of items in their areas.<br><em><a href="#rd-align"><code>rd_align</code></a></em></td></tr>
+<tr><td><code>justify_self</code></td><td><code>AUTO</code></td><td>Grid: inline-axis alignment of this item; <code>AUTO</code> uses the parent’s <code>justify_items</code>.<br><em><a href="#rd-align"><code>rd_align</code></a></em></td></tr>
+<tr><td><code>row_gap</code></td><td><code>0px</code></td><td>Space between rows, or between items in a column flex container.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>column_gap</code></td><td><code>0px</code></td><td>Space between columns, or between items in a row flex container.<br><em><code>rd_val</code></em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="grid"><a class="header" href="#grid">Grid</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>grid_template_columns</code></td><td>none</td><td>Explicit column tracks, from <code>rd_tracks_create</code>.<br><em><code>rd_tracks</code></em></td></tr>
+<tr><td><code>grid_template_rows</code></td><td>none</td><td>Explicit row tracks, from <code>rd_tracks_create</code>.<br><em><code>rd_tracks</code></em></td></tr>
+<tr><td><code>grid_auto_columns</code></td><td><code>auto</code></td><td>Size of implicitly created columns.<br><em><code>rd_track</code></em></td></tr>
+<tr><td><code>grid_auto_rows</code></td><td><code>auto</code></td><td>Size of implicitly created rows.<br><em><code>rd_track</code></em></td></tr>
+<tr><td><code>grid_auto_flow</code></td><td><code>ROW</code></td><td>Whether auto-placement fills rows or columns first.<br><em><a href="#rd-grid-flow"><code>rd_grid_flow</code></a></em></td></tr>
+<tr><td><code>grid_column_start</code></td><td><code>auto</code></td><td>Start line or span of the item’s columns.<br><em><code>rd_grid_line</code></em></td></tr>
+<tr><td><code>grid_column_end</code></td><td><code>auto</code></td><td>End line or span of the item’s columns.<br><em><code>rd_grid_line</code></em></td></tr>
+<tr><td><code>grid_row_start</code></td><td><code>auto</code></td><td>Start line or span of the item’s rows.<br><em><code>rd_grid_line</code></em></td></tr>
+<tr><td><code>grid_row_end</code></td><td><code>auto</code></td><td>End line or span of the item’s rows.<br><em><code>rd_grid_line</code></em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="paint"><a class="header" href="#paint">Paint</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>background</code></td><td>transparent</td><td>Fill of the border box, inside the rounded corners.<br><em><code>rd_color</code>, paint only</em></td></tr>
+<tr><td><code>border_color</code></td><td>transparent</td><td>Color of the border.<br><em><code>rd_color</code>, paint only</em></td></tr>
+<tr><td><code>border_radius</code></td><td><code>0px</code></td><td>Corner radii.<br><em><code>rd_corners</code>, paint only</em></td></tr>
+<tr><td><code>opacity</code></td><td><code>1</code></td><td>Opacity of the node and its subtree, 0 to 1, as <code>rd_num</code>.<br><em><code>rd_val</code>, paint only</em></td></tr>
+<tr><td><code>box_shadow</code></td><td>none</td><td>Outer shadow: offset, blur, spread and color.<br><em><code>rd_shadow</code>, paint only</em></td></tr>
+<tr><td><code>object_fit</code></td><td><code>FILL</code></td><td>How an image node’s image fills its content box: stretched, contained, covering, natural size, or scaled down.<br><em><a href="#rd-object-fit"><code>rd_object_fit</code></a>, paint only</em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="text"><a class="header" href="#text">Text</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>color</code></td><td><code>rgba(0, 0, 0, 255)</code></td><td>Text color.<br><em><code>rd_color</code>, inherited, paint only</em></td></tr>
+<tr><td><code>font</code></td><td>default font</td><td>Font handle from <code>rd_font_load</code>; <code>{0, true}</code> is the default font.<br><em><code>rd_font</code>, inherited</em></td></tr>
+<tr><td><code>font_size</code></td><td><code>16px</code></td><td>Text size in pixels.<br><em><code>rd_val</code>, inherited</em></td></tr>
+<tr><td><code>line_height</code></td><td><code>1.2</code></td><td>Line box height: <code>rd_num</code> times <code>font_size</code>, <code>rd_px</code>, or <code>rd_pct</code> of <code>font_size</code>.<br><em><code>rd_val</code>, inherited</em></td></tr>
+<tr><td><code>white_space</code></td><td><code>NORMAL</code></td><td>Collapsing of spaces and newlines, and whether lines wrap.<br><em><a href="#rd-white-space"><code>rd_white_space</code></a>, inherited</em></td></tr>
+<tr><td><code>text_overflow</code></td><td><code>CLIP</code></td><td>Treatment of text cut by the box or by <code>line_clamp</code>.<br><em><a href="#rd-text-overflow"><code>rd_text_overflow</code></a>, paint only</em></td></tr>
+<tr><td><code>line_clamp</code></td><td><code>0</code></td><td>Maximum number of lines shown, as <code>rd_num</code>; 0 is unlimited.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>text_align</code></td><td><code>START</code></td><td>Horizontal alignment of each line in the content box.<br><em><a href="#rd-text-align"><code>rd_text_align</code></a>, inherited, paint only</em></td></tr>
+<tr><td><code>user_select</code></td><td><code>AUTO</code></td><td>Whether dragging over the text selects it.<br><em><a href="#rd-user-select"><code>rd_user_select</code></a>, inherited, paint only</em></td></tr>
+<tr><td><code>caret_color</code></td><td>transparent</td><td>Input caret color; transparent uses <code>color</code>.<br><em><code>rd_color</code>, inherited, paint only</em></td></tr>
+<tr><td><code>selection_color</code></td><td><code>rgba(91, 140, 255, 90)</code></td><td>Background of selected text.<br><em><code>rd_color</code>, inherited, paint only</em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="scrolling"><a class="header" href="#scrolling">Scrolling</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>overflow_x</code></td><td><code>VISIBLE</code></td><td><code>HIDDEN</code> clips children horizontally; <code>SCROLL</code> clips and scrolls.<br><em><a href="#rd-overflow"><code>rd_overflow</code></a></em></td></tr>
+<tr><td><code>overflow_y</code></td><td><code>VISIBLE</code></td><td><code>HIDDEN</code> clips children vertically; <code>SCROLL</code> clips and scrolls.<br><em><a href="#rd-overflow"><code>rd_overflow</code></a></em></td></tr>
+<tr><td><code>scrollbar_width</code></td><td><code>8px</code></td><td>Thickness of the scrollbars on a <code>SCROLL</code> axis; <code>0px</code> hides them. They draw over the content edge and take no layout space.<br><em><code>rd_val</code>, paint only</em></td></tr>
+<tr><td><code>scrollbar_color</code></td><td><code>rgba(128, 128, 128, 120)</code></td><td>Scrollbar thumb color; brighter while hovered or dragged.<br><em><code>rd_color</code>, inherited, paint only</em></td></tr>
+<tr><td><code>scrollbar_track_color</code></td><td>transparent</td><td>Color behind the thumb; transparent by default.<br><em><code>rd_color</code>, inherited, paint only</em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="interaction"><a class="header" href="#interaction">Interaction</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>pointer_events</code></td><td><code>AUTO</code></td><td><code>NONE</code> makes the node invisible to hit-testing.<br><em><a href="#rd-pointer-events"><code>rd_pointer_events</code></a>, inherited, paint only</em></td></tr>
+<tr><td><code>focusable</code></td><td><code>NONE</code></td><td>Whether the node takes focus, and whether Tab reaches it.<br><em><a href="#rd-focusable"><code>rd_focusable</code></a>, paint only</em></td></tr>
+<tr><td><code>cursor</code></td><td><code>AUTO</code></td><td>Mouse cursor over the node. <code>AUTO</code> is text over selectable text and inputs, pointer over links, default elsewhere. Set it in an active variant for a drag cursor.<br><em><a href="#rd-cursor"><code>rd_cursor</code></a>, inherited, paint only</em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="transitions"><a class="header" href="#transitions">Transitions</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>transition_duration</code></td><td><code>0</code></td><td>How long changes to this node’s style animate, in seconds (<code>rd_ms(150)</code>, <code>rd_s(0.2)</code>); 0 changes at once.<br><em><code>rd_val</code>, paint only</em></td></tr>
+<tr><td><code>transition_delay</code></td><td><code>0</code></td><td>Seconds to wait before a change starts animating.<br><em><code>rd_val</code>, paint only</em></td></tr>
+<tr><td><code>transition_easing</code></td><td><code>EASE</code></td><td>The timing curve of transitions.<br><em><a href="#rd-easing"><code>rd_easing</code></a>, paint only</em></td></tr>
+<tr><td><code>transition_properties</code></td><td><code>ALL</code></td><td>Which groups of properties transition, as a mask of <code>RD_TRANSITION_*</code> flags.<br><em><a href="#rd-transition"><code>rd_transition</code></a>, paint only</em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="enumerations"><a class="header" href="#enumerations">Enumerations</a></h2>
+<h3 id="rd_display"><a class="header" href="#rd_display">rd_display</a></h3>
+<p><code>RD_DISPLAY_*</code>: <code>FLEX</code>, <code>GRID</code>, <code>NONE</code></p>
+<h3 id="rd_position"><a class="header" href="#rd_position">rd_position</a></h3>
+<p><code>RD_POSITION_*</code>: <code>RELATIVE</code>, <code>ABSOLUTE</code></p>
+<h3 id="rd_flex_direction"><a class="header" href="#rd_flex_direction">rd_flex_direction</a></h3>
+<p><code>RD_FLEX_*</code>: <code>ROW</code>, <code>COLUMN</code>, <code>ROW_REVERSE</code>, <code>COLUMN_REVERSE</code></p>
+<h3 id="rd_flex_wrap"><a class="header" href="#rd_flex_wrap">rd_flex_wrap</a></h3>
+<p><code>RD_FLEX_*</code>: <code>NOWRAP</code>, <code>WRAP</code>, <code>WRAP_REVERSE</code></p>
+<h3 id="rd_align"><a class="header" href="#rd_align">rd_align</a></h3>
+<p><code>RD_ALIGN_*</code>: <code>AUTO</code>, <code>NORMAL</code>, <code>START</code>, <code>END</code>, <code>CENTER</code>, <code>STRETCH</code>, <code>BASELINE</code>, <code>SPACE_BETWEEN</code>, <code>SPACE_AROUND</code>, <code>SPACE_EVENLY</code></p>
+<h3 id="rd_grid_flow"><a class="header" href="#rd_grid_flow">rd_grid_flow</a></h3>
+<p><code>RD_GRID_FLOW_*</code>: <code>ROW</code>, <code>COLUMN</code></p>
+<h3 id="rd_object_fit"><a class="header" href="#rd_object_fit">rd_object_fit</a></h3>
+<p><code>RD_OBJECT_FIT_*</code>: <code>FILL</code>, <code>CONTAIN</code>, <code>COVER</code>, <code>NONE</code>, <code>SCALE_DOWN</code></p>
+<h3 id="rd_white_space"><a class="header" href="#rd_white_space">rd_white_space</a></h3>
+<p><code>RD_WHITE_SPACE_*</code>: <code>NORMAL</code>, <code>NOWRAP</code>, <code>PRE</code>, <code>PRE_WRAP</code></p>
+<h3 id="rd_text_overflow"><a class="header" href="#rd_text_overflow">rd_text_overflow</a></h3>
+<p><code>RD_TEXT_OVERFLOW_*</code>: <code>CLIP</code>, <code>ELLIPSIS</code></p>
+<h3 id="rd_text_align"><a class="header" href="#rd_text_align">rd_text_align</a></h3>
+<p><code>RD_TEXT_ALIGN_*</code>: <code>START</code>, <code>CENTER</code>, <code>END</code></p>
+<h3 id="rd_user_select"><a class="header" href="#rd_user_select">rd_user_select</a></h3>
+<p><code>RD_USER_SELECT_*</code>: <code>AUTO</code>, <code>NONE</code></p>
+<h3 id="rd_overflow"><a class="header" href="#rd_overflow">rd_overflow</a></h3>
+<p><code>RD_OVERFLOW_*</code>: <code>VISIBLE</code>, <code>HIDDEN</code>, <code>SCROLL</code></p>
+<h3 id="rd_pointer_events"><a class="header" href="#rd_pointer_events">rd_pointer_events</a></h3>
+<p><code>RD_POINTER_EVENTS_*</code>: <code>AUTO</code>, <code>NONE</code></p>
+<h3 id="rd_focusable"><a class="header" href="#rd_focusable">rd_focusable</a></h3>
+<p><code>RD_FOCUSABLE_*</code>: <code>NONE</code>, <code>TAB</code>, <code>POINTER</code></p>
+<h3 id="rd_cursor"><a class="header" href="#rd_cursor">rd_cursor</a></h3>
+<p><code>RD_CURSOR_*</code>: <code>AUTO</code>, <code>DEFAULT</code>, <code>POINTER</code>, <code>TEXT</code>, <code>CROSSHAIR</code>, <code>MOVE</code>, <code>NOT_ALLOWED</code>, <code>EW_RESIZE</code>, <code>NS_RESIZE</code>, <code>NWSE_RESIZE</code>, <code>NESW_RESIZE</code>, <code>NONE</code></p>
+<h3 id="rd_easing"><a class="header" href="#rd_easing">rd_easing</a></h3>
+<p><code>RD_EASING_*</code>: <code>LINEAR</code>, <code>EASE</code>, <code>EASE_IN</code>, <code>EASE_OUT</code>, <code>EASE_IN_OUT</code></p>
+<h3 id="rd_transition"><a class="header" href="#rd_transition">rd_transition</a></h3>
+<p><code>RD_TRANSITION_*</code>: <code>COLOR</code>, <code>OPACITY</code>, <code>SHADOW</code>, <code>RADIUS</code>, <code>SIZE</code>, <code>SPACING</code>, <code>INSET</code>, <code>TEXT</code>, <code>ALL</code></p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../extras/dialog.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../reference/values.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../extras/dialog.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../reference/values.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="../theme/version-switcher-ca85feef.js"></script>
+
+
+
+    </div>
+    </body>
+</html>

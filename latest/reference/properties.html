@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-ae0ea313.js";
+            window.path_to_searchindex_js = "../searchindex-a8891df0.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-3d3667e3.js"></script>
+        <script src="../toc-c393df87.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -207,8 +207,6 @@ example <code>RD_DISPLAY_GRID</code>.</p>
 <tr><td><code>padding</code></td><td><code>0px</code></td><td>Inner spacing. Percentages resolve against the containing block’s width.<br><em><code>rd_edges</code></em></td></tr>
 <tr><td><code>border_width</code></td><td><code>0px</code></td><td>Border thickness per side, in pixels.<br><em><code>rd_edges</code></em></td></tr>
 <tr><td><code>inset</code></td><td><code>auto</code></td><td>Offsets from the containing block for absolute nodes; relative offsets otherwise.<br><em><code>rd_edges</code></em></td></tr>
-<tr><td><code>overflow_x</code></td><td><code>VISIBLE</code></td><td><code>HIDDEN</code> clips children horizontally; <code>SCROLL</code> clips and scrolls.<br><em><a href="#rd-overflow"><code>rd_overflow</code></a></em></td></tr>
-<tr><td><code>overflow_y</code></td><td><code>VISIBLE</code></td><td><code>HIDDEN</code> clips children vertically; <code>SCROLL</code> clips and scrolls.<br><em><a href="#rd-overflow"><code>rd_overflow</code></a></em></td></tr>
 </tbody>
 </table>
 </div>
@@ -276,6 +274,7 @@ example <code>RD_DISPLAY_GRID</code>.</p>
 <tr><td><code>border_radius</code></td><td><code>0px</code></td><td>Corner radii.<br><em><code>rd_corners</code>, paint only</em></td></tr>
 <tr><td><code>opacity</code></td><td><code>1</code></td><td>Opacity of the node and its subtree, 0 to 1, as <code>rd_num</code>.<br><em><code>rd_val</code>, paint only</em></td></tr>
 <tr><td><code>box_shadow</code></td><td>none</td><td>Outer shadow: offset, blur, spread and color.<br><em><code>rd_shadow</code>, paint only</em></td></tr>
+<tr><td><code>object_fit</code></td><td><code>FILL</code></td><td>How an image node’s image fills its content box: stretched, contained, covering, natural size, or scaled down.<br><em><a href="#rd-object-fit"><code>rd_object_fit</code></a>, paint only</em></td></tr>
 </tbody>
 </table>
 </div>
@@ -300,6 +299,21 @@ example <code>RD_DISPLAY_GRID</code>.</p>
 </tbody>
 </table>
 </div>
+<h2 id="scrolling"><a class="header" href="#scrolling">Scrolling</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>overflow_x</code></td><td><code>VISIBLE</code></td><td><code>HIDDEN</code> clips children horizontally; <code>SCROLL</code> clips and scrolls.<br><em><a href="#rd-overflow"><code>rd_overflow</code></a></em></td></tr>
+<tr><td><code>overflow_y</code></td><td><code>VISIBLE</code></td><td><code>HIDDEN</code> clips children vertically; <code>SCROLL</code> clips and scrolls.<br><em><a href="#rd-overflow"><code>rd_overflow</code></a></em></td></tr>
+<tr><td><code>scrollbar_width</code></td><td><code>8px</code></td><td>Thickness of the scrollbars on a <code>SCROLL</code> axis; <code>0px</code> hides them. They draw over the content edge and take no layout space.<br><em><code>rd_val</code>, paint only</em></td></tr>
+<tr><td><code>scrollbar_color</code></td><td><code>rgba(128, 128, 128, 120)</code></td><td>Scrollbar thumb color; brighter while hovered or dragged.<br><em><code>rd_color</code>, inherited, paint only</em></td></tr>
+<tr><td><code>scrollbar_track_color</code></td><td>transparent</td><td>Color behind the thumb; transparent by default.<br><em><code>rd_color</code>, inherited, paint only</em></td></tr>
+</tbody>
+</table>
+</div>
 <h2 id="interaction"><a class="header" href="#interaction">Interaction</a></h2>
 <div class="table-wrapper">
 <table>
@@ -309,6 +323,21 @@ example <code>RD_DISPLAY_GRID</code>.</p>
 <tbody>
 <tr><td><code>pointer_events</code></td><td><code>AUTO</code></td><td><code>NONE</code> makes the node invisible to hit-testing.<br><em><a href="#rd-pointer-events"><code>rd_pointer_events</code></a>, inherited, paint only</em></td></tr>
 <tr><td><code>focusable</code></td><td><code>NONE</code></td><td>Whether the node takes focus, and whether Tab reaches it.<br><em><a href="#rd-focusable"><code>rd_focusable</code></a>, paint only</em></td></tr>
+<tr><td><code>cursor</code></td><td><code>AUTO</code></td><td>Mouse cursor over the node. <code>AUTO</code> is text over selectable text and inputs, pointer over links, default elsewhere. Set it in an active variant for a drag cursor.<br><em><a href="#rd-cursor"><code>rd_cursor</code></a>, inherited, paint only</em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="transitions"><a class="header" href="#transitions">Transitions</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>transition_duration</code></td><td><code>0</code></td><td>How long changes to this node’s style animate, in seconds (<code>rd_ms(150)</code>, <code>rd_s(0.2)</code>); 0 changes at once.<br><em><code>rd_val</code>, paint only</em></td></tr>
+<tr><td><code>transition_delay</code></td><td><code>0</code></td><td>Seconds to wait before a change starts animating.<br><em><code>rd_val</code>, paint only</em></td></tr>
+<tr><td><code>transition_easing</code></td><td><code>EASE</code></td><td>The timing curve of transitions.<br><em><a href="#rd-easing"><code>rd_easing</code></a>, paint only</em></td></tr>
+<tr><td><code>transition_properties</code></td><td><code>ALL</code></td><td>Which groups of properties transition, as a mask of <code>RD_TRANSITION_*</code> flags.<br><em><a href="#rd-transition"><code>rd_transition</code></a>, paint only</em></td></tr>
 </tbody>
 </table>
 </div>
@@ -317,8 +346,6 @@ example <code>RD_DISPLAY_GRID</code>.</p>
 <p><code>RD_DISPLAY_*</code>: <code>FLEX</code>, <code>GRID</code>, <code>NONE</code></p>
 <h3 id="rd_position"><a class="header" href="#rd_position">rd_position</a></h3>
 <p><code>RD_POSITION_*</code>: <code>RELATIVE</code>, <code>ABSOLUTE</code></p>
-<h3 id="rd_overflow"><a class="header" href="#rd_overflow">rd_overflow</a></h3>
-<p><code>RD_OVERFLOW_*</code>: <code>VISIBLE</code>, <code>HIDDEN</code>, <code>SCROLL</code></p>
 <h3 id="rd_flex_direction"><a class="header" href="#rd_flex_direction">rd_flex_direction</a></h3>
 <p><code>RD_FLEX_*</code>: <code>ROW</code>, <code>COLUMN</code>, <code>ROW_REVERSE</code>, <code>COLUMN_REVERSE</code></p>
 <h3 id="rd_flex_wrap"><a class="header" href="#rd_flex_wrap">rd_flex_wrap</a></h3>
@@ -327,6 +354,8 @@ example <code>RD_DISPLAY_GRID</code>.</p>
 <p><code>RD_ALIGN_*</code>: <code>AUTO</code>, <code>NORMAL</code>, <code>START</code>, <code>END</code>, <code>CENTER</code>, <code>STRETCH</code>, <code>BASELINE</code>, <code>SPACE_BETWEEN</code>, <code>SPACE_AROUND</code>, <code>SPACE_EVENLY</code></p>
 <h3 id="rd_grid_flow"><a class="header" href="#rd_grid_flow">rd_grid_flow</a></h3>
 <p><code>RD_GRID_FLOW_*</code>: <code>ROW</code>, <code>COLUMN</code></p>
+<h3 id="rd_object_fit"><a class="header" href="#rd_object_fit">rd_object_fit</a></h3>
+<p><code>RD_OBJECT_FIT_*</code>: <code>FILL</code>, <code>CONTAIN</code>, <code>COVER</code>, <code>NONE</code>, <code>SCALE_DOWN</code></p>
 <h3 id="rd_white_space"><a class="header" href="#rd_white_space">rd_white_space</a></h3>
 <p><code>RD_WHITE_SPACE_*</code>: <code>NORMAL</code>, <code>NOWRAP</code>, <code>PRE</code>, <code>PRE_WRAP</code></p>
 <h3 id="rd_text_overflow"><a class="header" href="#rd_text_overflow">rd_text_overflow</a></h3>
@@ -335,16 +364,24 @@ example <code>RD_DISPLAY_GRID</code>.</p>
 <p><code>RD_TEXT_ALIGN_*</code>: <code>START</code>, <code>CENTER</code>, <code>END</code></p>
 <h3 id="rd_user_select"><a class="header" href="#rd_user_select">rd_user_select</a></h3>
 <p><code>RD_USER_SELECT_*</code>: <code>AUTO</code>, <code>NONE</code></p>
+<h3 id="rd_overflow"><a class="header" href="#rd_overflow">rd_overflow</a></h3>
+<p><code>RD_OVERFLOW_*</code>: <code>VISIBLE</code>, <code>HIDDEN</code>, <code>SCROLL</code></p>
 <h3 id="rd_pointer_events"><a class="header" href="#rd_pointer_events">rd_pointer_events</a></h3>
 <p><code>RD_POINTER_EVENTS_*</code>: <code>AUTO</code>, <code>NONE</code></p>
 <h3 id="rd_focusable"><a class="header" href="#rd_focusable">rd_focusable</a></h3>
 <p><code>RD_FOCUSABLE_*</code>: <code>NONE</code>, <code>TAB</code>, <code>POINTER</code></p>
+<h3 id="rd_cursor"><a class="header" href="#rd_cursor">rd_cursor</a></h3>
+<p><code>RD_CURSOR_*</code>: <code>AUTO</code>, <code>DEFAULT</code>, <code>POINTER</code>, <code>TEXT</code>, <code>CROSSHAIR</code>, <code>MOVE</code>, <code>NOT_ALLOWED</code>, <code>EW_RESIZE</code>, <code>NS_RESIZE</code>, <code>NWSE_RESIZE</code>, <code>NESW_RESIZE</code>, <code>NONE</code></p>
+<h3 id="rd_easing"><a class="header" href="#rd_easing">rd_easing</a></h3>
+<p><code>RD_EASING_*</code>: <code>LINEAR</code>, <code>EASE</code>, <code>EASE_IN</code>, <code>EASE_OUT</code>, <code>EASE_IN_OUT</code></p>
+<h3 id="rd_transition"><a class="header" href="#rd_transition">rd_transition</a></h3>
+<p><code>RD_TRANSITION_*</code>: <code>COLOR</code>, <code>OPACITY</code>, <code>SHADOW</code>, <code>RADIUS</code>, <code>SIZE</code>, <code>SPACING</code>, <code>INSET</code>, <code>TEXT</code>, <code>ALL</code></p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../extras/graph.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../extras/dialog.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
@@ -358,7 +395,7 @@ example <code>RD_DISPLAY_GRID</code>.</p>
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../extras/graph.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../extras/dialog.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 

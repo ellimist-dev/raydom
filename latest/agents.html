@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-ae0ea313.js";
+            window.path_to_searchindex_js = "searchindex-a8891df0.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-3d3667e3.js"></script>
+        <script src="toc-c393df87.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -222,10 +222,20 @@ ends.</li>
 <li>Geometry (<code>rd_node_rect</code>, <code>rd_node_bounds</code>) reflects the last layout. After building or changing the tree
 outside the frame loop, call <code>rd_ctx_layout</code> before reading it.</li>
 <li>The C++ layer doesn’t throw. Check returned handles and <code>bool</code> results where failure matters.</li>
-<li>raydom doesn’t own the main loop, the window, or time. The application drives all three.</li>
+<li>raydom doesn’t own the main loop or the window. Time comes from <code>rd_ctx_set_time</code>, which <code>rd_update</code> calls; use
+<code>rd_ctx_set_timer</code> for delays, and <code>rd_set_event_waiting</code> rather than raylib’s <code>EnableEventWaiting</code>.</li>
 <li>Create controls with their role: <code>rd_node_create_button</code> / <code>ctx.create_button</code> for buttons, <code>rd_node_create_input</code>
 / <code>ctx.create_input</code> for inputs, <code>rd_node_set_role</code> for headings, lists, links and checkboxes. Don’t build a
 button from a plain node and a click listener; it gets no role and no default focus.</li>
+<li>Put menus, popovers, tooltips and modals in <code>rd_ctx_overlay(ctx)</code> with <code>position: absolute</code>, and position them
+with <code>rd_node_set_anchor</code>. Don’t place them inside the trigger’s subtree, where overflow containers clip them.</li>
+<li>For checkboxes, switches, radio groups, sliders, toasts, menus, selects, modals, tooltips, tabs, splitters,
+lists, tables and trees, use the extras components (<code>rdx_checkbox_create</code>, <code>rdx_menu_open</code>, <code>rdx_list_create</code>,
+…). Listen for <code>RD_EVENT_CHANGE</code>; restyle through <code>rdx_theme(ctx)</code>. For more than a few hundred rows use
+<code>rdx_list_create</code> or <code>rdx_table_create</code>, which only create the rows in view. Build custom popups on the overlay
+only when the extras don’t fit.</li>
+<li>Animate with <code>transition_duration</code> on a class (it animates every style change, layout properties and
+<code>height: auto</code> included) or <code>rd_node_animate</code> for one-off motion. Don’t drive animations from timers by hand.</li>
 </ol>
 <h2 id="minimal-program"><a class="header" href="#minimal-program">Minimal program</a></h2>
 <pre><code class="language-c">#include &lt;raydom/raydom.h&gt;

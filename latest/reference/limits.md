@@ -6,9 +6,10 @@ What raydom doesn't do in this version. Behavior outside these limits is unspeci
 
 - No `display: block` or `inline`; every container is flex or grid. Text nodes are leaves.
 - Grid: no named lines, no named areas, no `dense` auto-flow, no `repeat(auto-fill)`.
-- No `position: fixed` or `sticky`.
-- No `z-index`; children draw in tree order, later siblings on top.
-- No `aspect_ratio`, no `transform`.
+- No `position: fixed` or `sticky`, and no `z-index`. Children draw in tree order, later siblings on top; content
+  that must sit above everything goes in the [overlay](../guide/overlay.md).
+- No `aspect_ratio`, no `transform`. Animate `inset` to move a node without reflowing its neighbors.
+- Transitions don't animate `width: auto`, unit changes (px to %), or `display`; those change at once.
 - `min_width`/`min_height` `auto` is 0, not the content size.
 
 ## Text
@@ -27,7 +28,10 @@ What raydom doesn't do in this version. Behavior outside these limits is unspeci
 
 ## Rendering
 
-- No images or textures as node backgrounds; use a canvas.
+- SVG: no text, filters, masks, clip paths, patterns or embedded images. Gradient coordinates written as unitless
+  fractions (`x2="1"`) render as a flat color; use percentages (`x2="100%"`). `currentColor` tints the whole SVG.
+- No background images; an image is its own node. Images are static (no GIF animation) unless updated with
+  `rd_image_update`.
 - Shadows are outer box shadows only.
 - No gradients.
 

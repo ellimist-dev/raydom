@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-ae0ea313.js";
+            window.path_to_searchindex_js = "../searchindex-a8891df0.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-3d3667e3.js"></script>
+        <script src="../toc-c393df87.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -184,9 +184,10 @@
 <ul>
 <li>No <code>display: block</code> or <code>inline</code>; every container is flex or grid. Text nodes are leaves.</li>
 <li>Grid: no named lines, no named areas, no <code>dense</code> auto-flow, no <code>repeat(auto-fill)</code>.</li>
-<li>No <code>position: fixed</code> or <code>sticky</code>.</li>
-<li>No <code>z-index</code>; children draw in tree order, later siblings on top.</li>
-<li>No <code>aspect_ratio</code>, no <code>transform</code>.</li>
+<li>No <code>position: fixed</code> or <code>sticky</code>, and no <code>z-index</code>. Children draw in tree order, later siblings on top; content
+that must sit above everything goes in the <a href="../guide/overlay.html">overlay</a>.</li>
+<li>No <code>aspect_ratio</code>, no <code>transform</code>. Animate <code>inset</code> to move a node without reflowing its neighbors.</li>
+<li>Transitions don’t animate <code>width: auto</code>, unit changes (px to %), or <code>display</code>; those change at once.</li>
 <li><code>min_width</code>/<code>min_height</code> <code>auto</code> is 0, not the content size.</li>
 </ul>
 <h2 id="text"><a class="header" href="#text">Text</a></h2>
@@ -205,7 +206,10 @@ Greek and CJK display; Arabic and Indic scripts don’t shape correctly.</li>
 </ul>
 <h2 id="rendering"><a class="header" href="#rendering">Rendering</a></h2>
 <ul>
-<li>No images or textures as node backgrounds; use a canvas.</li>
+<li>SVG: no text, filters, masks, clip paths, patterns or embedded images. Gradient coordinates written as unitless
+fractions (<code>x2="1"</code>) render as a flat color; use percentages (<code>x2="100%"</code>). <code>currentColor</code> tints the whole SVG.</li>
+<li>No background images; an image is its own node. Images are static (no GIF animation) unless updated with
+<code>rd_image_update</code>.</li>
 <li>Shadows are outer box shadows only.</li>
 <li>No gradients.</li>
 </ul>

@@ -21,9 +21,12 @@ Each page below is Markdown. `llms-full.txt` is the whole book in one file. Read
 - [Styles and classes](guide/styles.md): Inline styles, classes, state variants, precedence order, inheritance, computed styles.
 - [Layout](guide/layout.md): Flexbox and grid, geometry queries, absolute positioning, scrolling, custom measurement.
 - [Text and fonts](guide/text.md): Fonts, text nodes, wrapping, ellipsis, line clamping, highlights, measuring, selection.
+- [Images](guide/images.md): Loading images from files, memory or pixels; image nodes, aspect-ratio sizing, object_fit, updates.
 - [Events](guide/events.md): Listeners, capture and bubble, event types and fields, pointer capture, default actions.
 - [Focus, keyboard and text input](guide/input.md): Focus and Tab order, keyboard events, text inputs and their editing keys, clipboard.
 - [Roles](guide/roles.md): Semantic roles and the button/text/input constructors; how roles affect focus.
+- [Animation](guide/animation.md): Transitions on style changes, layout properties and auto height included; explicit rd_node_animate.
+- [Overlay and anchoring](guide/overlay.md): The overlay layer for popups, and anchoring nodes to other nodes or points with flip and shift.
 - [Canvases](guide/canvas.md): Custom raylib drawing inside a node with paint callbacks.
 
 ## C++
@@ -32,7 +35,11 @@ Each page below is Markdown. `llms-full.txt` is the whole book in one file. Read
 
 ## Extras
 
+- [Controls and toasts](extras/controls.md): Checkbox, switch, radio group, slider and toast components; their events, keys and theme classes.
+- [Menus, selects, modals and tooltips](extras/popups.md): Menus, context menus, selects, modal dialogs and tooltips; dismissal and focus rules.
+- [Tabs, splitters, lists, tables and trees](extras/views.md): Tabs, splitters, virtualized lists, tables and tree views; selection, keys, fill callbacks.
 - [Network view](extras/graph.md): rdx_graph network view: nodes, edges, messages, pan/zoom, graph events.
+- [File dialogs](extras/dialog.md): Native open, save and folder dialogs: rdx_dialog_* in C, rdx::open_file and friends in C++.
 
 ## Reference
 

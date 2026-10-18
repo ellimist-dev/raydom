@@ -72,6 +72,18 @@ item* back = rd_node_userdata(ctx, a);
 
 C++: `node.emplace_userdata<T>(args...)` allocates a `T` owned by the node, and `node.userdata<T>()` returns it.
 
+## Extension storage
+
+Libraries built on raydom can keep per-context data without a global map:
+
+```c
+static const char key;  // any address the library owns
+rd_ctx_set_extension(ctx, &key, data, free_data);  // destroyed with the context
+my_state* s = rd_ctx_extension(ctx, &key);
+```
+
+The extras controls keep their classes and state this way, which leaves every node's userdata to the application.
+
 ## Destroying
 
 ```c

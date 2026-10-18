@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-ae0ea313.js";
+            window.path_to_searchindex_js = "../searchindex-a8891df0.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-3d3667e3.js"></script>
+        <script src="../toc-c393df87.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -265,6 +265,25 @@ rd_node_set_scroll(ctx, list, 0, 300);  // clamped to the content: at most 50 * 
 <p><code>overflow_x</code> and <code>overflow_y</code> set to <code>RD_OVERFLOW_HIDDEN</code> clip children; <code>RD_OVERFLOW_SCROLL</code> also makes the node
 scroll with the wheel. The wheel scrolls the nearest scroll container under the pointer that can move in the gesture’s
 direction; once a gesture starts, it stays with that container until the wheel pauses.</p>
+<p>A <code>SCROLL</code> axis whose content overflows shows a scrollbar. Bars draw over the content’s edge, inside the padding
+box, and take no layout space, so content doesn’t reflow when one appears. Dragging the thumb scrolls; pressing the
+track pages toward the pointer. Presses on a bar never reach the content under it.</p>
+<pre><code class="language-c">rd_node_merge_style(ctx, list, &amp;(rd_style){
+    .scrollbar_width = rd_px(6),                     // 0px hides the bars; scrolling still works
+    .scrollbar_color = rd_rgba(255, 255, 255, 60),   // inherited, so set it once on the root for a theme
+});
+</code></pre>
+<p>Leave room with <code>padding</code> if content shouldn’t sit under the bar.</p>
+<h2 id="layout-hooks"><a class="header" href="#layout-hooks">Layout hooks</a></h2>
+<p><code>rd_ctx_on_layout(ctx, fn, data, destroy)</code> runs <code>fn</code> after every layout, with that layout’s geometry and scroll
+offsets. It’s for content that depends on its own geometry: a virtualized list binding the rows that scrolled into
+view, a chat log staying scrolled to its end. If hooks change the tree, layout runs once more before
+<code>rd_ctx_layout</code> returns, so the change shows in the same frame; hooks don’t run for that second pass.</p>
+<pre><code class="language-c">static void stick_to_bottom(rd_ctx* ctx, void* data) {
+  rd_node log = *(rd_node*)data;
+  rd_node_set_scroll(ctx, log, 0, 1e9f);  // clamped to the content just laid out
+}
+</code></pre>
 <h2 id="custom-measurement"><a class="header" href="#custom-measurement">Custom measurement</a></h2>
 <p>A leaf node can report its own size with <code>rd_node_set_measure</code>. The callback receives a width and height, each with
 a mode:</p>

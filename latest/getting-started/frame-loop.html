@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-ae0ea313.js";
+            window.path_to_searchindex_js = "../searchindex-a8891df0.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-3d3667e3.js"></script>
+        <script src="../toc-c393df87.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -187,12 +187,14 @@
   EndDrawing();
 }
 </code></pre>
-<p><code>rd_update</code> does four things, in order:</p>
+<p><code>rd_update</code> does these things, in order:</p>
 <ol>
-<li>Sets the context clock from <code>GetTime()</code> (<code>rd_ctx_set_time</code>).</li>
+<li>Sets the context clock from <code>GetTime()</code> (<code>rd_ctx_set_time</code>), which fires due timers.</li>
 <li>Feeds raylib’s keyboard and text input (<code>rd_ctx_key</code>, <code>rd_ctx_text</code>).</li>
 <li>Feeds the mouse position, buttons and wheel (<code>rd_ctx_pointer</code>). Listeners run here.</li>
-<li>Lays the tree out at the screen size (<code>rd_ctx_layout</code>).</li>
+<li>Lays the tree out at the screen size (<code>rd_ctx_layout</code>): advances animations, computes styles, lays out, and places
+anchored nodes.</li>
+<li>Applies the mouse cursor, and, with <code>rd_set_event_waiting</code>, raylib’s event waiting.</li>
 </ol>
 <p><code>rd_draw</code> builds a display list from the laid-out tree and executes it with raylib. It must be called between
 <code>BeginDrawing</code> and <code>EndDrawing</code>. Anything drawn with raylib after <code>rd_draw</code> appears on top of the UI.</p>
@@ -212,6 +214,40 @@ rd_ctx_layout(ctx, width, height);
 </code></pre>
 <p>Nothing except <code>rd_update</code>, <code>rd_draw</code>, and paint callbacks touches raylib, so a context can be built, laid out and
 driven with input without a window. The headless examples behind the guide chapters run this way.</p>
+<h2 id="timers"><a class="header" href="#timers">Timers</a></h2>
+<p>Timers run on the context’s clock. <code>rd_update</code> sets the clock from raylib each frame, before input, and every due
+timer fires then, on the main thread, so callbacks may change the tree like any listener.</p>
+<pre><code class="language-c">static void hide_toast(rd_ctx* ctx, void* data) {
+  toast* t = data;
+  rd_node_merge_style(ctx, t-&gt;node, &amp;(rd_style){.display = RD_DISPLAY_NONE});
+}
+
+static void show_toast(rd_ctx* ctx, toast* t) {
+  rd_node_merge_style(ctx, t-&gt;node, &amp;(rd_style){.display = RD_DISPLAY_FLEX});
+  rd_ctx_clear_timer(ctx, t-&gt;hide);  // showing again restarts the countdown
+  t-&gt;hide = rd_ctx_set_timer(ctx, 2.0, 0, hide_toast, t, NULL);
+}
+</code></pre>
+<pre><code class="language-c">int      seconds = 0;
+rd_timer clock   = rd_ctx_set_timer(ctx, 1.0, RD_TIMER_REPEAT, tick, &amp;seconds, NULL);
+// ... later
+rd_ctx_clear_timer(ctx, clock);
+</code></pre>
+<p>A one-shot timer is destroyed after it fires; clearing it afterwards is a harmless no-op, so “clear, then set” is
+the restart idiom. A repeating timer that falls behind (the window was minimized, say) fires once and skips the rest.
+A timer set from a timer callback doesn’t fire until the next clock update, so callbacks can’t loop forever within
+one frame. <code>destroy(data)</code> runs when a timer is cleared, a one-shot has fired, or the context is destroyed.</p>
+<p>C++: <code>ctx.set_timeout(2.0, [&amp;] { ... })</code> and <code>ctx.set_interval(1.0, [&amp;] { ... })</code> return an <code>rd_timer</code> for
+<code>ctx.clear_timer</code>.</p>
+<h3 id="event-waiting"><a class="header" href="#event-waiting">Event waiting</a></h3>
+<p>raylib’s <code>EnableEventWaiting</code> makes idle frames block until input arrives, which saves power but would also stall
+timers. Let raydom manage it instead:</p>
+<pre><code class="language-c">rd_set_event_waiting(ctx, true);  // instead of EnableEventWaiting()
+</code></pre>
+<p><code>rd_update</code> then turns raylib’s event waiting off while any timer is pending or anything animates, and back on when
+neither is true, so a
+tooltip delay or toast fires on time and an idle UI still costs nothing. A repeating timer keeps frames running for as
+long as it exists.</p>
 <h2 id="lifetime"><a class="header" href="#lifetime">Lifetime</a></h2>
 <p>Destroy the context before <code>CloseWindow</code>. <code>rd_ctx_destroy</code> frees every node and runs every destroy callback
 registered for userdata, listeners, measure and paint functions.</p>

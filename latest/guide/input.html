@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-ae0ea313.js";
+            window.path_to_searchindex_js = "../searchindex-a8891df0.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-3d3667e3.js"></script>
+        <script src="../toc-c393df87.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -194,6 +194,8 @@ save.on_click([&amp;] { ++saves; });  // also fires on Enter or Space while focu
 <p>Tab and Shift+Tab move through <code>TAB</code> nodes in tree order, wrapping, skipping hidden and disabled subtrees.
 <code>rd_node_focus(ctx, node)</code> focuses from code; a null node clears focus. <code>rd_ctx_focus_next</code> steps like Tab. A focus
 change fires <code>BLUR</code>, <code>FOCUS_OUT</code>, <code>FOCUS</code>, <code>FOCUS_IN</code>, in that order.</p>
+<p><code>rd_ctx_set_focus_scope(ctx, node)</code> keeps Tab and Shift+Tab inside a subtree, as a modal dialog needs; null
+restores the whole tree, and so does destroying the scope node. Pointer and programmatic focus aren’t restricted.</p>
 <p>Enter and Space on a focused node that isn’t an input fire <code>CLICK</code>, so keyboard users can activate buttons without
 extra code.</p>
 <h2 id="keyboard"><a class="header" href="#keyboard">Keyboard</a></h2>

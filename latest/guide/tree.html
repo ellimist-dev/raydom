@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-ae0ea313.js";
+            window.path_to_searchindex_js = "../searchindex-a8891df0.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-3d3667e3.js"></script>
+        <script src="../toc-c393df87.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -231,6 +231,13 @@ rd_node_set_userdata(ctx, a, data, free_item);
 item* back = rd_node_userdata(ctx, a);
 </code></pre>
 <p>C++: <code>node.emplace_userdata&lt;T&gt;(args...)</code> allocates a <code>T</code> owned by the node, and <code>node.userdata&lt;T&gt;()</code> returns it.</p>
+<h2 id="extension-storage"><a class="header" href="#extension-storage">Extension storage</a></h2>
+<p>Libraries built on raydom can keep per-context data without a global map:</p>
+<pre><code class="language-c">static const char key;  // any address the library owns
+rd_ctx_set_extension(ctx, &amp;key, data, free_data);  // destroyed with the context
+my_state* s = rd_ctx_extension(ctx, &amp;key);
+</code></pre>
+<p>The extras controls keep their classes and state this way, which leaves every node’s userdata to the application.</p>
 <h2 id="destroying"><a class="header" href="#destroying">Destroying</a></h2>
 <pre><code class="language-c">rd_node_destroy(ctx, list);         // destroys list, a and c; a's userdata is freed
 bool alive = rd_node_alive(ctx, a);  // false: the handle is stale, and every call on it is a no-op

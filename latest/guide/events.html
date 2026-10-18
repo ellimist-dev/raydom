@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-ae0ea313.js";
+            window.path_to_searchindex_js = "../searchindex-a8891df0.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-3d3667e3.js"></script>
+        <script src="../toc-c393df87.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -254,10 +254,30 @@ released or <code>rd_node_release_pointer_capture</code> is called. Use it for d
 <pre><code class="language-cpp">rd::Node canvas = ctx.create(rd::Style().height(100_px).overflow_y(RD_OVERFLOW_SCROLL));
 canvas.on(RD_EVENT_WHEEL, [](rd::Event&amp; e) { e.prevent_default(); });  // handle the wheel yourself, no scrolling
 </code></pre>
+<h2 id="firing-events"><a class="header" href="#firing-events">Firing events</a></h2>
+<p><code>rd_node_dispatch(ctx, node, type)</code> fires an event through capture, target and bubble like any other, with the
+current pointer position and modifiers. Components use it to announce their own <code>INPUT</code> and <code>CHANGE</code>, so
+applications listen to them the same way as to built-in inputs. It returns false if a listener called
+<code>rd_event_prevent_default</code>.</p>
 <h2 id="hit-testing"><a class="header" href="#hit-testing">Hit-testing</a></h2>
 <p><code>rd_node_at(ctx, x, y)</code> returns the topmost node under a point after layout. Nodes with <code>pointer_events: none</code> are
 skipped, and children inherit it unless they set <code>auto</code>. Use <code>none</code> for overlays and decorative layers that
 shouldn’t take the pointer.</p>
+<h2 id="cursors"><a class="header" href="#cursors">Cursors</a></h2>
+<p>The <code>cursor</code> style property sets the mouse cursor over a node. It’s inherited, so setting it on a card applies to
+everything inside. <code>rd_update</code> shows the cursor of the hovered node, or of the node holding the pointer capture.</p>
+<pre><code class="language-cpp">rd::Class grip = ctx.create_class(rd::Style().cursor(RD_CURSOR_EW_RESIZE));
+grip.on(RD_STATE_ACTIVE, rd::Style().cursor(RD_CURSOR_MOVE));  // while pressed, for the whole drag
+</code></pre>
+<p><code>RD_CURSOR_AUTO</code>, the default, shows:</p>
+<ul>
+<li>text over inputs, and over text whose <code>user_select</code> is <code>auto</code>;</li>
+<li>pointer over nodes with the link role;</li>
+<li>default over everything else, including text inside a button or other interactive role.</li>
+</ul>
+<p>While the user drags a text selection, the cursor stays text even over other nodes. <code>RD_CURSOR_NONE</code> hides it.
+<code>rd_ctx_cursor</code> returns the resolved cursor, for applications that drive input themselves. Don’t call raylib’s
+<code>SetMouseCursor</code> alongside <code>rd_update</code>; set the style instead.</p>
 <h2 id="mutating-during-dispatch"><a class="header" href="#mutating-during-dispatch">Mutating during dispatch</a></h2>
 <p>Listeners may create, move and destroy nodes, including the target and the current node. A node destroyed during
 dispatch is detached at once and freed when dispatch ends, so <code>ev-&gt;current</code> stays valid until the listener returns.
@@ -267,7 +287,7 @@ A listener added to a node while that node’s listeners are running doesn’t r
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="../guide/text.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../guide/images.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
@@ -281,7 +301,7 @@ A listener added to a node while that node’s listeners are running doesn’t r
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="../guide/text.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../guide/images.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
