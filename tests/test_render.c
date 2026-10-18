@@ -70,11 +70,15 @@ static void test_clip_and_cull(void) {
   uint32_t       n;
   const rd__cmd* cmds = rd__display_list(ctx, &n);
   CHECK(count_kind(cmds, n, RD_CMD_CLIP) == 2);
-  CHECK(count_kind(cmds, n, RD_CMD_RECT) == 3);
+  CHECK(count_kind(cmds, n, RD_CMD_RECT) == 4);  // three visible rows and the scrollbar thumb
   const rd__cmd* c = &cmds[0];
   CHECK(c->kind == RD_CMD_CLIP && near(c->rect.x, 5) && near(c->rect.y, 5) && near(c->rect.width, 90) &&
         near(c->rect.height, 90));
-  CHECK(cmds[n - 1].kind == RD_CMD_CLIP && near(cmds[n - 1].rect.width, 400));
+  CHECK(cmds[n - 2].kind == RD_CMD_CLIP && near(cmds[n - 2].rect.width, 400));
+  // The thumb: inside the padding box, 2px from the edge, 8px wide, at least 24px long.
+  const rd__cmd* thumb = &cmds[n - 1];
+  CHECK(thumb->kind == RD_CMD_RECT && near(thumb->rect.x, 85) && near(thumb->rect.y, 7) && near(thumb->rect.width, 8) &&
+        near(thumb->rect.height, 24) && near(thumb->radii[0], 4));
 
   rd_size content = rd_node_content_size(ctx, clip);
   CHECK(near(content.height, 400));

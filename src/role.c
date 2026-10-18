@@ -25,6 +25,12 @@ bool rd__role_interactive(const rd_ctx* ctx, uint32_t i) {
     case RD_ROLE_LINK:
     case RD_ROLE_CHECKBOX:
     case RD_ROLE_RADIO_BUTTON:
+    case RD_ROLE_SWITCH:
+    case RD_ROLE_SLIDER:
+    case RD_ROLE_MENU_ITEM:
+    case RD_ROLE_COMBO_BOX:
+    case RD_ROLE_TAB:
+    case RD_ROLE_SPLITTER:
       return true;
     default:
       return false;

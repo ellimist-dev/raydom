@@ -51,6 +51,7 @@ static const rd_style default_style = {
     .border_radius         = {PX0, PX0, PX0, PX0},
     .opacity               = {1, RD_UNIT_NUM},
     .box_shadow            = {PX0, PX0, PX0, PX0, {0, 0, 0, 0, true}},
+    .object_fit            = RD_OBJECT_FIT_FILL,
     .color                 = {0, 0, 0, 255, true},
     .font_size             = {16, RD_UNIT_PX},
     .line_height           = {1.2f, RD_UNIT_NUM},
@@ -62,6 +63,14 @@ static const rd_style default_style = {
     .line_clamp            = {0, RD_UNIT_NUM},
     .pointer_events        = RD_POINTER_EVENTS_AUTO,
     .focusable             = RD_FOCUSABLE_NONE,
+    .cursor                = RD_CURSOR_AUTO,
+    .scrollbar_width       = {8, RD_UNIT_PX},
+    .scrollbar_color       = {128, 128, 128, 120, true},
+    .scrollbar_track_color = {0, 0, 0, 0, true},
+    .transition_duration   = {0, RD_UNIT_NUM},
+    .transition_delay      = {0, RD_UNIT_NUM},
+    .transition_easing     = RD_EASING_EASE,
+    .transition_properties = RD_TRANSITION_ALL,
     .caret_color           = {0, 0, 0, 0, true},
     .selection_color       = {91, 140, 255, 90, true},
 };
@@ -216,14 +225,26 @@ static void build(const rd_ctx* ctx, uint32_t i, const rd_style* parent, rd_styl
   const rd_node_style* ns = &ctx->styles[i];
   for (uint32_t c = 0; c < ns->class_count; c++)
     rd_style_merge(out, &ctx->classes[ns->classes[c] - 1].base);
+  uint8_t states = ns->states;
+  for (uint32_t j = i; ctx->styles[j].share_states && ctx->slots[j].parent;) {
+    j = ctx->slots[j].parent;
+    states |= ctx->styles[j].states;
+  }
   for (uint32_t k = 0; k < RD_STATE_COUNT; k++) {
-    if (!(ns->states & (1u << k))) continue;
+    if (!(states & (1u << k))) continue;
     for (uint32_t c = 0; c < ns->class_count; c++) {
       const rd_class_data* cd = &ctx->classes[ns->classes[c] - 1];
       if (cd->state_mask & (1u << k)) rd_style_merge(out, &cd->states[k]);
     }
   }
   if (ns->inline_style) rd_style_merge(out, ns->inline_style);
+  // The overlay always covers the root, whatever its classes and inline style say.
+  if (i == ctx->overlay.index && ctx->slots[i].gen == ctx->overlay.gen) {
+    rd_val px0 = {0, RD_UNIT_PX}, autov = {0, RD_UNIT_AUTO};
+    out->position = RD_POSITION_ABSOLUTE;
+    out->inset = out->margin = (rd_edges){px0, px0, px0, px0};
+    out->width = out->height = out->min_width = out->min_height = out->max_width = out->max_height = autov;
+  }
 }
 
 static void compute_rec(rd_ctx* ctx, uint32_t i, const rd_style* parent, bool force) {
@@ -233,6 +254,7 @@ static void compute_rec(rd_ctx* ctx, uint32_t i, const rd_style* parent, bool fo
   if (force || (s->flags & RD_FLAG_STYLE_DIRTY)) {
     rd_style next;
     build(ctx, i, parent, &next);
+    rd__transition(ctx, i, &next);
     unsigned d = style_diff(&next, &ns->computed);
     if (d) {
       ns->computed     = next;
@@ -284,6 +306,8 @@ void rd__style_slot_free(rd_ctx* ctx, uint32_t i) {
   ns->inline_style = NULL;
   ns->classes      = NULL;
   ns->class_count = ns->class_cap = 0;
+  rd__anim_free(ns);
+  ns->computed_once = false;
 }
 
 void rd__style_ctx_free(rd_ctx* ctx) {
@@ -459,6 +483,22 @@ bool rd_node_has_class(const rd_ctx* ctx, rd_node node, rd_class cls) {
   return rd__slot(ctx, node) && node_has_class(&ctx->styles[node.index], cls.id);
 }
 
+// Children sharing a node's states restyle when they change, and so on down.
+static void mark_sharers(rd_ctx* ctx, uint32_t i) {
+  for (uint32_t c = ctx->slots[i].first_child; c; c = ctx->slots[c].next_sibling) {
+    if (!ctx->styles[c].share_states) continue;
+    rd__mark_style_dirty(ctx, c);
+    mark_sharers(ctx, c);
+  }
+}
+
+void rd_node_set_share_states(rd_ctx* ctx, rd_node node, bool share) {
+  if (!rd__slot(ctx, node) || ctx->styles[node.index].share_states == share) return;
+  ctx->styles[node.index].share_states = share;
+  rd__mark_style_dirty(ctx, node.index);
+  mark_sharers(ctx, node.index);
+}
+
 void rd_node_set_states(rd_ctx* ctx, rd_node node, uint8_t states, bool on) {
   if (!rd__slot(ctx, node)) return;
   rd_node_style* ns   = &ctx->styles[node.index];
@@ -466,6 +506,7 @@ void rd_node_set_states(rd_ctx* ctx, rd_node node, uint8_t states, bool on) {
   uint8_t        diff = ns->states ^ next;
   ns->states          = next;
   if (!diff) return;
+  mark_sharers(ctx, node.index);
   for (uint32_t c = 0; c < ns->class_count; c++) {
     if (ctx->classes[ns->classes[c] - 1].state_mask & diff) {
       rd__mark_style_dirty(ctx, node.index);

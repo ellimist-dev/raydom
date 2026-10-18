@@ -46,6 +46,12 @@ rd_node  rd_node_prev_sibling(const rd_ctx* ctx, rd_node node);
 uint32_t rd_node_child_count(const rd_ctx* ctx, rd_node node);
 
 // Replacing userdata runs the previous destroy callback.
+// Per-context storage for libraries built on raydom, keyed by the address of something the library
+// owns, such as a static variable. destroy(data) runs when the entry is replaced or the context is
+// destroyed, after its nodes; it must not call into the context.
+bool  rd_ctx_set_extension(rd_ctx* ctx, const void* key, void* data, rd_destroy_fn destroy);
+void* rd_ctx_extension(const rd_ctx* ctx, const void* key);
+
 bool  rd_node_set_userdata(rd_ctx* ctx, rd_node node, void* data, rd_destroy_fn destroy);
 void* rd_node_userdata(const rd_ctx* ctx, rd_node node);
 

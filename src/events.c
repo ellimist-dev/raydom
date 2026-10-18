@@ -167,6 +167,11 @@ static bool fire(rd_ctx* ctx, rd_event_type type, rd_node target, uint8_t button
 
 void rd__fire(rd_ctx* ctx, rd_event_type type, rd_node target) { fire(ctx, type, target, 0, true); }
 
+bool rd_node_dispatch(rd_ctx* ctx, rd_node node, rd_event_type type) {
+  if (!ctx || type >= RD_EVENT_TYPE_COUNT) return true;
+  return !fire(ctx, type, node, 0, true);
+}
+
 // Pointer.
 
 static bool disabled(const rd_ctx* ctx, rd_node n) {
@@ -292,6 +297,7 @@ bool rd_node_focus(rd_ctx* ctx, rd_node node) {
     set_focus(ctx, node, false);
     return true;
   }
+  rd_ctx_compute_styles(ctx);  // a node created this frame has no computed focusable yet
   if (!can_focus(ctx, node, false)) return false;
   set_focus(ctx, node, ctx->keyboard_modality || rd_node_is_input(ctx, node));
   return true;
@@ -308,10 +314,19 @@ static void collect_tabbable(const rd_ctx* ctx, uint32_t i, rd__chain* out) {
   for (uint32_t c = ctx->slots[i].first_child; c; c = ctx->slots[c].next_sibling) collect_tabbable(ctx, c, out);
 }
 
+void rd_ctx_set_focus_scope(rd_ctx* ctx, rd_node scope) {
+  if (ctx) ctx->focus_scope = scope;
+}
+
+rd_node rd_ctx_focus_scope(const rd_ctx* ctx) {
+  return ctx && rd__slot(ctx, ctx->focus_scope) ? ctx->focus_scope : (rd_node){0};
+}
+
 bool rd_ctx_focus_next(rd_ctx* ctx, bool backward) {
   if (!ctx) return false;
+  rd_ctx_compute_styles(ctx);  // focusable and display may have changed since the last layout
   rd__chain list = {0};
-  collect_tabbable(ctx, ctx->root, &list);
+  collect_tabbable(ctx, rd__slot(ctx, ctx->focus_scope) ? ctx->focus_scope.index : ctx->root, &list);
   if (!list.len) {
     free(list.nodes);
     return false;
@@ -442,11 +457,81 @@ static void scroll_gesture(rd_ctx* ctx, rd_node t, float x, float y, float wheel
 }
 
 void rd_ctx_set_time(rd_ctx* ctx, double seconds) {
-  if (ctx) ctx->now = seconds;
+  if (!ctx) return;
+  ctx->now = seconds;
+  rd__timers_run(ctx);
 }
 
 static rd_node pointer_target(rd_ctx* ctx, rd_node hit) {
   return rd__slot(ctx, ctx->capture) ? ctx->capture : hit;
+}
+
+// Scrollbars.
+
+static bool inside(rd_rect r, float x, float y) { return x >= r.x && y >= r.y && x < r.x + r.width && y < r.y + r.height; }
+
+// The scrollbar under (x, y): on the nearest scroll container above the hit node. The grab area is
+// slightly larger than the bar.
+static bool scrollbar_at(const rd_ctx* ctx, uint32_t hit, float x, float y, uint32_t* node, int* axis, rd_rect* thumb) {
+  for (uint32_t i = hit; i; i = ctx->slots[i].parent) {
+    rd_rect r = rd_node_bounds(ctx, rd__handle(ctx, i));
+    for (int a = 0; a < 2; a++) {
+      rd_rect track;
+      if (!rd__scrollbar(ctx, i, r, a, &track, thumb)) continue;
+      if (inside((rd_rect){track.x - 2, track.y - 2, track.width + 4, track.height + 4}, x, y)) {
+        *node = i;
+        *axis = a;
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+static void drag_thumb(rd_ctx* ctx, float x, float y) {
+  uint32_t i = ctx->sb_drag.node.index;
+  int      a = ctx->sb_drag.axis;
+  rd_rect  track, thumb;
+  if (!rd__slot(ctx, ctx->sb_drag.node) || !rd__scrollbar(ctx, i, rd_node_bounds(ctx, ctx->sb_drag.node), a, &track, &thumb))
+    return;
+  float travel = a ? track.height - thumb.height : track.width - thumb.width;
+  if (travel <= 0) return;
+  float p                    = (a ? y - track.y : x - track.x) - ctx->sb_drag.grab;
+  float to                   = p / travel * rd__scroll_max(ctx, i, a);
+  float now                  = ctx->layouts[i].scroll[a];
+  rd__scroll_by(ctx, i, a ? 0 : to - now, a ? to - now : 0);
+}
+
+// Handles the pointer when it's on, or dragging, a scrollbar. True when the content shouldn't see it.
+static bool scrollbar_pointer(rd_ctx* ctx, uint32_t hit, float x, float y, uint8_t buttons) {
+  if (ctx->sb_drag.active) {
+    if (buttons & RD_BUTTON_PRIMARY) {
+      if (ctx->sb_drag.thumb) drag_thumb(ctx, x, y);
+      return true;
+    }
+    ctx->sb_drag.active = false;
+    ctx->paint_dirty    = true;
+  }
+  uint32_t i = 0;
+  int      a = 0;
+  rd_rect  thumb;
+  bool     over = !ctx->pointer_buttons && scrollbar_at(ctx, hit, x, y, &i, &a, &thumb);
+  rd_node  hot  = over ? rd__handle(ctx, i) : (rd_node){0};
+  if (!rd_node_eq(hot, ctx->sb_hot.node) || ctx->sb_hot.axis != a) ctx->paint_dirty = true;
+  ctx->sb_hot.node = hot;
+  ctx->sb_hot.axis = a;
+  if (!over || !(buttons & RD_BUTTON_PRIMARY)) return false;
+
+  bool on_thumb = inside(thumb, x, y);
+  ctx->sb_drag  = (typeof(ctx->sb_drag)){hot, a, a ? y - thumb.y : x - thumb.x, on_thumb, true};
+  if (!on_thumb) {  // a track press pages toward the pointer
+    const rd_node_layout* L    = &ctx->layouts[i];
+    float                 view = a ? L->rect.height - L->border[0] - L->border[2]   // top, bottom
+                                   : L->rect.width - L->border[3] - L->border[1];   // left, right
+    float                 d    = ((a ? y < thumb.y : x < thumb.x) ? -1.0f : 1.0f) * view * 0.9f;
+    rd__scroll_by(ctx, i, a ? 0 : d, a ? d : 0);
+  }
+  return true;
 }
 
 void rd_ctx_pointer(rd_ctx* ctx, float x, float y, uint8_t buttons, float wheel_x, float wheel_y) {
@@ -456,6 +541,7 @@ void rd_ctx_pointer(rd_ctx* ctx, float x, float y, uint8_t buttons, float wheel_
   ctx->pointer_x    = x;
   ctx->pointer_y    = y;
   rd_node hit       = rd__handle(ctx, rd__hit(ctx, x, y));
+  if (scrollbar_pointer(ctx, hit.index, x, y, buttons)) return;
 
   update_hover(ctx, pointer_target(ctx, hit));
   if (moved) {
@@ -513,6 +599,22 @@ void rd_ctx_pointer(rd_ctx* ctx, float x, float y, uint8_t buttons, float wheel_
     dispatch(ctx, &ev, true);
     if (!ev.default_prevented && rd__slot(ctx, t)) scroll_gesture(ctx, t, x, y, wheel_x, wheel_y);
   }
+}
+
+rd_cursor rd_ctx_cursor(const rd_ctx* ctx) {
+  if (!ctx) return RD_CURSOR_DEFAULT;
+  if (ctx->selecting && (ctx->pointer_buttons & RD_BUTTON_PRIMARY)) return RD_CURSOR_TEXT;
+  if (ctx->sb_drag.active || !rd_node_is_null(ctx->sb_hot.node)) return RD_CURSOR_DEFAULT;
+  rd_node n = rd_ctx_hovered(ctx);
+  if (rd_node_is_null(n)) return RD_CURSOR_DEFAULT;
+  const rd_style* st = &ctx->styles[n.index].computed;
+  if (st->cursor != RD_CURSOR_AUTO && st->cursor != RD_CURSOR_UNSET) return st->cursor;
+  if (rd_node_is_input(ctx, n)) return RD_CURSOR_TEXT;
+  // Text inside a control belongs to the control: a button's label isn't an I-beam.
+  for (uint32_t i = n.index; i; i = ctx->slots[i].parent)
+    if (rd__role_interactive(ctx, i)) return ctx->slots[i].role == RD_ROLE_LINK ? RD_CURSOR_POINTER : RD_CURSOR_DEFAULT;
+  if (rd__text_get(ctx, n.index) && st->user_select == RD_USER_SELECT_AUTO) return RD_CURSOR_TEXT;
+  return RD_CURSOR_DEFAULT;
 }
 
 rd_node rd_ctx_hovered(const rd_ctx* ctx) {

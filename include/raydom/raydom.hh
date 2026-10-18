@@ -57,6 +57,11 @@ constexpr rd_val operator""_pct(long double v) { return {static_cast<float>(v), 
 constexpr rd_val operator""_pct(unsigned long long v) { return {static_cast<float>(v), RD_UNIT_PCT}; }
 constexpr rd_val operator""_fr(long double v) { return {static_cast<float>(v), RD_UNIT_FR}; }
 constexpr rd_val operator""_fr(unsigned long long v) { return {static_cast<float>(v), RD_UNIT_FR}; }
+// Durations, for transition_duration and transition_delay: 150_ms, 0.2_s.
+constexpr rd_val operator""_ms(long double v) { return {static_cast<float>(v / 1000), RD_UNIT_NUM}; }
+constexpr rd_val operator""_ms(unsigned long long v) { return {static_cast<float>(v) / 1000, RD_UNIT_NUM}; }
+constexpr rd_val operator""_s(long double v) { return {static_cast<float>(v), RD_UNIT_NUM}; }
+constexpr rd_val operator""_s(unsigned long long v) { return {static_cast<float>(v), RD_UNIT_NUM}; }
 }  // namespace literals
 
 class Style {
@@ -381,6 +386,60 @@ public:
     rd_input_select(ctx_, handle_, anchor, caret);
     return *this;
   }
+  // Null clears it. See rd_node_set_anchor.
+  Node& anchor(const rd_anchor& a) {
+    rd_node_set_anchor(ctx_, handle_, &a);
+    return *this;
+  }
+  Node& clear_anchor() {
+    rd_node_set_anchor(ctx_, handle_, nullptr);
+    return *this;
+  }
+  rd_side anchor_side() const { return rd_node_anchor_side(ctx_, handle_); }
+  // True if other is this node or one of its descendants.
+  bool contains(Node other) const {
+    for (; other; other = other.parent())
+      if (other == *this) return true;
+    return false;
+  }
+
+  // Null image clears it.
+  Node& image(rd_image img) {
+    rd_node_set_image(ctx_, handle_, img);
+    return *this;
+  }
+  rd_image image() const { return rd_node_image(ctx_, handle_); }
+
+  // Class variants also apply for the parent's states. See rd_node_set_share_states.
+  Node& share_states(bool share = true) {
+    rd_node_set_share_states(ctx_, handle_, share);
+    return *this;
+  }
+  // Fires an event at the node; false if a listener prevented the default.
+  bool dispatch(rd_event_type type) { return rd_node_dispatch(ctx_, handle_, type); }
+
+  // Animates to `to` over seconds; see rd_node_animate. done(), if given, runs afterward and is owned
+  // by the timer.
+  Node& animate(const Style& to, double seconds, rd_easing easing = RD_EASING_EASE) {
+    rd_node_animate(ctx_, handle_, nullptr, &to.get(), seconds, easing, nullptr, nullptr);
+    return *this;
+  }
+  Node& animate(const Style& from, const Style& to, double seconds, rd_easing easing = RD_EASING_EASE) {
+    rd_node_animate(ctx_, handle_, &from.get(), &to.get(), seconds, easing, nullptr, nullptr);
+    return *this;
+  }
+  template <class F>
+  Node& animate(const Style& to, double seconds, rd_easing easing, F&& done) {
+    using Fn = std::decay_t<F>;
+    Fn* p    = new (std::nothrow) Fn(std::forward<F>(done));
+    if (!p) return animate(to, seconds, easing);
+    rd_timer_fn call = [](rd_ctx*, void* d) { (*static_cast<Fn*>(d))(); };
+    rd_destroy_fn del = [](void* d) { delete static_cast<Fn*>(d); };
+    rd_node_animate(ctx_, handle_, nullptr, &to.get(), seconds, easing, nullptr, nullptr);
+    if (!rd_ctx_set_timer(ctx_, seconds, 0, call, p, del).index) delete p;
+    return *this;
+  }
+
   Node& role(rd_role r) {
     rd_node_set_role(ctx_, handle_, r);
     return *this;
@@ -479,6 +538,8 @@ public:
 
   rd_ctx*       get() const { return ctx_; }
   Node          root() const { return {ctx_, rd_ctx_root(ctx_)}; }
+  // The layer above the tree for popups; created on first use.
+  Node          overlay() const { return {ctx_, rd_ctx_overlay(ctx_)}; }
   std::uint32_t node_count() const { return rd_ctx_node_count(ctx_); }
 
   // Null node on allocation failure.
@@ -499,6 +560,19 @@ public:
     return rd_font_load(ctx_, data, size, copy);
   }
   rd_font load_font_file(const char* path) const { return rd_font_load_file(ctx_, path); }
+
+  // Null image on failure. See image.h.
+  rd_image load_image(const void* data, std::size_t size) const { return rd_image_load(ctx_, data, size); }
+  rd_image load_image_file(const char* path) const { return rd_image_load_file(ctx_, path); }
+  rd_image image_from_pixels(const void* rgba, int width, int height) const {
+    return rd_image_from_pixels(ctx_, rgba, width, height);
+  }
+  bool    update_image(rd_image img, const void* rgba, int width, int height) const {
+    return rd_image_update(ctx_, img, rgba, width, height);
+  }
+  void    unload_image(rd_image img) const { rd_image_unload(ctx_, img); }
+  rd_size image_size(rd_image img) const { return rd_image_size(ctx_, img); }
+  Node    create_image(rd_image img, const Style& style = {}) const { return create(style).image(img).role(RD_ROLE_IMAGE); }
   void    set_default_font(rd_font f) const { rd_ctx_set_default_font(ctx_, f); }
   float   measure_text(std::string_view s, float size, rd_font f = {0, true}) const {
     return rd_font_measure(ctx_, f, size, s.data(), s.size());
@@ -514,7 +588,22 @@ public:
   void compute_styles() const { rd_ctx_compute_styles(ctx_); }
   void layout(float width, float height) const { rd_ctx_layout(ctx_, width, height); }
 
-  Node hovered() const { return {ctx_, rd_ctx_hovered(ctx_)}; }
+  // f() after delay seconds, or every delay seconds. The callable is owned by the timer. Null timer
+  // on allocation failure.
+  template <class F>
+  rd_timer set_timeout(double delay, F&& f) const {
+    return set_timer(delay, 0, std::forward<F>(f));
+  }
+  template <class F>
+  rd_timer set_interval(double delay, F&& f) const {
+    return set_timer(delay, RD_TIMER_REPEAT, std::forward<F>(f));
+  }
+  bool clear_timer(rd_timer t) const { return rd_ctx_clear_timer(ctx_, t); }
+  // The clock timers run on; rd_update sets it from raylib.
+  void set_time(double seconds) const { rd_ctx_set_time(ctx_, seconds); }
+
+  Node      hovered() const { return {ctx_, rd_ctx_hovered(ctx_)}; }
+  rd_cursor cursor() const { return rd_ctx_cursor(ctx_); }
   Node pointer_capture() const { return {ctx_, rd_ctx_pointer_capture(ctx_)}; }
   Node focused() const { return {ctx_, rd_ctx_focused(ctx_)}; }
   void blur() const { rd_node_focus(ctx_, {}); }
@@ -550,6 +639,18 @@ public:
   void draw() const { rd_draw(ctx_); }
 
 private:
+  template <class F>
+  rd_timer set_timer(double delay, std::uint32_t flags, F&& f) const {
+    using Fn = std::decay_t<F>;
+    Fn* p    = new (std::nothrow) Fn(std::forward<F>(f));
+    if (!p) return {};
+    rd_timer t = rd_ctx_set_timer(
+        ctx_, delay, flags, [](rd_ctx*, void* d) { (*static_cast<Fn*>(d))(); }, p,
+        [](void* d) { delete static_cast<Fn*>(d); });
+    if (!t.index) delete p;
+    return t;
+  }
+
   rd_tracks tracks(const Track* t, std::size_t n) const {
     static_assert(sizeof(Track) == sizeof(rd_track));
     rd_tracks r = rd_tracks_create(ctx_, reinterpret_cast<const rd_track*>(t), static_cast<std::uint32_t>(n));

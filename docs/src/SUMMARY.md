@@ -14,9 +14,12 @@
 - [Styles and classes](guide/styles.md)
 - [Layout](guide/layout.md)
 - [Text and fonts](guide/text.md)
+- [Images](guide/images.md)
 - [Events](guide/events.md)
 - [Focus, keyboard and text input](guide/input.md)
 - [Roles](guide/roles.md)
+- [Animation](guide/animation.md)
+- [Overlay and anchoring](guide/overlay.md)
 - [Canvases](guide/canvas.md)
 
 # C++
@@ -25,7 +28,11 @@
 
 # Extras
 
+- [Controls and toasts](extras/controls.md)
+- [Menus, selects, modals and tooltips](extras/popups.md)
+- [Tabs, splitters, lists, tables and trees](extras/views.md)
 - [Network view](extras/graph.md)
+- [File dialogs](extras/dialog.md)
 
 # Reference
 

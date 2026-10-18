@@ -7,9 +7,6 @@ build:
 showcase: build
     ./build/examples/showcase
 
-network: build
-    ./build/examples/network
-
 test: build
     ctest --test-dir build --output-on-failure
 

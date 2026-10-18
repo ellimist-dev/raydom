@@ -1,4 +1,4 @@
-// A deterministic single-decree Paxos run drawn with raydom_extras' network view. Two proposers
+// The Network tab: a deterministic single-decree Paxos run drawn with raydom_extras' network view. Two proposers
 // compete for five acceptors. Message delays come from a seeded generator and the simulation
 // advances in whole logical ticks, so a seed always produces the same run; the view only
 // interpolates messages between ticks.
@@ -15,18 +15,14 @@
 #include <string>
 #include <vector>
 
+#include "showcase.h"
+
 using namespace rd::literals;
 
 namespace {
 
-const unsigned char kFont[] = {
-#embed "anonymous_pro_bold.ttf"
-};
-
 constexpr int kAcceptors = 5, kProposers = 2, kMajority = kAcceptors / 2 + 1;
 
-constexpr std::uint32_t kBg = 0x0f1115, kPanel = 0x151922, kLine = 0x272d3a, kText = 0xe4e7ee, kMuted = 0x8a93a6,
-                        kAccent = 0x5b8cff;
 
 // Simulation.
 
@@ -177,6 +173,8 @@ struct App {
   float                 speed = 1, frac = 0;
   int                   selected = -1;
   rd::Node              tick_label, play_label, speed_label, title, role, state, log_text, verdict;
+  rd_timer              ticker{};
+  double                last = 0;
 };
 
 std::string node_label(const Sim& s, int id) {
@@ -263,8 +261,7 @@ rd::Node button(rd::Context& ctx, rd::Class cls, std::string_view label, rd::Nod
   return b;
 }
 
-void build(rd::Context& ctx, App& app) {
-  ctx.root().style(rd::Style().background(rd::hex(kBg)).color(rd::hex(kText)).font_size(14_px));
+rd::Node build(rd::Context& ctx, App& app) {
 
   rd::Class btn = ctx.create_class(rd::Style()
                                        .padding(6_px, 14_px)
@@ -297,9 +294,25 @@ void build(rd::Context& ctx, App& app) {
   rd::Node speed = button(ctx, btn, "1x", &app.speed_label);
   header.append(app.tick_label).append(play).append(next).append(again).append(speed);
 
+  // Playing advances on a timer, which keeps frames coming while it runs.
   auto toggle = [&app] {
     app.playing = !app.playing;
     app.play_label.text(app.playing ? "Pause" : "Play");
+    if (!app.playing) {
+      app.ctx->clear_timer(app.ticker);
+      return;
+    }
+    app.last   = GetTime();
+    app.ticker = app.ctx->set_interval(1.0 / 120, [&app] {
+      double now = GetTime();
+      app.frac += static_cast<float>(now - app.last) * app.speed * 4;
+      app.last = now;
+      while (app.frac >= 1) {
+        app.frac -= 1;
+        step(app);
+      }
+      push_messages(app);
+    });
   };
   play.on_click(toggle);
   next.on_click([&app] {
@@ -314,7 +327,9 @@ void build(rd::Context& ctx, App& app) {
     std::snprintf(s, sizeof s, app.speed < 1 ? "%.1fx" : "%.0fx", static_cast<double>(app.speed));
     app.speed_label.text(s);
   });
-  ctx.root().on(RD_EVENT_KEY_DOWN, [&app, toggle](rd::Event& e) {
+  // Shortcuts while the tab has focus (click anywhere in it).
+  rd::Node root = ctx.create(rd::Style().flex(1).min_height(0_px).focusable(RD_FOCUSABLE_POINTER));
+  root.on(RD_EVENT_KEY_DOWN, [&app, toggle](rd::Event& e) {
     if (e.key() == RD_KEY_SPACE) toggle();
     if (e.key() == RD_KEY_RIGHT) {
       app.frac = 0;
@@ -324,7 +339,7 @@ void build(rd::Context& ctx, App& app) {
     if (e.key() == RD_KEY_R) reset(app);
   });
 
-  rd::Node body   = ctx.create(rd::Style().flex(1).flex_direction(RD_FLEX_ROW));
+  rd::Node body   = ctx.create(rd::Style().flex(1).min_height(0_px).flex_direction(RD_FLEX_ROW));
   rd::Node canvas = ctx.create(rd::Style().flex(1));
   app.graph       = rdx::Graph::create(canvas);
   app.graph.background(rd::hex(0x0b0d12));
@@ -383,66 +398,15 @@ void build(rd::Context& ctx, App& app) {
   }
   side.append(app.verdict).append(legend).append(app.title).append(app.role).append(app.state).append(app.log_text);
   body.append(canvas).append(side);
-  ctx.root().append(header).append(body);
+  root.append(header).append(body);
   reset(app);
+  return root;
 }
 
 }  // namespace
 
-// RAYDOM_SCREENSHOT=<file.png> runs RAYDOM_TICKS=<n> ticks (default 12), selects RAYDOM_SELECT=<id>
-// if given, renders, saves a frame and exits.
-int main() {  // NOLINT(bugprone-exception-escape): std::bad_alloc should terminate.
-  const char* shot = std::getenv("RAYDOM_SCREENSHOT");
-  SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE | FLAG_VSYNC_HINT);
-  InitWindow(1280, 800, "raydom: paxos");
-  SetWindowMinSize(900, 560);
-  SetExitKey(KEY_NULL);
-  {
-    rd::Context ctx;
-    ctx.load_font(kFont, sizeof kFont, false);
-    App app;
-    app.ctx = &ctx;
-    build(ctx, app);
-    if (shot) {
-      const char* n = std::getenv("RAYDOM_TICKS");
-      for (long j = n ? std::strtol(n, nullptr, 10) : 12; j > 0; j--) app.sim.step();
-      app.frac = 0.5f;
-      if (const char* s = std::getenv("RAYDOM_SELECT")) {
-        app.selected = static_cast<int>(std::strtol(s, nullptr, 10));
-        app.graph.select(app.nodes[static_cast<std::size_t>(app.selected)]);
-      }
-      refresh(app);
-      push_messages(app);
-    }
-
-    double last = GetTime();
-    for (int frame = 0; !WindowShouldClose(); frame++) {
-      double now = GetTime(), dt = now - last;
-      last = now;
-      if (shot) {
-        // Screenshots render the prepared state without advancing.
-      } else if (app.playing) {
-        DisableEventWaiting();
-        app.frac += static_cast<float>(dt) * app.speed * 4;
-        while (app.frac >= 1) {
-          app.frac -= 1;
-          step(app);
-        }
-        push_messages(app);
-      } else {
-        EnableEventWaiting();
-      }
-      ctx.update();
-      ctx.layout(static_cast<float>(GetScreenWidth()), static_cast<float>(GetScreenHeight()));
-      BeginDrawing();
-      ClearBackground(Color{0x0f, 0x11, 0x15, 0xff});
-      ctx.draw();
-      EndDrawing();
-      if (shot && frame == 3) {
-        TakeScreenshot(shot);
-        break;
-      }
-    }
-  }
-  CloseWindow();
+rd::Node build_network(rd::Context& ctx) {
+  App* app = new App;  // lives as long as the program
+  app->ctx = &ctx;
+  return build(ctx, *app);
 }

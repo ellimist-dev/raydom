@@ -39,6 +39,10 @@ void rd_paint_scissor(const rd_paint_info* info);
 // size; rd_draw draws it between BeginDrawing and EndDrawing. Destroy the context before
 // CloseWindow so its textures and shader are released.
 void rd_update(rd_ctx* ctx);
+// Lets raydom manage raylib's event waiting: idle frames wait for input (EnableEventWaiting), except
+// while a timer is pending, when frames keep running so it fires on time. Use instead of calling
+// EnableEventWaiting yourself.
+void rd_set_event_waiting(rd_ctx* ctx, bool enabled);
 void rd_draw(rd_ctx* ctx);
 
 #ifdef __cplusplus

@@ -34,8 +34,16 @@ typedef enum rd_measure_mode : uint8_t {
 typedef rd_size (*rd_measure_fn)(void* data, float width, rd_measure_mode width_mode, float height,
                                  rd_measure_mode height_mode);
 
-// Computes styles, then lays out the tree with the root sized to width x height.
+// Advances animations, computes styles, then lays out the tree with the root sized to width x height,
+// places anchored nodes, and runs the layout hooks.
 void rd_ctx_layout(rd_ctx* ctx, float width, float height);
+
+// Called after every layout, with this layout's geometry and scroll offsets. For content that depends
+// on its own geometry: a virtualized list adding the rows that scrolled into view, a chat staying
+// scrolled to the bottom. If hooks change the tree, layout runs once more before rd_ctx_layout returns;
+// hooks don't run again for that pass.
+typedef void (*rd_layout_hook)(rd_ctx* ctx, void* data);
+bool rd_ctx_on_layout(rd_ctx* ctx, rd_layout_hook fn, void* data, rd_destroy_fn destroy);
 
 // Border box relative to the parent's border box.
 rd_rect rd_node_rect(const rd_ctx* ctx, rd_node node);

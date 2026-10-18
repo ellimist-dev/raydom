@@ -59,4 +59,4 @@ The graph has no clock. Each frame, pass the messages in flight with their progr
 {{#include ../../examples/graph.cc:messages}}
 ```
 
-The `network` example in the repository is a Paxos simulator built this way.
+The showcase's Network tab is a Paxos simulator built this way (`examples/showcase/network.cc`).

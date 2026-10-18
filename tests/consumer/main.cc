@@ -1,3 +1,4 @@
+#include <raydom/extras/dialog.hh>
 #include <raydom/extras/graph.hh>
 #include <raydom/raydom.hh>
 
@@ -14,6 +15,9 @@ int main() {
   rdx_node   b = g.add_node({100, 0}, rd::hex(0xc77dff));
   g.connect(a, b);
   ctx.layout(800, 600);
-  std::printf("raydom %s (C++): %s\n", RD_VERSION_STRING, g.alive(a) && g.alive(b) ? "ok" : "failed");
-  return g.alive(a) && g.alive(b) ? 0 : 1;
+  // Links the dialog backend without opening a dialog: a null output is an argument error.
+  bool dialog = rdx_dialog_open(nullptr, nullptr) == RDX_DIALOG_ERROR;
+  bool ok     = g.alive(a) && g.alive(b) && dialog;
+  std::printf("raydom %s (C++): %s\n", RD_VERSION_STRING, ok ? "ok" : "failed");
+  return ok ? 0 : 1;
 }

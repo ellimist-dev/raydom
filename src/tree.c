@@ -137,6 +137,14 @@ void rd_ctx_destroy(rd_ctx* ctx) {
   }
   rd__style_ctx_free(ctx);
   rd__font_ctx_free(ctx);
+  for (uint32_t i = 0; i < ctx->hook_count; i++)
+    if (ctx->hooks[i].destroy) ctx->hooks[i].destroy(ctx->hooks[i].data);
+  free(ctx->hooks);
+  for (uint32_t i = 0; i < ctx->extension_count; i++)
+    if (ctx->extensions[i].destroy) ctx->extensions[i].destroy(ctx->extensions[i].data);
+  free(ctx->extensions);
+  rd__images_free(ctx);
+  rd__timers_free(ctx);
   rd__render_ctx_free(ctx);
   rd__events_ctx_free(ctx);
   free(ctx->events);
@@ -170,6 +178,9 @@ bool rd_node_append(rd_ctx* ctx, rd_node parent, rd_node child) {
 
 bool rd_node_insert_before(rd_ctx* ctx, rd_node parent, rd_node child, rd_node ref) {
   if (!rd__slot(ctx, parent) || !rd__slot(ctx, child) || child.index == ctx->root) return false;
+  // The overlay stays the root's last child so it draws above, and is hit-tested before, everything else.
+  if (rd_node_is_null(ref) && parent.index == ctx->root && rd__slot(ctx, ctx->overlay) && child.index != ctx->overlay.index)
+    ref = ctx->overlay;
   if (!rd_node_is_null(ref)) {
     rd_slot* r = rd__slot(ctx, ref);
     if (!r || r->parent != parent.index) return false;
@@ -225,4 +236,27 @@ bool rd_node_set_userdata(rd_ctx* ctx, rd_node node, void* data, rd_destroy_fn d
 void* rd_node_userdata(const rd_ctx* ctx, rd_node node) {
   rd_slot* s = rd__slot(ctx, node);
   return s ? s->userdata : NULL;
+}
+
+bool rd_ctx_set_extension(rd_ctx* ctx, const void* key, void* data, rd_destroy_fn destroy) {
+  if (!ctx || !key) return false;
+  for (uint32_t i = 0; i < ctx->extension_count; i++) {
+    rd__extension* e = &ctx->extensions[i];
+    if (e->key != key) continue;
+    rd__extension old = *e;
+    *e                = (rd__extension){key, data, destroy};
+    if (old.destroy && old.data != data) old.destroy(old.data);
+    return true;
+  }
+  rd__extension* p = realloc(ctx->extensions, (ctx->extension_count + 1) * sizeof *p);
+  if (!p) return false;
+  ctx->extensions                         = p;
+  ctx->extensions[ctx->extension_count++] = (rd__extension){key, data, destroy};
+  return true;
+}
+
+void* rd_ctx_extension(const rd_ctx* ctx, const void* key) {
+  for (uint32_t i = 0; ctx && i < ctx->extension_count; i++)
+    if (ctx->extensions[i].key == key) return ctx->extensions[i].data;
+  return NULL;
 }

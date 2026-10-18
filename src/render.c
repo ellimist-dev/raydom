@@ -18,6 +18,10 @@ static const char* FS_BODY =
     "uniform vec4 stroke;\n"
     "uniform float blur;\n"
     "uniform float scale;\n"
+    "uniform float textured;\n"
+    "uniform vec4 imgrect;\n"
+    "uniform vec4 uvrect;\n"
+    "uniform sampler2D texture0;\n"
     "float pick(vec2 p, vec4 r) { return p.x < 0.0 ? (p.y < 0.0 ? r.x : r.w) : (p.y < 0.0 ? r.y : r.z); }\n"
     "float box(vec2 p, vec2 h, float r) {\n"
     "  vec2 q = abs(p) - h + r;\n"
@@ -31,6 +35,14 @@ static const char* FS_BODY =
     "void main() {\n"
     "  vec2 p = fragTexCoord;\n"
     "  float outer = sdf(p, vec2(0.0), size, radii);\n"
+    // Images: sampled inside imgrect, masked by the rounded box.
+    "  if (textured > 0.5) {\n"
+    "    vec2 q = (p - imgrect.xy) / imgrect.zw;\n"
+    "    if (q.x < 0.0 || q.y < 0.0 || q.x > 1.0 || q.y > 1.0) { OUT_COLOR = vec4(0.0); return; }\n"
+    "    vec4 t = TEX(texture0, mix(uvrect.xy, uvrect.zw, q));\n"
+    "    OUT_COLOR = vec4(t.rgb, t.a * fill.a * clamp(0.5 - outer * scale, 0.0, 1.0));\n"
+    "    return;\n"
+    "  }\n"
     "  if (blur > 0.0) {\n"
     "    OUT_COLOR = vec4(fill.rgb, fill.a * (1.0 - smoothstep(-blur, blur, outer)));\n"
     "    return;\n"
@@ -50,20 +62,23 @@ static const char* FS_330 =
     "in vec2 fragTexCoord;\n"
     "in vec4 fragColor;\n"
     "out vec4 finalColor;\n"
-    "#define OUT_COLOR finalColor\n";
+    "#define OUT_COLOR finalColor\n"
+    "#define TEX texture\n";
 
 static const char* FS_120 =
     "#version 120\n"
     "varying vec2 fragTexCoord;\n"
     "varying vec4 fragColor;\n"
-    "#define OUT_COLOR gl_FragColor\n";
+    "#define OUT_COLOR gl_FragColor\n"
+    "#define TEX texture2D\n";
 
 static const char* FS_100 =
     "#version 100\n"
     "precision mediump float;\n"
     "varying vec2 fragTexCoord;\n"
     "varying vec4 fragColor;\n"
-    "#define OUT_COLOR gl_FragColor\n";
+    "#define OUT_COLOR gl_FragColor\n"
+    "#define TEX texture2D\n";
 
 enum { U_SIZE,
        U_RADII,
@@ -72,8 +87,12 @@ enum { U_SIZE,
        U_STROKE,
        U_BLUR,
        U_SCALE,
+       U_TEXTURED,
+       U_IMGRECT,
+       U_UVRECT,
        U_COUNT };
-static const char* UNIFORMS[U_COUNT] = {"size", "radii", "borders", "fill", "stroke", "blur", "scale"};
+static const char* UNIFORMS[U_COUNT] = {"size", "radii", "borders", "fill", "stroke",
+                                        "blur", "scale", "textured", "imgrect", "uvrect"};
 
 typedef struct glyph_slot {
   uint64_t key;  // 0 when empty
@@ -130,6 +149,8 @@ void rd__render_ctx_free(rd_ctx* ctx) {
   free(ctx->cmds);
   free(ctx->hover_chain.nodes);
   free(ctx->active_chain.nodes);
+  free(ctx->anchored.nodes);
+  free(ctx->animating.nodes);
 }
 
 // Glyph atlas.
@@ -282,6 +303,8 @@ static void sdf_quad(gpu* g, Rectangle r, float pad, const float radii[4], const
   set_color(g, U_STROKE, stroke);
   SetShaderValue(g->shader, g->loc[U_BLUR], &blur, SHADER_UNIFORM_FLOAT);
   SetShaderValue(g->shader, g->loc[U_SCALE], &dpi, SHADER_UNIFORM_FLOAT);
+  float off = 0;
+  SetShaderValue(g->shader, g->loc[U_TEXTURED], &off, SHADER_UNIFORM_FLOAT);
   textured_quad(rlGetTextureIdDefault(), -pad, -pad, r.width + pad, r.height + pad, r.x - pad, r.y - pad,
                 r.x + r.width + pad, r.y + r.height + pad, WHITE);
 }
@@ -403,6 +426,79 @@ static void draw_text(gpu* g, rd_ctx* ctx, const rd__cmd* c, float dpi) {
   }
 }
 
+// Images.
+
+void rd__image_release(rd_ctx* ctx, rd__image* im) {
+  (void)ctx;
+  if (im->tex && IsWindowReady()) rlUnloadTexture(im->tex);
+  im->tex = 0;
+}
+
+// Uploads new pixels, then frees them: the texture is the copy from here on.
+static bool image_texture(rd__image* im, Texture2D* out) {
+  if (im->dirty && im->pixels) {
+    if (im->tex && im->tex_w == im->w && im->tex_h == im->h) {
+      UpdateTexture((Texture2D){im->tex, im->w, im->h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8}, im->pixels);
+    } else {
+      if (im->tex) rlUnloadTexture(im->tex);
+      Texture2D t = LoadTextureFromImage((Image){im->pixels, im->w, im->h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8});
+      im->tex     = t.id;
+      im->tex_w   = t.width;
+      im->tex_h   = t.height;
+    }
+    Texture2D t = {im->tex, im->tex_w, im->tex_h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
+    if (t.id) {
+      GenTextureMipmaps(&t);
+      SetTextureFilter(t, t.mipmaps > 1 ? TEXTURE_FILTER_TRILINEAR : TEXTURE_FILTER_BILINEAR);
+    }
+    free(im->pixels);
+    im->pixels = NULL;
+    im->dirty  = false;
+  }
+  *out = (Texture2D){im->tex, im->tex_w, im->tex_h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
+  return im->tex != 0;
+}
+
+static void draw_image(gpu* g, rd_ctx* ctx, const rd__cmd* c, float dpi) {
+  rd__image* im = rd__image_get(ctx, c->image);
+  if (!im) return;
+  if (im->svg) {
+    // Rasterize at the drawn size in device pixels; only ever larger, so smaller uses take mipmaps.
+    float need = fmaxf(c->dest.width / c->src.width, c->dest.height / c->src.height) * dpi;
+    need       = fminf(need, (float)RD__MAX_RASTER / fmaxf(im->natural_w, im->natural_h));
+    if (need > im->raster_scale * 1.001f && !rd__image_rasterize(im, need)) return;
+  }
+  Texture2D t;
+  if (!image_texture(im, &t)) return;
+  // src is in natural units; the texture holds raster_scale texels per unit.
+  rd_rect src = {c->src.x * im->raster_scale, c->src.y * im->raster_scale, c->src.width * im->raster_scale,
+                 c->src.height * im->raster_scale};
+  bool rounded = c->radii[0] > 0 || c->radii[1] > 0 || c->radii[2] > 0 || c->radii[3] > 0;
+  if (!rounded) {
+    shader_mode(g, false);
+    DrawTexturePro(t, (Rectangle){src.x, src.y, src.width, src.height},
+                   (Rectangle){c->dest.x, c->dest.y, c->dest.width, c->dest.height}, (Vector2){0, 0}, 0,
+                   to_color(c->fill));
+    return;
+  }
+  // The quad covers the content box; the shader samples inside dest and masks to the rounded corners.
+  Rectangle box = {c->rect.x, c->rect.y, c->rect.width, c->rect.height};
+  shader_mode(g, true);
+  rlDrawRenderBatchActive();
+  float size[2] = {box.width, box.height}, on = 1;
+  SetShaderValue(g->shader, g->loc[U_SIZE], size, SHADER_UNIFORM_VEC2);
+  set_vec4(g, U_RADII, c->radii[0], c->radii[1], c->radii[2], c->radii[3]);
+  set_color(g, U_FILL, c->fill);
+  SetShaderValue(g->shader, g->loc[U_SCALE], &dpi, SHADER_UNIFORM_FLOAT);
+  SetShaderValue(g->shader, g->loc[U_TEXTURED], &on, SHADER_UNIFORM_FLOAT);
+  set_vec4(g, U_IMGRECT, c->dest.x - box.x, c->dest.y - box.y, c->dest.width, c->dest.height);
+  set_vec4(g, U_UVRECT, src.x / (float)t.width, src.y / (float)t.height, (src.x + src.width) / (float)t.width,
+           (src.y + src.height) / (float)t.height);
+  textured_quad(t.id, -1, -1, box.width + 1, box.height + 1, box.x - 1, box.y - 1, box.x + box.width + 1,
+                box.y + box.height + 1, WHITE);
+  rlDrawRenderBatchActive();
+}
+
 static void scissor(rd_rect r) {
   int x0 = (int)floorf(r.x), y0 = (int)floorf(r.y);
   int x1 = (int)ceilf(r.x + r.width), y1 = (int)ceilf(r.y + r.height);
@@ -443,6 +539,9 @@ void rd_draw(rd_ctx* ctx) {
         break;
       case RD_CMD_PLACEHOLDER:
         draw_placeholder(g, ctx, c, dpi);
+        break;
+      case RD_CMD_IMAGE:
+        draw_image(g, ctx, c, dpi);
         break;
       case RD_CMD_FILL: {
         shader_mode(g, false);
@@ -532,6 +631,24 @@ static void feed_keyboard(rd_ctx* ctx) {
   for (int cp = GetCharPressed(); cp; cp = GetCharPressed()) rd_ctx_text(ctx, (uint32_t)cp);
 }
 
+static void apply_cursor(rd_ctx* ctx) {
+  rd_cursor c = rd_ctx_cursor(ctx);
+  if (c == ctx->applied_cursor) return;
+  if (ctx->applied_cursor == RD_CURSOR_NONE) ShowCursor();
+  static const int MAP[] = {
+      [RD_CURSOR_DEFAULT] = MOUSE_CURSOR_DEFAULT,          [RD_CURSOR_POINTER] = MOUSE_CURSOR_POINTING_HAND,
+      [RD_CURSOR_TEXT] = MOUSE_CURSOR_IBEAM,               [RD_CURSOR_CROSSHAIR] = MOUSE_CURSOR_CROSSHAIR,
+      [RD_CURSOR_MOVE] = MOUSE_CURSOR_RESIZE_ALL,          [RD_CURSOR_NOT_ALLOWED] = MOUSE_CURSOR_NOT_ALLOWED,
+      [RD_CURSOR_EW_RESIZE] = MOUSE_CURSOR_RESIZE_EW,      [RD_CURSOR_NS_RESIZE] = MOUSE_CURSOR_RESIZE_NS,
+      [RD_CURSOR_NWSE_RESIZE] = MOUSE_CURSOR_RESIZE_NWSE,  [RD_CURSOR_NESW_RESIZE] = MOUSE_CURSOR_RESIZE_NESW,
+  };
+  if (c == RD_CURSOR_NONE)
+    HideCursor();
+  else
+    SetMouseCursor(c < sizeof MAP / sizeof MAP[0] ? MAP[c] : MOUSE_CURSOR_DEFAULT);
+  ctx->applied_cursor = c;
+}
+
 void rd_update(rd_ctx* ctx) {
   if (!ctx) return;
   rd_ctx_set_time(ctx, GetTime());
@@ -542,4 +659,24 @@ void rd_update(rd_ctx* ctx) {
                     (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE) ? RD_BUTTON_MIDDLE : 0);
   rd_ctx_pointer(ctx, m.x, m.y, buttons, w.x, w.y);
   rd_ctx_layout(ctx, (float)GetScreenWidth(), (float)GetScreenHeight());
+  apply_cursor(ctx);
+  if (ctx->event_waiting) {
+    bool wait = rd_ctx_timer_wait(ctx) == INFINITY && !rd_ctx_animating(ctx);
+    if (wait != ctx->waiting_now) {
+      if (wait)
+        EnableEventWaiting();
+      else
+        DisableEventWaiting();
+      ctx->waiting_now = wait;
+    }
+  }
+}
+
+void rd_set_event_waiting(rd_ctx* ctx, bool enabled) {
+  if (!ctx) return;
+  ctx->event_waiting = enabled;
+  if (!enabled && ctx->waiting_now) {
+    DisableEventWaiting();
+    ctx->waiting_now = false;
+  }
 }

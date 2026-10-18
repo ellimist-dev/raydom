@@ -1,0 +1,3 @@
+nativefiledialog-extended v1.4.1
+https://github.com/btzy/nativefiledialog-extended
+Unmodified: include/nfd.h, nfd_cocoa.m, nfd_win.cpp, nfd_portal.cpp, nfd_linux_shared.hpp from src/.

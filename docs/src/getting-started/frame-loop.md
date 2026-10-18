@@ -10,12 +10,14 @@ while (!WindowShouldClose()) {
 }
 ```
 
-`rd_update` does four things, in order:
+`rd_update` does these things, in order:
 
-1. Sets the context clock from `GetTime()` (`rd_ctx_set_time`).
+1. Sets the context clock from `GetTime()` (`rd_ctx_set_time`), which fires due timers.
 2. Feeds raylib's keyboard and text input (`rd_ctx_key`, `rd_ctx_text`).
 3. Feeds the mouse position, buttons and wheel (`rd_ctx_pointer`). Listeners run here.
-4. Lays the tree out at the screen size (`rd_ctx_layout`).
+4. Lays the tree out at the screen size (`rd_ctx_layout`): advances animations, computes styles, lays out, and places
+   anchored nodes.
+5. Applies the mouse cursor, and, with `rd_set_event_waiting`, raylib's event waiting.
 
 `rd_draw` builds a display list from the laid-out tree and executes it with raylib. It must be called between
 `BeginDrawing` and `EndDrawing`. Anything drawn with raylib after `rd_draw` appears on top of the UI.
@@ -43,6 +45,41 @@ rd_ctx_layout(ctx, width, height);
 
 Nothing except `rd_update`, `rd_draw`, and paint callbacks touches raylib, so a context can be built, laid out and
 driven with input without a window. The headless examples behind the guide chapters run this way.
+
+## Timers
+
+Timers run on the context's clock. `rd_update` sets the clock from raylib each frame, before input, and every due
+timer fires then, on the main thread, so callbacks may change the tree like any listener.
+
+```c
+{{#include ../../examples/timers.c:oneshot}}
+```
+
+```c
+{{#include ../../examples/timers.c:repeat}}
+```
+
+A one-shot timer is destroyed after it fires; clearing it afterwards is a harmless no-op, so "clear, then set" is
+the restart idiom. A repeating timer that falls behind (the window was minimized, say) fires once and skips the rest.
+A timer set from a timer callback doesn't fire until the next clock update, so callbacks can't loop forever within
+one frame. `destroy(data)` runs when a timer is cleared, a one-shot has fired, or the context is destroyed.
+
+C++: `ctx.set_timeout(2.0, [&] { ... })` and `ctx.set_interval(1.0, [&] { ... })` return an `rd_timer` for
+`ctx.clear_timer`.
+
+### Event waiting
+
+raylib's `EnableEventWaiting` makes idle frames block until input arrives, which saves power but would also stall
+timers. Let raydom manage it instead:
+
+```c
+rd_set_event_waiting(ctx, true);  // instead of EnableEventWaiting()
+```
+
+`rd_update` then turns raylib's event waiting off while any timer is pending or anything animates, and back on when
+neither is true, so a
+tooltip delay or toast fires on time and an idle UI still costs nothing. A repeating timer keeps frames running for as
+long as it exists.
 
 ## Lifetime
 

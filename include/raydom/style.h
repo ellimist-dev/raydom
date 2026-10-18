@@ -153,6 +153,58 @@ typedef enum rd_focusable : uint8_t {
   RD_FOCUSABLE_POINTER,  // Focusable by pointer and code, skipped by Tab.
 } rd_focusable;
 
+// Mouse cursor over the node. AUTO picks text over selectable text and inputs, pointer over links,
+// and default elsewhere. To show a different cursor while dragging, set it in a class's active variant.
+typedef enum rd_cursor : uint8_t {
+  RD_CURSOR_UNSET,
+  RD_CURSOR_AUTO,
+  RD_CURSOR_DEFAULT,
+  RD_CURSOR_POINTER,
+  RD_CURSOR_TEXT,
+  RD_CURSOR_CROSSHAIR,
+  RD_CURSOR_MOVE,
+  RD_CURSOR_NOT_ALLOWED,
+  RD_CURSOR_EW_RESIZE,
+  RD_CURSOR_NS_RESIZE,
+  RD_CURSOR_NWSE_RESIZE,
+  RD_CURSOR_NESW_RESIZE,
+  RD_CURSOR_NONE,  // Hidden.
+} rd_cursor;
+
+// How an image fills its content box. The image is centered, and cropped where it overflows.
+typedef enum rd_object_fit : uint8_t {
+  RD_OBJECT_FIT_UNSET,
+  RD_OBJECT_FIT_FILL,        // Stretched to the box.
+  RD_OBJECT_FIT_CONTAIN,     // Scaled to fit inside, keeping the aspect ratio.
+  RD_OBJECT_FIT_COVER,       // Scaled to cover the box, keeping the aspect ratio.
+  RD_OBJECT_FIT_NONE,        // Natural size.
+  RD_OBJECT_FIT_SCALE_DOWN,  // NONE or CONTAIN, whichever is smaller.
+} rd_object_fit;
+
+// Timing curves for transitions and animations; the CSS cubic-bezier curves of the same names.
+typedef enum rd_easing : uint8_t {
+  RD_EASING_UNSET,
+  RD_EASING_LINEAR,
+  RD_EASING_EASE,
+  RD_EASING_EASE_IN,
+  RD_EASING_EASE_OUT,
+  RD_EASING_EASE_IN_OUT,
+} rd_easing;
+
+// Which properties transition_duration animates, as a mask. Unset means all.
+typedef enum rd_transition : uint8_t {
+  RD_TRANSITION_UNSET   = 0,
+  RD_TRANSITION_COLOR   = 1u << 0,  // background, border, text, caret, selection and scrollbar colors
+  RD_TRANSITION_OPACITY = 1u << 1,
+  RD_TRANSITION_SHADOW  = 1u << 2,
+  RD_TRANSITION_RADIUS  = 1u << 3,
+  RD_TRANSITION_SIZE    = 1u << 4,  // width, height, their min and max, flex grow, shrink and basis
+  RD_TRANSITION_SPACING = 1u << 5,  // margin, padding, border width, gaps
+  RD_TRANSITION_INSET   = 1u << 6,
+  RD_TRANSITION_TEXT    = 1u << 7,  // font size, line height
+  RD_TRANSITION_ALL     = 0xff,
+} rd_transition;
+
 typedef enum rd_user_select : uint8_t {
   RD_USER_SELECT_UNSET,
   RD_USER_SELECT_AUTO,  // Text can be selected by dragging.
@@ -215,6 +267,7 @@ typedef enum rd_text_align : uint8_t {
   X(border_radius, rd_corners, CORNERS, 0, 0)         \
   X(opacity, rd_val, VAL, 0, 0)                       \
   X(box_shadow, rd_shadow, SHADOW, 0, 0)              \
+  X(object_fit, rd_object_fit, ENUM, 0, 0)            \
   X(color, rd_color, COLOR, 1, 0)                     \
   X(font, rd_font, FONT, 1, 1)                        \
   X(font_size, rd_val, VAL, 1, 1)                     \
@@ -225,6 +278,14 @@ typedef enum rd_text_align : uint8_t {
   X(line_clamp, rd_val, VAL, 0, 1)                    \
   X(pointer_events, rd_pointer_events, ENUM, 1, 0)    \
   X(focusable, rd_focusable, ENUM, 0, 0)              \
+  X(cursor, rd_cursor, ENUM, 1, 0)                    \
+  X(scrollbar_width, rd_val, VAL, 0, 0)               \
+  X(scrollbar_color, rd_color, COLOR, 1, 0)           \
+  X(scrollbar_track_color, rd_color, COLOR, 1, 0)     \
+  X(transition_duration, rd_val, VAL, 0, 0)           \
+  X(transition_delay, rd_val, VAL, 0, 0)              \
+  X(transition_easing, rd_easing, ENUM, 0, 0)         \
+  X(transition_properties, rd_transition, ENUM, 0, 0) \
   X(caret_color, rd_color, COLOR, 1, 0)               \
   X(selection_color, rd_color, COLOR, 1, 0)           \
   X(text_align, rd_text_align, ENUM, 1, 0)
@@ -238,11 +299,12 @@ typedef struct rd_style {
 // Bit order is precedence: later states' class variants win.
 typedef enum rd_state : uint8_t {
   RD_STATE_HOVER         = 1u << 0,
-  RD_STATE_FOCUS_WITHIN  = 1u << 1,  // The node or a descendant has focus.
-  RD_STATE_FOCUS         = 1u << 2,
-  RD_STATE_FOCUS_VISIBLE = 1u << 3,  // Focus that should show a ring: from the keyboard, or on an input.
-  RD_STATE_ACTIVE        = 1u << 4,
-  RD_STATE_DISABLED      = 1u << 5,
+  RD_STATE_CHECKED       = 1u << 1,  // Set by the application or a control: a ticked checkbox, an on switch.
+  RD_STATE_FOCUS_WITHIN  = 1u << 2,  // The node or a descendant has focus.
+  RD_STATE_FOCUS         = 1u << 3,
+  RD_STATE_FOCUS_VISIBLE = 1u << 4,  // Focus that should show a ring: from the keyboard, or on an input.
+  RD_STATE_ACTIVE        = 1u << 5,
+  RD_STATE_DISABLED      = 1u << 6,
 } rd_state;
 
 typedef struct rd_class {
@@ -261,6 +323,9 @@ static inline rd_val rd_num(float v) {
   rd_val r = {v, RD_UNIT_NUM};
   return r;
 }
+// Durations, as seconds: transition_duration = rd_ms(150).
+static inline rd_val rd_s(float seconds) { return rd_num(seconds); }
+static inline rd_val rd_ms(float ms) { return rd_num(ms / 1000.0f); }
 static inline rd_val rd_auto(void) {
   rd_val r = {0, RD_UNIT_AUTO};
   return r;
@@ -356,6 +421,9 @@ void rd_node_clear_classes(rd_ctx* ctx, rd_node node);
 bool rd_node_has_class(const rd_ctx* ctx, rd_node node, rd_class cls);
 
 void    rd_node_set_states(rd_ctx* ctx, rd_node node, uint8_t states, bool on);
+// The node's class variants also apply for its parent's states, as if it had them: the box of a
+// checkbox looks hovered while the pointer is anywhere on the row. Chains through sharing parents.
+void    rd_node_set_share_states(rd_ctx* ctx, rd_node node, bool share);
 uint8_t rd_node_states(const rd_ctx* ctx, rd_node node);
 
 void rd_ctx_compute_styles(rd_ctx* ctx);

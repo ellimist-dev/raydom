@@ -10,8 +10,12 @@ statically linked binary.
 - Pointer events with capture and bubbling, keyboard focus, Tab navigation
 - Text inputs, single- and multi-line, with selection, clipboard and undo
 - Rounded boxes, borders, shadows, scrolling, clipping
+- Transitions on any style change, layout included, and explicit animations
+- Images (PNG, JPEG, SVG and more) with object-fit and rounded clipping; SVG icons follow `color`
 - Canvas nodes for custom raylib drawing
-- `raydom::extras`: an interactive network view (3D spheres, edges, labels, pan and zoom)
+- `raydom::extras`: checkbox, switch, radio group, slider, toast, menu, context menu, select, modal, tooltip, tabs,
+  splitter, virtualized list, table and tree view components; an interactive network view (3D
+  spheres, edges, labels, pan and zoom); native open, save and folder dialogs
 
 ## Status
 
@@ -59,6 +63,7 @@ target_link_libraries(your_app PRIVATE raydom::raydom)
 | Option                 | Default            | Effect                                         |
 | ---------------------- | ------------------ | ---------------------------------------------- |
 | `RAYDOM_BUILD_EXTRAS`  | `ON`               | Build `raydom::extras`                         |
+| `RAYDOM_FILE_DIALOG`   | `ON`               | Native file dialogs in extras; needs libdbus on Linux |
 | `RAYDOM_FETCH_RAYLIB`  | `ON`               | Download raylib when it can't be found         |
 | `RAYDOM_INSTALL`       | top-level only     | Generate install rules and the CMake package   |
 | `RAYDOM_BUILD_TESTS`   | top-level only     | Build the test suite                           |
@@ -151,7 +156,7 @@ int main() {
 ### Extras
 
 Link `raydom::extras` and include `<raydom/extras/graph.h>` (C) or `<raydom/extras/graph.hh>` (C++) for the network
-view. `examples/network` shows it driving a deterministic Paxos simulation.
+view. The showcase's Network tab drives a deterministic Paxos simulation with it.
 
 ## Building from source
 
@@ -160,12 +165,12 @@ With [just](https://github.com/casey/just):
 ```sh
 just build      # development build with sanitizers
 just test       # run the test suite
-just showcase   # feature tour
-just network    # network view example
+just showcase   # tabs: a tour of every feature, a desktop messaging app, a Paxos simulation
 just consumer   # check that FetchContent and find_package both work
 just clean      # remove build outputs
 ```
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). Vendored code keeps its own license: stb_truetype and stb_image (MIT or public domain) and
+nanosvg (zlib) in `src/external`, and nativefiledialog-extended (zlib) in `extras/src/external/nfd`.

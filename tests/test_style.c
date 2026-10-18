@@ -147,8 +147,40 @@ static void test_dirty_tracking(void) {
   rd_ctx_destroy(ctx);
 }
 
+static void test_shared_states(void) {
+  rd_ctx*  ctx  = rd_ctx_create();
+  rd_node  row  = rd_node_create(ctx);  // no classes: its own style never reacts to states
+  rd_node  box  = rd_node_create(ctx);
+  rd_node  mark = rd_node_create(ctx);
+  rd_class look = rd_class_create(ctx, &(rd_style){.opacity = rd_num(0.5f)});
+  rd_class_set_state(ctx, look, RD_STATE_HOVER, &(rd_style){.opacity = rd_num(0.8f)});
+  rd_class_set_state(ctx, look, RD_STATE_CHECKED, &(rd_style){.opacity = rd_num(1)});
+  rd_node_append(ctx, rd_ctx_root(ctx), row);
+  rd_node_append(ctx, row, box);
+  rd_node_append(ctx, box, mark);
+  rd_node_add_class(ctx, box, look);
+  rd_node_add_class(ctx, mark, look);
+  rd_node_set_share_states(ctx, box, true);
+  rd_node_set_share_states(ctx, mark, true);
+
+  rd_node_set_states(ctx, row, RD_STATE_HOVER, true);
+  CHECK(rd_node_computed_style(ctx, box)->opacity.value == 0.8f);
+  CHECK(rd_node_computed_style(ctx, mark)->opacity.value == 0.8f);  // through the box
+  rd_node_set_states(ctx, row, RD_STATE_CHECKED, true);
+  CHECK(rd_node_computed_style(ctx, mark)->opacity.value == 1);
+  CHECK(rd_node_states(ctx, box) == 0);  // own states unchanged
+  rd_node_set_states(ctx, row, RD_STATE_HOVER | RD_STATE_CHECKED, false);
+  CHECK(rd_node_computed_style(ctx, mark)->opacity.value == 0.5f);
+
+  rd_node_set_share_states(ctx, box, false);  // the chain breaks at the box
+  rd_node_set_states(ctx, row, RD_STATE_CHECKED, true);
+  CHECK(rd_node_computed_style(ctx, box)->opacity.value == 0.5f && rd_node_computed_style(ctx, mark)->opacity.value == 0.5f);
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   test_defaults();
+  test_shared_states();
   test_inheritance();
   test_class_order_and_inline();
   test_states();

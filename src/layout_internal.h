@@ -93,6 +93,7 @@ static inline bool in_flow(const rd_style* st) {
 }
 
 rd_size rd__layout_node(rd_ctx* ctx, uint32_t i, rd_layout_key k, bool perform);
+void    rd__place_anchored(rd_ctx* ctx);
 void    rd__layout_absolute(rd_ctx* ctx, uint32_t c, const rd_node_layout* parent, const float size[2]);
 void    rd__apply_relative(const rd_style* st, rd_node_layout* L, const float cb[2]);
 void    rd__justify_offsets(rd_align justify, float free, uint32_t n, float* off, float* between);

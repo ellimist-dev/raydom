@@ -149,6 +149,50 @@ static void build_input(rd_ctx* ctx, uint32_t i, const rd_style* st, rd_rect con
   if (!v->multiline) push(ctx, RD_CMD_CLIP, i)->rect = clip;
 }
 
+static void build_scrollbars(rd_ctx* ctx, uint32_t i, const rd_style* st, rd_rect r, float op);
+
+// Places an image in the content box by object_fit: scaled about the center, then cropped to the box.
+static void build_image(rd_ctx* ctx, uint32_t i, const rd_style* st, const rd_node_layout* L, rd_rect box,
+                        const float radii[4], float op, uint32_t id) {
+  const rd__image* im = rd__image_get(ctx, id);
+  if (!im || im->natural_w <= 0 || im->natural_h <= 0 || box.width <= 0 || box.height <= 0) return;
+  float iw = im->natural_w, ih = im->natural_h;
+  float fit = fminf(box.width / iw, box.height / ih), sx = 1, sy = 1;
+  switch (st->object_fit) {
+    case RD_OBJECT_FIT_CONTAIN:
+      sx = sy = fit;
+      break;
+    case RD_OBJECT_FIT_COVER:
+      sx = sy = fmaxf(box.width / iw, box.height / ih);
+      break;
+    case RD_OBJECT_FIT_NONE:
+      break;
+    case RD_OBJECT_FIT_SCALE_DOWN:
+      sx = sy = fminf(1, fit);
+      break;
+    default:
+      sx = box.width / iw;
+      sy = box.height / ih;
+      break;
+  }
+  rd_rect full = {box.x + (box.width - iw * sx) / 2, box.y + (box.height - ih * sy) / 2, iw * sx, ih * sy};
+  float   x0 = fmaxf(full.x, box.x), y0 = fmaxf(full.y, box.y);
+  float   x1 = fminf(full.x + full.width, box.x + box.width), y1 = fminf(full.y + full.height, box.y + box.height);
+  if (x1 <= x0 || y1 <= y0) return;
+  rd__cmd* c = push(ctx, RD_CMD_IMAGE, i);
+  c->rect    = box;
+  c->image   = id;
+  c->dest    = (rd_rect){x0, y0, x1 - x0, y1 - y0};
+  c->src     = (rd_rect){(x0 - full.x) / sx, (y0 - full.y) / sy, (x1 - x0) / sx, (y1 - y0) / sy};
+  c->fill    = fade(im->current_color ? st->color : rd_rgba(255, 255, 255, 255), op);  // currentColor SVGs are tinted
+  // The content box's corners: the border radius less the border and padding on the adjacent sides.
+  const int sides[4][2] = {{EDGE_T, EDGE_L}, {EDGE_T, EDGE_R}, {EDGE_B, EDGE_R}, {EDGE_B, EDGE_L}};
+  for (int j = 0; j < 4; j++) {
+    float in = fmaxf(L->border[sides[j][0]] + L->padding[sides[j][0]], L->border[sides[j][1]] + L->padding[sides[j][1]]);
+    c->radii[j] = fmaxf(0, radii[j] - in);
+  }
+}
+
 static void build(rd_ctx* ctx, uint32_t i, float ox, float oy, float opacity, rd_rect clip) {
   const rd_style*       st = &ctx->styles[i].computed;
   const rd_node_layout* L  = &ctx->layouts[i];
@@ -193,7 +237,10 @@ static void build(rd_ctx* ctx, uint32_t i, float ox, float oy, float opacity, rd
                             fmaxf(0, pad.width - L->padding[EDGE_L] - L->padding[EDGE_R]),
                             fmaxf(0, pad.height - L->padding[EDGE_T] - L->padding[EDGE_B])};
   rd__input_view view;
-  if (visible && rd__input_view_get(ctx, i, &view)) {
+  uint32_t       image = rd__node_image(ctx, i);
+  if (visible && image) {
+    build_image(ctx, i, st, L, content, radii, op, image);
+  } else if (visible && rd__input_view_get(ctx, i, &view)) {
     build_input(ctx, i, st, content, clip, op, &view);
   } else if (visible && rd__is_text(ctx, i) && st->color.a) {
     build_highlights(ctx, i, st, content, op);
@@ -227,6 +274,7 @@ static void build(rd_ctx* ctx, uint32_t i, float ox, float oy, float opacity, rd
   for (uint32_t ch = ctx->slots[i].first_child; ch; ch = ctx->slots[ch].next_sibling)
     build(ctx, ch, r.x - L->scroll[0], r.y - L->scroll[1], op, inner);
   if (clips) push(ctx, RD_CMD_CLIP, i)->rect = clip;
+  if (visible) build_scrollbars(ctx, i, st, r, op);
 }
 
 const rd__cmd* rd__display_list(rd_ctx* ctx, uint32_t* count) {
@@ -253,7 +301,7 @@ static uint32_t hit(const rd_ctx* ctx, uint32_t i, float ox, float oy, rd_rect c
       }
     }
   }
-  bool target = st->pointer_events != RD_POINTER_EVENTS_NONE;
+  bool target = st->pointer_events != RD_POINTER_EVENTS_NONE && !(i == ctx->overlay.index && rd__slot(ctx, ctx->overlay));
   return target && contains(r, x, y) && contains(clip, x, y) ? i : 0;
 }
 
@@ -347,4 +395,63 @@ bool rd_node_set_paint(rd_ctx* ctx, rd_node node, rd_paint_fn fn, void* data, rd
   if (old_destroy && (old_data != L->paint_data || !fn)) old_destroy(old_data);
   ctx->paint_dirty = true;
   return true;
+}
+
+// Scrollbars: overlay bars inside the padding box, over the content edge, taking no layout space.
+
+static const float SB_GAP = 2, SB_MIN_THUMB = 24;
+
+bool rd__scrollbar(const rd_ctx* ctx, uint32_t i, rd_rect r, int axis, rd_rect* track, rd_rect* thumb) {
+  const rd_style*       st = &ctx->styles[i].computed;
+  const rd_node_layout* L  = &ctx->layouts[i];
+  if ((axis ? st->overflow_y : st->overflow_x) != RD_OVERFLOW_SCROLL) return false;
+  float t = resolve0(st->scrollbar_width, NAN);
+  if (t <= 0) return false;
+  float max[2];
+  scroll_range(L, max);
+  if (max[axis] < 0.5f) return false;
+
+  rd_rect pad   = padding_box(r, L);
+  bool    other = (axis ? st->overflow_x : st->overflow_y) == RD_OVERFLOW_SCROLL && max[!axis] >= 0.5f;
+  float   view  = axis ? pad.height : pad.width;
+  float   len   = view - 2 * SB_GAP - (other ? t + SB_GAP : 0);
+  if (len <= 0) return false;
+  *track = axis ? (rd_rect){pad.x + pad.width - t - SB_GAP, pad.y + SB_GAP, t, len}
+                : (rd_rect){pad.x + SB_GAP, pad.y + pad.height - t - SB_GAP, len, t};
+  float size = fminf(len, fmaxf(SB_MIN_THUMB, len * view / (view + max[axis])));
+  float pos  = (len - size) * clampf(L->scroll[axis] / max[axis], 0, 1);
+  *thumb     = axis ? (rd_rect){track->x, track->y + pos, t, size} : (rd_rect){track->x + pos, track->y, size, t};
+  return true;
+}
+
+float rd__scroll_max(const rd_ctx* ctx, uint32_t i, int axis) {
+  float max[2];
+  scroll_range(&ctx->layouts[i], max);
+  return max[axis];
+}
+
+static rd_color brighten(rd_color c) {
+  c.a = (uint8_t)fminf(255, (float)c.a * 1.8f);
+  return c;
+}
+
+static void build_scrollbars(rd_ctx* ctx, uint32_t i, const rd_style* st, rd_rect r, float op) {
+  for (int axis = 0; axis < 2; axis++) {
+    rd_rect track, thumb;
+    if (!rd__scrollbar(ctx, i, r, axis, &track, &thumb)) continue;
+    float radius = (axis ? track.width : track.height) / 2;
+    if (st->scrollbar_track_color.a) {
+      rd__cmd* c = push(ctx, RD_CMD_RECT, i);
+      c->rect    = track;
+      c->fill    = fade(st->scrollbar_track_color, op);
+      for (int j = 0; j < 4; j++) c->radii[j] = radius;
+    }
+    bool hot = (rd_node_eq(ctx->sb_hot.node, rd__handle(ctx, i)) && ctx->sb_hot.axis == axis) ||
+               (ctx->sb_drag.active && ctx->sb_drag.thumb && rd_node_eq(ctx->sb_drag.node, rd__handle(ctx, i)) &&
+                ctx->sb_drag.axis == axis);
+    rd__cmd* c = push(ctx, RD_CMD_RECT, i);
+    c->rect    = thumb;
+    c->fill    = fade(hot ? brighten(st->scrollbar_color) : st->scrollbar_color, op);
+    for (int j = 0; j < 4; j++) c->radii[j] = radius;
+  }
 }

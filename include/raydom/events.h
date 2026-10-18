@@ -1,7 +1,7 @@
 #ifndef RAYDOM_EVENTS_H
 #define RAYDOM_EVENTS_H
 
-#include <raydom/tree.h>
+#include <raydom/style.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -144,6 +144,11 @@ rd_listener rd_node_on(rd_ctx* ctx, rd_node node, rd_event_type type, rd_event_f
 // Runs the listener's destroy callback, deferred if dispatch is in progress.
 bool rd_node_off(rd_ctx* ctx, rd_listener listener);
 
+// Fires an event of type at node, through capture and bubble like any other, with the pointer
+// position and modifiers of the moment. For components announcing their own INPUT and CHANGE. Returns
+// false if a listener called rd_event_prevent_default.
+bool rd_node_dispatch(rd_ctx* ctx, rd_node node, rd_event_type type);
+
 static inline void rd_event_stop_propagation(rd_event* ev) { ev->stopped = true; }
 static inline void rd_event_stop_immediate_propagation(rd_event* ev) { ev->stopped = ev->stopped_immediate = true; }
 static inline void rd_event_prevent_default(rd_event* ev) { ev->default_prevented = true; }
@@ -157,8 +162,12 @@ rd_node rd_ctx_pointer_capture(const rd_ctx* ctx);
 // buttons is a mask of RD_BUTTON_*; wheel deltas are in notches.
 void    rd_ctx_pointer(rd_ctx* ctx, float x, float y, uint8_t buttons, float wheel_x, float wheel_y);
 rd_node rd_ctx_hovered(const rd_ctx* ctx);
+// The cursor to show, as of the last layout: the hovered (or capturing) node's cursor, with AUTO
+// resolved, or text while a selection is being dragged. Never AUTO. rd_update applies it.
+rd_cursor rd_ctx_cursor(const rd_ctx* ctx);
 
-// Seconds on any monotonic clock; used to end wheel gestures. rd_update sets it from raylib.
+// Seconds on any monotonic clock; used to end wheel gestures, and fires due timers (timer.h).
+// rd_update sets it from raylib.
 void rd_ctx_set_time(rd_ctx* ctx, double seconds);
 
 // Keyboard input goes to the focused node, or the root when nothing has focus.
@@ -168,8 +177,13 @@ void rd_ctx_text(rd_ctx* ctx, uint32_t codepoint);
 // Focus moves fire blur, focusout, focus, focusin. A null node clears focus.
 bool    rd_node_focus(rd_ctx* ctx, rd_node node);
 rd_node rd_ctx_focused(const rd_ctx* ctx);
-// Next or previous node with focusable: tab, in tree order, wrapping. False if there is none.
+// Next or previous node with focusable: tab, in tree order, wrapping, within the focus scope. False
+// if there is none.
 bool rd_ctx_focus_next(rd_ctx* ctx, bool backward);
+// Keeps Tab and Shift+Tab inside a subtree, such as a modal dialog. Null, or a destroyed node, means
+// the whole tree. Pointer and programmatic focus aren't restricted.
+void    rd_ctx_set_focus_scope(rd_ctx* ctx, rd_node scope);
+rd_node rd_ctx_focus_scope(const rd_ctx* ctx);
 
 // Clipboard used by inputs. Defaults to an in-memory buffer; rd_update installs raylib's.
 typedef const char* (*rd_clipboard_get_fn)(void* data);

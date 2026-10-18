@@ -93,8 +93,33 @@ static void buttons(void) {
   rd_ctx_destroy(ctx);
 }
 
+static void scope(void) {
+  rd_ctx* ctx  = rd_ctx_create();
+  rd_node page = rd_node_create_button(ctx, "page", RD_TEXT_NUL);
+  rd_node dlg  = rd_node_create(ctx);
+  rd_node a = rd_node_create_button(ctx, "a", RD_TEXT_NUL), b = rd_node_create_button(ctx, "b", RD_TEXT_NUL);
+  rd_node_append(ctx, rd_ctx_root(ctx), page);
+  rd_node_append(ctx, rd_ctx_root(ctx), dlg);
+  rd_node_append(ctx, dlg, a);
+  rd_node_append(ctx, dlg, b);
+  rd_ctx_layout(ctx, 400, 300);
+  rd_ctx_set_focus_scope(ctx, dlg);
+  CHECK(rd_node_eq(rd_ctx_focus_scope(ctx), dlg));
+  press(ctx, RD_KEY_TAB);
+  CHECK(rd_node_eq(rd_ctx_focused(ctx), a));
+  press(ctx, RD_KEY_TAB);
+  press(ctx, RD_KEY_TAB);  // wraps inside the scope
+  CHECK(rd_node_eq(rd_ctx_focused(ctx), a));
+  rd_node_destroy(ctx, dlg);  // a dead scope is the whole tree
+  CHECK(rd_node_is_null(rd_ctx_focus_scope(ctx)));
+  press(ctx, RD_KEY_TAB);
+  CHECK(rd_node_eq(rd_ctx_focused(ctx), page));
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   derived();
+  scope();
   buttons();
   return TEST_RESULT();
 }

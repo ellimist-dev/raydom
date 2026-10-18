@@ -64,21 +64,36 @@ DESCRIPTIONS = {
     "caret_color": "Input caret color; transparent uses `color`.",
     "selection_color": "Background of selected text.",
     "text_align": "Horizontal alignment of each line in the content box.",
+    "scrollbar_width": "Thickness of the scrollbars on a `SCROLL` axis; `0px` hides them. They draw over the "
+                       "content edge and take no layout space.",
+    "scrollbar_color": "Scrollbar thumb color; brighter while hovered or dragged.",
+    "scrollbar_track_color": "Color behind the thumb; transparent by default.",
+    "object_fit": "How an image node's image fills its content box: stretched, contained, covering, natural size, "
+                  "or scaled down.",
+    "transition_duration": "How long changes to this node's style animate, in seconds (`rd_ms(150)`, `rd_s(0.2)`); "
+                           "0 changes at once.",
+    "transition_delay": "Seconds to wait before a change starts animating.",
+    "transition_easing": "The timing curve of transitions.",
+    "transition_properties": "Which groups of properties transition, as a mask of `RD_TRANSITION_*` flags.",
+    "cursor": "Mouse cursor over the node. `AUTO` is text over selectable text and inputs, pointer over links, "
+              "default elsewhere. Set it in an active variant for a drag cursor.",
 }
 
 
 GROUPS = [
     ("Box model", ["display", "position", "width", "height", "min_width", "min_height", "max_width", "max_height",
-                   "margin", "padding", "border_width", "inset", "overflow_x", "overflow_y"]),
+                   "margin", "padding", "border_width", "inset"]),
     ("Flexbox", ["flex_direction", "flex_wrap", "flex_grow", "flex_shrink", "flex_basis"]),
     ("Alignment and gaps", ["justify_content", "align_items", "align_self", "align_content", "justify_items",
                             "justify_self", "row_gap", "column_gap"]),
     ("Grid", ["grid_template_columns", "grid_template_rows", "grid_auto_columns", "grid_auto_rows", "grid_auto_flow",
               "grid_column_start", "grid_column_end", "grid_row_start", "grid_row_end"]),
-    ("Paint", ["background", "border_color", "border_radius", "opacity", "box_shadow"]),
+    ("Paint", ["background", "border_color", "border_radius", "opacity", "box_shadow", "object_fit"]),
     ("Text", ["color", "font", "font_size", "line_height", "white_space", "text_overflow", "line_clamp",
               "text_align", "user_select", "caret_color", "selection_color"]),
-    ("Interaction", ["pointer_events", "focusable"]),
+    ("Scrolling", ["overflow_x", "overflow_y", "scrollbar_width", "scrollbar_color", "scrollbar_track_color"]),
+    ("Interaction", ["pointer_events", "focusable", "cursor"]),
+    ("Transitions", ["transition_duration", "transition_delay", "transition_easing", "transition_properties"]),
 ]
 
 

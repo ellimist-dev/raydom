@@ -9,7 +9,8 @@ enum { RD_CMD_RECT,
        RD_CMD_CLIP,
        RD_CMD_FILL,
        RD_CMD_PLACEHOLDER,
-       RD_CMD_PAINT };
+       RD_CMD_PAINT,
+       RD_CMD_IMAGE };
 
 // Root coordinates, logical pixels. Colors carry inherited opacity in their alpha.
 typedef struct rd__cmd {
@@ -24,6 +25,8 @@ typedef struct rd__cmd {
   float    blur;
   float    dx;    // TEXT, PLACEHOLDER: horizontal scroll offset
   rd_rect  clip;  // PAINT: the clip in effect
+  uint32_t image;      // IMAGE: rect is the content box; dest is where the image lands in it,
+  rd_rect  src, dest;  // and src the part of the image, in pixels, that goes there
 } rd__cmd;
 
 // Rebuilds the display list from the last layout.

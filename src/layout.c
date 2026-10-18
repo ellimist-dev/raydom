@@ -607,13 +607,35 @@ rd_size rd__layout_node(rd_ctx* ctx, uint32_t i, rd_layout_key k, bool perform) 
   return r;
 }
 
-void rd_ctx_layout(rd_ctx* ctx, float width, float height) {
-  if (!ctx) return;
+static void layout_pass(rd_ctx* ctx, float width, float height) {
   rd_ctx_compute_styles(ctx);
   rd__layout_node(ctx, ctx->root, (rd_layout_key){width, height, width, height, RD_MEASURE_EXACTLY, RD_MEASURE_EXACTLY},
                   true);
   ctx->layouts[ctx->root].rect.x = 0;
   ctx->layouts[ctx->root].rect.y = 0;
+  rd__place_anchored(ctx);
+}
+
+static bool tree_dirty(const rd_ctx* ctx) {
+  const rd_slot* r = &ctx->slots[ctx->root];
+  return r->flags & (RD_FLAG_LAYOUT_DIRTY | RD_FLAG_STYLE_DIRTY | RD_FLAG_SUBTREE_STYLE_DIRTY);
+}
+
+void rd_ctx_layout(rd_ctx* ctx, float width, float height) {
+  if (!ctx) return;
+  rd__anim_tick(ctx);
+  layout_pass(ctx, width, height);
+  for (uint32_t j = 0; j < ctx->hook_count; j++) ctx->hooks[j].fn(ctx, ctx->hooks[j].data);
+  if (tree_dirty(ctx)) layout_pass(ctx, width, height);
+}
+
+bool rd_ctx_on_layout(rd_ctx* ctx, rd_layout_hook fn, void* data, rd_destroy_fn destroy) {
+  if (!ctx || !fn) return false;
+  rd__hook* p = realloc(ctx->hooks, (ctx->hook_count + 1) * sizeof *p);
+  if (!p) return false;
+  ctx->hooks                    = p;
+  ctx->hooks[ctx->hook_count++] = (rd__hook){fn, data, destroy};
+  return true;
 }
 
 rd_rect rd_node_rect(const rd_ctx* ctx, rd_node node) {
@@ -673,4 +695,19 @@ void rd__layout_slot_free(rd_ctx* ctx, uint32_t i) {
   L->paint_data               = NULL;
   L->paint_destroy            = NULL;
   if (paint_destroy) paint_destroy(paint_data);
+  free(L->anchor);
+  L->anchor = NULL;
+}
+
+float rd__natural_height(rd_ctx* ctx, uint32_t i) {
+  rd_node_layout* L     = &ctx->layouts[i];
+  rd_style*       st    = &ctx->styles[i].computed;
+  rd_val          shown = st->height;
+  st->height            = (rd_val){0, RD_UNIT_AUTO};
+  rd_layout_key k       = L->layout.key;
+  rd_size       s       = rd__layout_node(
+      ctx, i, (rd_layout_key){L->rect.width, NAN, k.cbw, k.cbh, RD_MEASURE_EXACTLY, RD_MEASURE_UNDEFINED}, false);
+  st->height = shown;
+  rd__mark_layout_dirty(ctx, i);  // the measurement used a height that isn't shown
+  return s.height;
 }

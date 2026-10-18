@@ -72,11 +72,38 @@ released or `rd_node_release_pointer_capture` is called. Use it for drags, slide
 {{#include ../../examples/events.cc:wheel}}
 ```
 
+## Firing events
+
+`rd_node_dispatch(ctx, node, type)` fires an event through capture, target and bubble like any other, with the
+current pointer position and modifiers. Components use it to announce their own `INPUT` and `CHANGE`, so
+applications listen to them the same way as to built-in inputs. It returns false if a listener called
+`rd_event_prevent_default`.
+
 ## Hit-testing
 
 `rd_node_at(ctx, x, y)` returns the topmost node under a point after layout. Nodes with `pointer_events: none` are
 skipped, and children inherit it unless they set `auto`. Use `none` for overlays and decorative layers that
 shouldn't take the pointer.
+
+## Cursors
+
+The `cursor` style property sets the mouse cursor over a node. It's inherited, so setting it on a card applies to
+everything inside. `rd_update` shows the cursor of the hovered node, or of the node holding the pointer capture.
+
+```cpp
+rd::Class grip = ctx.create_class(rd::Style().cursor(RD_CURSOR_EW_RESIZE));
+grip.on(RD_STATE_ACTIVE, rd::Style().cursor(RD_CURSOR_MOVE));  // while pressed, for the whole drag
+```
+
+`RD_CURSOR_AUTO`, the default, shows:
+
+- text over inputs, and over text whose `user_select` is `auto`;
+- pointer over nodes with the link role;
+- default over everything else, including text inside a button or other interactive role.
+
+While the user drags a text selection, the cursor stays text even over other nodes. `RD_CURSOR_NONE` hides it.
+`rd_ctx_cursor` returns the resolved cursor, for applications that drive input themselves. Don't call raylib's
+`SetMouseCursor` alongside `rd_update`; set the style instead.
 
 ## Mutating during dispatch
 

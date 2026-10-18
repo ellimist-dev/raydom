@@ -1,7 +1,37 @@
-add_library(raydom_extras STATIC src/graph.c)
+add_library(raydom_extras STATIC src/graph.c src/dialog.c src/theme.c src/controls.c src/toast.c src/popups.c src/registry.c src/views.c src/lists.c)
 add_library(raydom::extras ALIAS raydom_extras)
 set_target_properties(raydom_extras PROPERTIES EXPORT_NAME extras)
 target_include_directories(raydom_extras PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                                                 $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_link_libraries(raydom_extras PUBLIC raydom)
 target_compile_options(raydom_extras PRIVATE ${RAYDOM_WARNINGS} ${RAYDOM_SANITIZERS})
+
+# nativefiledialog-extended, vendored in src/external/nfd and compiled into this library.
+if (RAYDOM_FILE_DIALOG AND NOT EMSCRIPTEN)
+    set(nfd ${CMAKE_CURRENT_SOURCE_DIR}/src/external/nfd)
+    if (APPLE)
+        target_sources(raydom_extras PRIVATE ${nfd}/nfd_cocoa.m)
+        # allowedContentTypes needs macOS 11; older deployment targets use the deprecated allowedFileTypes.
+        if (CMAKE_OSX_DEPLOYMENT_TARGET AND CMAKE_OSX_DEPLOYMENT_TARGET VERSION_LESS 11.0)
+            target_compile_definitions(raydom_extras PRIVATE NFD_MACOS_ALLOWEDCONTENTTYPES=0)
+            target_link_libraries(raydom_extras PUBLIC "-framework AppKit")
+        else ()
+            target_compile_definitions(raydom_extras PRIVATE NFD_MACOS_ALLOWEDCONTENTTYPES=1)
+            target_link_libraries(raydom_extras PUBLIC "-framework AppKit" "-framework UniformTypeIdentifiers")
+        endif ()
+    elseif (WIN32)
+        target_sources(raydom_extras PRIVATE ${nfd}/nfd_win.cpp)
+        target_link_libraries(raydom_extras PUBLIC ole32 uuid shell32)
+    elseif (UNIX)
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(RAYDOM_DBUS REQUIRED dbus-1)
+        target_sources(raydom_extras PRIVATE ${nfd}/nfd_portal.cpp)
+        target_include_directories(raydom_extras PRIVATE ${RAYDOM_DBUS_INCLUDE_DIRS})
+        target_compile_definitions(raydom_extras PRIVATE NFD_PORTAL NFD_X11)
+        target_link_libraries(raydom_extras PUBLIC $<BUILD_INTERFACE:${RAYDOM_DBUS_LINK_LIBRARIES}>
+                                                   $<INSTALL_INTERFACE:dbus-1>)
+    endif ()
+    target_compile_definitions(raydom_extras PRIVATE RDX_DIALOG_NATIVE)
+    set_source_files_properties(${nfd}/nfd_cocoa.m ${nfd}/nfd_win.cpp ${nfd}/nfd_portal.cpp
+                                PROPERTIES COMPILE_OPTIONS "-w;$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions;-fno-rtti>")
+endif ()
