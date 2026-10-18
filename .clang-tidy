@@ -1,0 +1,10 @@
+Checks: >
+  -*,
+  bugprone-*,
+  clang-analyzer-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-signed-bitwise,
+  -bugprone-macro-parentheses,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
+HeaderFilterRegex: '(include|src|tests)/'
+ExcludeHeaderFilterRegex: 'src/external/'

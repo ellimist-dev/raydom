@@ -1,0 +1,6 @@
+build/
+.cache/
+.envrc
+build-web/
+web/resources/*.js
+bin/

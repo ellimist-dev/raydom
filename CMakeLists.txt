@@ -1,0 +1,105 @@
+cmake_minimum_required(VERSION 3.25)
+project(raydom VERSION 0.1.1 LANGUAGES C CXX)
+
+option(RAYDOM_FETCH_RAYLIB "Download raylib when find_package can't find it" ON)
+option(RAYDOM_BUILD_EXTRAS "Build raydom::extras" ON)
+option(RAYDOM_INSTALL "Generate install and package rules" ${PROJECT_IS_TOP_LEVEL})
+option(RAYDOM_BUILD_TESTS "Build tests" ${PROJECT_IS_TOP_LEVEL})
+option(RAYDOM_BUILD_EXAMPLES "Build examples" ${PROJECT_IS_TOP_LEVEL})
+option(RAYDOM_SANITIZE "Build raydom and its tests with ASan and UBSan" OFF)
+
+if (PROJECT_IS_TOP_LEVEL)
+    set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+endif ()
+
+include(cmake/fetch_raylib.cmake)
+include(GNUInstallDirs)
+
+set(RAYDOM_WARNINGS $<$<NOT:$<C_COMPILER_ID:MSVC>>:-Wall -Wextra>)
+set(RAYDOM_SANITIZERS $<$<BOOL:${RAYDOM_SANITIZE}>:-fsanitize=address,undefined>)
+
+configure_file(cmake/version.h.in ${PROJECT_BINARY_DIR}/include/raydom/version.h @ONLY)
+
+add_library(raydom STATIC
+    src/tree.c
+    src/style.c
+    src/layout.c
+    src/grid.c
+    src/font.c
+    src/text.c
+    src/display.c
+    src/events.c
+    src/input.c
+    src/selection.c
+    src/render.c
+)
+add_library(raydom::raydom ALIAS raydom)
+target_include_directories(raydom
+    PUBLIC
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+    PRIVATE src)
+# The public C headers use C23; the C++ layer uses C++20.
+target_compile_features(raydom PUBLIC c_std_23 cxx_std_20)
+target_link_libraries(raydom PUBLIC raylib)
+target_compile_options(raydom PRIVATE ${RAYDOM_WARNINGS} ${RAYDOM_SANITIZERS})
+target_link_options(raydom PUBLIC ${RAYDOM_SANITIZERS})
+
+if (APPLE)
+    target_link_libraries(raydom PUBLIC "-framework CoreVideo" "-framework IOKit" "-framework Cocoa"
+                                        "-framework OpenGL")
+endif ()
+
+if (RAYDOM_BUILD_EXTRAS)
+    add_subdirectory(extras)
+endif ()
+
+if (RAYDOM_BUILD_EXAMPLES)
+    add_subdirectory(examples)
+endif ()
+
+if (RAYDOM_BUILD_TESTS AND NOT EMSCRIPTEN)
+    if (NOT DEFINED raylib_SOURCE_DIR)
+        message(STATUS "raydom: tests need raylib's example fonts from a downloaded raylib; skipping")
+    else ()
+        enable_testing()
+        set(font "${raylib_SOURCE_DIR}/examples/text/resources/anonymous_pro_bold.ttf")
+        foreach (t test_tree test_tree_cpp test_style test_style_cpp test_layout test_layout_cpp test_grid
+                   test_grid_cpp test_text test_text_cpp test_render test_events test_events_cpp test_input
+                   test_input_cpp test_selection test_graph)
+            file(GLOB src tests/${t}.c tests/${t}.cc)
+            add_executable(${t} ${src})
+            target_link_libraries(${t} $<IF:$<TARGET_EXISTS:raydom_extras>,raydom_extras,raydom>)
+            target_include_directories(${t} PRIVATE src)
+            target_compile_options(${t} PRIVATE ${RAYDOM_WARNINGS} ${RAYDOM_SANITIZERS}
+                                                $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions>)
+            target_compile_definitions(${t} PRIVATE "RAYDOM_TEST_FONT=\"${font}\"")
+            add_test(NAME ${t} COMMAND ${t})
+        endforeach ()
+    endif ()
+endif ()
+
+if (RAYDOM_INSTALL)
+    include(CMakePackageConfigHelpers)
+    set(targets raydom)
+    if (TARGET raydom_extras)
+        list(APPEND targets raydom_extras)
+        install(DIRECTORY extras/include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    endif ()
+    install(TARGETS ${targets} EXPORT raydomTargets ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+    install(DIRECTORY include/ ${PROJECT_BINARY_DIR}/include/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    install(EXPORT raydomTargets NAMESPACE raydom:: DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/raydom)
+
+    # Until 1.0, minor versions may break compatibility.
+    if (PROJECT_VERSION_MAJOR EQUAL 0)
+        set(compat SameMinorVersion)
+    else ()
+        set(compat SameMajorVersion)
+    endif ()
+    configure_package_config_file(cmake/raydomConfig.cmake.in ${PROJECT_BINARY_DIR}/raydomConfig.cmake
+                                  INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/raydom)
+    write_basic_package_version_file(${PROJECT_BINARY_DIR}/raydomConfigVersion.cmake COMPATIBILITY ${compat})
+    install(FILES ${PROJECT_BINARY_DIR}/raydomConfig.cmake ${PROJECT_BINARY_DIR}/raydomConfigVersion.cmake
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/raydom)
+endif ()

@@ -1,0 +1,22 @@
+set(SHOWCASE_FONT_DIR "${raylib_SOURCE_DIR}/examples/text/resources")
+if (NOT EXISTS "${SHOWCASE_FONT_DIR}/anonymous_pro_bold.ttf")
+    message(STATUS "raydom: showcase needs raylib's example fonts; skipping")
+    return()
+endif ()
+
+add_executable(showcase showcase/main.cc)
+target_link_libraries(showcase raydom)
+target_compile_options(showcase PRIVATE --embed-dir=${SHOWCASE_FONT_DIR} -Wno-c23-extensions)
+set_source_files_properties(showcase/main.cc PROPERTIES OBJECT_DEPENDS "${SHOWCASE_FONT_DIR}/anonymous_pro_bold.ttf")
+
+if (EMSCRIPTEN)
+    target_link_options(showcase PRIVATE -sUSE_GLFW=3 -sASYNCIFY -sALLOW_MEMORY_GROWTH=1 -sSINGLE_FILE=1)
+    set_target_properties(showcase PROPERTIES SUFFIX ".html")
+endif ()
+
+if (TARGET raydom_extras)
+    add_executable(network network/main.cc)
+    target_link_libraries(network raydom_extras)
+    target_compile_options(network PRIVATE --embed-dir=${SHOWCASE_FONT_DIR} -Wno-c23-extensions)
+    set_source_files_properties(network/main.cc PROPERTIES OBJECT_DEPENDS "${SHOWCASE_FONT_DIR}/anonymous_pro_bold.ttf")
+endif ()
