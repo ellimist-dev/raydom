@@ -48,7 +48,7 @@ Agents and tools can read the book as plain Markdown; see [For AI agents](agents
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.3)
+    GIT_TAG        v0.2.4)
 FetchContent_MakeAvailable(raydom)
 
 target_link_libraries(your_app PRIVATE raydom::raydom)
@@ -213,7 +213,7 @@ project(hello LANGUAGES C CXX)
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.3)
+    GIT_TAG        v0.2.4)
 FetchContent_MakeAvailable(raydom)
 
 add_executable(hello main.cc)
@@ -1269,8 +1269,8 @@ resolved role. Setting `RD_ROLE_AUTO` returns a node to its derived role.
 
 The roles are a subset of [AccessKit](https://accesskit.dev/)'s: generic, group, button, link, checkbox, radio
 button, radio group, switch, slider, text, label, heading, text input, multi-line text input, list, list item, image,
-canvas, menu, menu item, combo box, dialog, tooltip. More can be added
-in a minor release.
+canvas, menu, menu item, combo box, dialog, tooltip, tab list, tab, tab panel, splitter, table, row, cell, column
+header, tree, tree item, spin button. More can be added in a minor release.
 
 ## Focus
 
@@ -1650,7 +1650,7 @@ int main() {
 
 # Controls and toasts
 
-`raydom::extras` has form controls (checkbox, switch, radio group, slider) and toasts. They are ordinary nodes built
+`raydom::extras` has form controls (checkbox, switch, radio group, slider, numeric input) and toasts. They are ordinary nodes built
 from core primitives, with a role, keyboard support and a default look, so they mix freely with your own nodes.
 
 ```cpp
@@ -1659,9 +1659,10 @@ from core primitives, with a role, keyboard support and a default look, so they 
 
 ## Events
 
-A control fires `RD_EVENT_CHANGE` when the user changes it, and a slider also fires `RD_EVENT_INPUT` while it moves.
-Listen with `rd_node_on` or `node.on`; read the value with the getter. Setters (`rdx_set_checked`,
-`rdx_radio_select`, `rdx_slider_set_value`) fire nothing, so code that syncs a control from your model doesn't loop.
+A control fires `RD_EVENT_CHANGE` when the user changes it, and a slider and a numeric input also fire
+`RD_EVENT_INPUT` on every change of value. Listen with `rd_node_on` or `node.on`; read the value with the getter.
+Setters (`rdx_set_checked`, `rdx_radio_select`, `rdx_slider_set_value`, `rdx_number_set_value`) fire nothing, so
+code that syncs a control from your model doesn't loop.
 
 To disable a control, set `RD_STATE_DISABLED` on it: it stops taking input and focus, and the theme dims it.
 
@@ -1707,6 +1708,28 @@ Dragging or pressing anywhere on the track moves it; the drag continues outside 
 (1% of the range when `step` is 0), Page Up and Page Down a tenth of the range, Home and End to the ends. A zero
 `rdx_slider_desc` is 0 to 100, continuous. With a step, values are `min + n * step`, as for an HTML range input; when
 the range isn't a whole number of steps, the largest value is the last step below `max`. The default width is 200px; set `width` on the slider to change it.
+
+## Numeric input
+
+```cpp
+rd::Node particles = rdx::number(ctx, {.min = 1000, .max = 100000, .value = 12000, .step = 1000});
+rd::Node exposure  = rdx::number(ctx, {.min = 0.2f, .max = 3, .value = 1, .step = 0.05f, .decimals = 2});
+exposure.on(RD_EVENT_INPUT, [&] { /* rdx::number_value(exposure) */ });  // every change
+```
+
+A text field with stepper buttons, for values a slider can't set precisely. Typing takes digits, a decimal point
+when `decimals` is above 0, and a minus sign when the range allows negatives; anything else is refused. Enter or
+leaving the field commits: the number is clamped to the range and rounded to `decimals` places, and text that isn't
+a number reverts. Escape drops what was typed.
+
+Up and Down step by `step` (ten steps with Shift), Page Up and Down by ten steps, and the stepper buttons step,
+repeating while held. `step` defaults to one unit of the last place shown. With `max` at or below `min` the field is
+unbounded. `INPUT` fires on every change of value; `CHANGE` when it settles: on commit, on each key, and when a held
+stepper is released. The field's own text edits don't reach the control's listeners.
+
+`rdx_number_set_range` changes the range and clamps the value without an event. `rdx_number_input` returns the text
+field inside, for a placeholder or a style of its own. The role is `RD_ROLE_SPIN_BUTTON`. Disabled, the field can
+still take focus but refuses edits and steps.
 
 ## Toasts
 
@@ -1755,6 +1778,7 @@ rd::Class(ctx.get(), theme->check_box).on(RD_STATE_CHECKED, rd::Style().backgrou
 | `switch_row`, `switch_track`, `switch_thumb`         | Switch row, track, thumb                 |
 | `radio_group`, `radio_row`, `radio_ring`, `radio_dot` | Group, option row, ring, dot            |
 | `slider`, `slider_track`, `slider_fill`, `slider_thumb` | Slider, rail, filled part, thumb      |
+| `number`, `number_input`, `number_steppers`, `number_step` | Numeric field, its text, the stepper column, a stepper |
 | `label`                                              | Text beside a checkbox, switch or option |
 | `toast_stack`, `toast`, `toast_bar`, `toast_title`, `toast_body`, `toast_close` | Toast parts |
 | `toast_info`, `toast_success`, `toast_warning`, `toast_error` | The bar's color per kind        |
@@ -1903,6 +1927,32 @@ rd::Node sidebar = rdx::pane(split, 0), content = rdx::pane(split, 1);
 Two panes with a handle between them, side by side or (`vertical`) stacked. Dragging the handle or, with it
 focused, the arrow keys resize the panes, within each pane's minimum. The first pane's size is a fraction of the
 splitter, so it follows window resizes; `rdx_split_fraction` reads it and `CHANGE` fires when a drag ends.
+
+For a sidebar, `size` keeps the first pane at a width in pixels instead, and `reverse` puts it at the right (or,
+stacked, the bottom). A `collapsible` first pane snaps shut when dragged below half its minimum and keeps its size
+while shut; dragging the handle back out, double-clicking it, or Enter with it focused opens it again.
+
+```cpp
+// A 280px panel that keeps its width as the window resizes and snaps shut when dragged narrow.
+rd::Node panel = rdx::split(ctx, {.size = 280, .min_first = 200, .min_second = 300, .collapsible = true});
+panel.style(rd::Style().height(400_px));
+rd::Node reopen = ctx.create_button("Show panel");
+reopen.on_click([panel] { rdx::set_split_collapsed(panel, false); });
+panel.on(RD_EVENT_CHANGE, [panel, reopen] {
+  reopen.merge_style(rd::Style().display(rdx::split_collapsed(panel) ? RD_DISPLAY_FLEX : RD_DISPLAY_NONE));
+});
+// On a narrow window: stacked, with the panel at the bottom.
+rdx::set_split_direction(panel, true, true);
+```
+
+| Function                                   | Does                                                                |
+| ------------------------------------------ | ------------------------------------------------------------------- |
+| `rdx_split_size`, `rdx_split_set_size`     | The first pane's size in pixels when shown, within the minimums     |
+| `rdx_split_collapsed`, `rdx_split_set_collapsed` | Whether the first pane is shut; the setter fires nothing      |
+| `rdx_split_set_direction`                  | Side by side or stacked, and which end the first pane is at        |
+
+C++: `rdx::split_size`, `rdx::set_split_size`, `rdx::split_collapsed`, `rdx::set_split_collapsed`,
+`rdx::set_split_direction`, `rdx::split_fraction` and `rdx::set_split_fraction`.
 
 ## Virtualized list
 
@@ -2471,7 +2521,7 @@ Every published version of this book has, next to its HTML:
 | `<page>.md`       | Each page as Markdown, at the HTML page's path with `.md`      |
 
 Use the copy under the version that matches the project's `GIT_TAG` or `find_package` version, for example
-`/v0.2.3/llms-full.txt`. `/latest/` follows the newest release; `/dev/` follows the main branch and may
+`/v0.2.4/llms-full.txt`. `/latest/` follows the newest release; `/dev/` follows the main branch and may
 describe unreleased API.
 
 The headers are the ground truth. `include/raydom/*.h` documents every function in a comment above it, and

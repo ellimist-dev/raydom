@@ -37,7 +37,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-303fe6e0.js";
+            window.path_to_searchindex_js = "searchindex-21f1d3f6.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c393df87.js"></script>
@@ -215,7 +215,7 @@ behave as described for this version.</p>
 <pre><code class="language-cmake">include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.3)
+    GIT_TAG        v0.2.4)
 FetchContent_MakeAvailable(raydom)
 
 target_link_libraries(your_app PRIVATE raydom::raydom)
@@ -368,7 +368,7 @@ project(hello LANGUAGES C CXX)
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.3)
+    GIT_TAG        v0.2.4)
 FetchContent_MakeAvailable(raydom)
 
 add_executable(hello main.cc)
@@ -1193,8 +1193,8 @@ for other text leaves, canvas for nodes with a paint callback, and generic other
 resolved role. Setting <code>RD_ROLE_AUTO</code> returns a node to its derived role.</p>
 <p>The roles are a subset of <a href="https://accesskit.dev/">AccessKit</a>’s: generic, group, button, link, checkbox, radio
 button, radio group, switch, slider, text, label, heading, text input, multi-line text input, list, list item, image,
-canvas, menu, menu item, combo box, dialog, tooltip. More can be added
-in a minor release.</p>
+canvas, menu, menu item, combo box, dialog, tooltip, tab list, tab, tab panel, splitter, table, row, cell, column
+header, tree, tree item, spin button. More can be added in a minor release.</p>
 <h2 id="focus-1"><a class="header" href="#focus-1">Focus</a></h2>
 <p>Interactive roles (button, link, checkbox, radio button, switch, slider, menu item, combo box) take focus without a <code>focusable</code> style, as inputs do:</p>
 <ul>
@@ -1507,14 +1507,15 @@ form of <code>rd_class_set_state</code>.</li>
 </ul>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="controls-and-toasts"><a class="header" href="#controls-and-toasts">Controls and toasts</a></h1>
-<p><code>raydom::extras</code> has form controls (checkbox, switch, radio group, slider) and toasts. They are ordinary nodes built
+<p><code>raydom::extras</code> has form controls (checkbox, switch, radio group, slider, numeric input) and toasts. They are ordinary nodes built
 from core primitives, with a role, keyboard support and a default look, so they mix freely with your own nodes.</p>
 <pre><code class="language-cpp">#include &lt;raydom/extras/controls.hh&gt;  // C: controls.h and toast.h
 </code></pre>
 <h2 id="events-1"><a class="header" href="#events-1">Events</a></h2>
-<p>A control fires <code>RD_EVENT_CHANGE</code> when the user changes it, and a slider also fires <code>RD_EVENT_INPUT</code> while it moves.
-Listen with <code>rd_node_on</code> or <code>node.on</code>; read the value with the getter. Setters (<code>rdx_set_checked</code>,
-<code>rdx_radio_select</code>, <code>rdx_slider_set_value</code>) fire nothing, so code that syncs a control from your model doesn’t loop.</p>
+<p>A control fires <code>RD_EVENT_CHANGE</code> when the user changes it, and a slider and a numeric input also fire
+<code>RD_EVENT_INPUT</code> on every change of value. Listen with <code>rd_node_on</code> or <code>node.on</code>; read the value with the getter.
+Setters (<code>rdx_set_checked</code>, <code>rdx_radio_select</code>, <code>rdx_slider_set_value</code>, <code>rdx_number_set_value</code>) fire nothing, so
+code that syncs a control from your model doesn’t loop.</p>
 <p>To disable a control, set <code>RD_STATE_DISABLED</code> on it: it stops taking input and focus, and the theme dims it.</p>
 <h2 id="checkbox-and-switch"><a class="header" href="#checkbox-and-switch">Checkbox and switch</a></h2>
 <pre><code class="language-cpp">rd::Node remember = rdx::checkbox(ctx, "Remember me");
@@ -1546,6 +1547,22 @@ value is clamped into the new range and no event fires.</p>
 (1% of the range when <code>step</code> is 0), Page Up and Page Down a tenth of the range, Home and End to the ends. A zero
 <code>rdx_slider_desc</code> is 0 to 100, continuous. With a step, values are <code>min + n * step</code>, as for an HTML range input; when
 the range isn’t a whole number of steps, the largest value is the last step below <code>max</code>. The default width is 200px; set <code>width</code> on the slider to change it.</p>
+<h2 id="numeric-input"><a class="header" href="#numeric-input">Numeric input</a></h2>
+<pre><code class="language-cpp">rd::Node particles = rdx::number(ctx, {.min = 1000, .max = 100000, .value = 12000, .step = 1000});
+rd::Node exposure  = rdx::number(ctx, {.min = 0.2f, .max = 3, .value = 1, .step = 0.05f, .decimals = 2});
+exposure.on(RD_EVENT_INPUT, [&amp;] { /* rdx::number_value(exposure) */ });  // every change
+</code></pre>
+<p>A text field with stepper buttons, for values a slider can’t set precisely. Typing takes digits, a decimal point
+when <code>decimals</code> is above 0, and a minus sign when the range allows negatives; anything else is refused. Enter or
+leaving the field commits: the number is clamped to the range and rounded to <code>decimals</code> places, and text that isn’t
+a number reverts. Escape drops what was typed.</p>
+<p>Up and Down step by <code>step</code> (ten steps with Shift), Page Up and Down by ten steps, and the stepper buttons step,
+repeating while held. <code>step</code> defaults to one unit of the last place shown. With <code>max</code> at or below <code>min</code> the field is
+unbounded. <code>INPUT</code> fires on every change of value; <code>CHANGE</code> when it settles: on commit, on each key, and when a held
+stepper is released. The field’s own text edits don’t reach the control’s listeners.</p>
+<p><code>rdx_number_set_range</code> changes the range and clamps the value without an event. <code>rdx_number_input</code> returns the text
+field inside, for a placeholder or a style of its own. The role is <code>RD_ROLE_SPIN_BUTTON</code>. Disabled, the field can
+still take focus but refuses edits and steps.</p>
 <h2 id="toasts"><a class="header" href="#toasts">Toasts</a></h2>
 <pre><code class="language-cpp">rd::Node t = rdx::toast(ctx, {.title    = "Exported",
                               .text     = "report.csv is in your Downloads folder.",
@@ -1592,6 +1609,7 @@ rd::Class(ctx.get(), theme-&gt;check_box).on(RD_STATE_CHECKED, rd::Style().backg
 <tr><td><code>switch_row</code>, <code>switch_track</code>, <code>switch_thumb</code></td><td>Switch row, track, thumb</td></tr>
 <tr><td><code>radio_group</code>, <code>radio_row</code>, <code>radio_ring</code>, <code>radio_dot</code></td><td>Group, option row, ring, dot</td></tr>
 <tr><td><code>slider</code>, <code>slider_track</code>, <code>slider_fill</code>, <code>slider_thumb</code></td><td>Slider, rail, filled part, thumb</td></tr>
+<tr><td><code>number</code>, <code>number_input</code>, <code>number_steppers</code>, <code>number_step</code></td><td>Numeric field, its text, the stepper column, a stepper</td></tr>
 <tr><td><code>label</code></td><td>Text beside a checkbox, switch or option</td></tr>
 <tr><td><code>toast_stack</code>, <code>toast</code>, <code>toast_bar</code>, <code>toast_title</code>, <code>toast_body</code>, <code>toast_close</code></td><td>Toast parts</td></tr>
 <tr><td><code>toast_info</code>, <code>toast_success</code>, <code>toast_warning</code>, <code>toast_error</code></td><td>The bar’s color per kind</td></tr>
@@ -1703,6 +1721,34 @@ rd::Node sidebar = rdx::pane(split, 0), content = rdx::pane(split, 1);
 <p>Two panes with a handle between them, side by side or (<code>vertical</code>) stacked. Dragging the handle or, with it
 focused, the arrow keys resize the panes, within each pane’s minimum. The first pane’s size is a fraction of the
 splitter, so it follows window resizes; <code>rdx_split_fraction</code> reads it and <code>CHANGE</code> fires when a drag ends.</p>
+<p>For a sidebar, <code>size</code> keeps the first pane at a width in pixels instead, and <code>reverse</code> puts it at the right (or,
+stacked, the bottom). A <code>collapsible</code> first pane snaps shut when dragged below half its minimum and keeps its size
+while shut; dragging the handle back out, double-clicking it, or Enter with it focused opens it again.</p>
+<pre><code class="language-cpp">// A 280px panel that keeps its width as the window resizes and snaps shut when dragged narrow.
+rd::Node panel = rdx::split(ctx, {.size = 280, .min_first = 200, .min_second = 300, .collapsible = true});
+panel.style(rd::Style().height(400_px));
+rd::Node reopen = ctx.create_button("Show panel");
+reopen.on_click([panel] { rdx::set_split_collapsed(panel, false); });
+panel.on(RD_EVENT_CHANGE, [panel, reopen] {
+  reopen.merge_style(rd::Style().display(rdx::split_collapsed(panel) ? RD_DISPLAY_FLEX : RD_DISPLAY_NONE));
+});
+// On a narrow window: stacked, with the panel at the bottom.
+rdx::set_split_direction(panel, true, true);
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Function</th><th>Does</th></tr>
+</thead>
+<tbody>
+<tr><td><code>rdx_split_size</code>, <code>rdx_split_set_size</code></td><td>The first pane’s size in pixels when shown, within the minimums</td></tr>
+<tr><td><code>rdx_split_collapsed</code>, <code>rdx_split_set_collapsed</code></td><td>Whether the first pane is shut; the setter fires nothing</td></tr>
+<tr><td><code>rdx_split_set_direction</code></td><td>Side by side or stacked, and which end the first pane is at</td></tr>
+</tbody>
+</table>
+</div>
+<p>C++: <code>rdx::split_size</code>, <code>rdx::set_split_size</code>, <code>rdx::split_collapsed</code>, <code>rdx::set_split_collapsed</code>,
+<code>rdx::set_split_direction</code>, <code>rdx::split_fraction</code> and <code>rdx::set_split_fraction</code>.</p>
 <h2 id="virtualized-list"><a class="header" href="#virtualized-list">Virtualized list</a></h2>
 <pre><code class="language-cpp">std::vector&lt;std::string&gt; names;
 for (int i = 0; i &lt; 50000; i++) names.push_back("Contact " + std::to_string(i));
@@ -2223,7 +2269,7 @@ raydom code, in a form that is cheap to retrieve.</p>
 </table>
 </div>
 <p>Use the copy under the version that matches the project’s <code>GIT_TAG</code> or <code>find_package</code> version, for example
-<code>/v0.2.3/llms-full.txt</code>. <code>/latest/</code> follows the newest release; <code>/dev/</code> follows the main branch and may
+<code>/v0.2.4/llms-full.txt</code>. <code>/latest/</code> follows the newest release; <code>/dev/</code> follows the main branch and may
 describe unreleased API.</p>
 <p>The headers are the ground truth. <code>include/raydom/*.h</code> documents every function in a comment above it, and
 <code>include/raydom/style.h</code> defines every style property in the <code>RD_STYLE_PROPS</code> X-macro.</p>

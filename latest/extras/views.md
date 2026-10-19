@@ -32,6 +32,32 @@ Two panes with a handle between them, side by side or (`vertical`) stacked. Drag
 focused, the arrow keys resize the panes, within each pane's minimum. The first pane's size is a fraction of the
 splitter, so it follows window resizes; `rdx_split_fraction` reads it and `CHANGE` fires when a drag ends.
 
+For a sidebar, `size` keeps the first pane at a width in pixels instead, and `reverse` puts it at the right (or,
+stacked, the bottom). A `collapsible` first pane snaps shut when dragged below half its minimum and keeps its size
+while shut; dragging the handle back out, double-clicking it, or Enter with it focused opens it again.
+
+```cpp
+// A 280px panel that keeps its width as the window resizes and snaps shut when dragged narrow.
+rd::Node panel = rdx::split(ctx, {.size = 280, .min_first = 200, .min_second = 300, .collapsible = true});
+panel.style(rd::Style().height(400_px));
+rd::Node reopen = ctx.create_button("Show panel");
+reopen.on_click([panel] { rdx::set_split_collapsed(panel, false); });
+panel.on(RD_EVENT_CHANGE, [panel, reopen] {
+  reopen.merge_style(rd::Style().display(rdx::split_collapsed(panel) ? RD_DISPLAY_FLEX : RD_DISPLAY_NONE));
+});
+// On a narrow window: stacked, with the panel at the bottom.
+rdx::set_split_direction(panel, true, true);
+```
+
+| Function                                   | Does                                                                |
+| ------------------------------------------ | ------------------------------------------------------------------- |
+| `rdx_split_size`, `rdx_split_set_size`     | The first pane's size in pixels when shown, within the minimums     |
+| `rdx_split_collapsed`, `rdx_split_set_collapsed` | Whether the first pane is shut; the setter fires nothing      |
+| `rdx_split_set_direction`                  | Side by side or stacked, and which end the first pane is at        |
+
+C++: `rdx::split_size`, `rdx::set_split_size`, `rdx::split_collapsed`, `rdx::set_split_collapsed`,
+`rdx::set_split_direction`, `rdx::split_fraction` and `rdx::set_split_fraction`.
+
 ## Virtualized list
 
 ```cpp

@@ -75,8 +75,8 @@ resolved role. Setting `RD_ROLE_AUTO` returns a node to its derived role.
 
 The roles are a subset of [AccessKit](https://accesskit.dev/)'s: generic, group, button, link, checkbox, radio
 button, radio group, switch, slider, text, label, heading, text input, multi-line text input, list, list item, image,
-canvas, menu, menu item, combo box, dialog, tooltip. More can be added
-in a minor release.
+canvas, menu, menu item, combo box, dialog, tooltip, tab list, tab, tab panel, splitter, table, row, cell, column
+header, tree, tree item, spin button. More can be added in a minor release.
 
 ## Focus
 

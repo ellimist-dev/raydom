@@ -36,7 +36,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-303fe6e0.js";
+            window.path_to_searchindex_js = "../searchindex-21f1d3f6.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-c393df87.js"></script>
@@ -179,14 +179,15 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="controls-and-toasts"><a class="header" href="#controls-and-toasts">Controls and toasts</a></h1>
-<p><code>raydom::extras</code> has form controls (checkbox, switch, radio group, slider) and toasts. They are ordinary nodes built
+<p><code>raydom::extras</code> has form controls (checkbox, switch, radio group, slider, numeric input) and toasts. They are ordinary nodes built
 from core primitives, with a role, keyboard support and a default look, so they mix freely with your own nodes.</p>
 <pre><code class="language-cpp">#include &lt;raydom/extras/controls.hh&gt;  // C: controls.h and toast.h
 </code></pre>
 <h2 id="events"><a class="header" href="#events">Events</a></h2>
-<p>A control fires <code>RD_EVENT_CHANGE</code> when the user changes it, and a slider also fires <code>RD_EVENT_INPUT</code> while it moves.
-Listen with <code>rd_node_on</code> or <code>node.on</code>; read the value with the getter. Setters (<code>rdx_set_checked</code>,
-<code>rdx_radio_select</code>, <code>rdx_slider_set_value</code>) fire nothing, so code that syncs a control from your model doesn’t loop.</p>
+<p>A control fires <code>RD_EVENT_CHANGE</code> when the user changes it, and a slider and a numeric input also fire
+<code>RD_EVENT_INPUT</code> on every change of value. Listen with <code>rd_node_on</code> or <code>node.on</code>; read the value with the getter.
+Setters (<code>rdx_set_checked</code>, <code>rdx_radio_select</code>, <code>rdx_slider_set_value</code>, <code>rdx_number_set_value</code>) fire nothing, so
+code that syncs a control from your model doesn’t loop.</p>
 <p>To disable a control, set <code>RD_STATE_DISABLED</code> on it: it stops taking input and focus, and the theme dims it.</p>
 <h2 id="checkbox-and-switch"><a class="header" href="#checkbox-and-switch">Checkbox and switch</a></h2>
 <pre><code class="language-cpp">rd::Node remember = rdx::checkbox(ctx, "Remember me");
@@ -218,6 +219,22 @@ value is clamped into the new range and no event fires.</p>
 (1% of the range when <code>step</code> is 0), Page Up and Page Down a tenth of the range, Home and End to the ends. A zero
 <code>rdx_slider_desc</code> is 0 to 100, continuous. With a step, values are <code>min + n * step</code>, as for an HTML range input; when
 the range isn’t a whole number of steps, the largest value is the last step below <code>max</code>. The default width is 200px; set <code>width</code> on the slider to change it.</p>
+<h2 id="numeric-input"><a class="header" href="#numeric-input">Numeric input</a></h2>
+<pre><code class="language-cpp">rd::Node particles = rdx::number(ctx, {.min = 1000, .max = 100000, .value = 12000, .step = 1000});
+rd::Node exposure  = rdx::number(ctx, {.min = 0.2f, .max = 3, .value = 1, .step = 0.05f, .decimals = 2});
+exposure.on(RD_EVENT_INPUT, [&amp;] { /* rdx::number_value(exposure) */ });  // every change
+</code></pre>
+<p>A text field with stepper buttons, for values a slider can’t set precisely. Typing takes digits, a decimal point
+when <code>decimals</code> is above 0, and a minus sign when the range allows negatives; anything else is refused. Enter or
+leaving the field commits: the number is clamped to the range and rounded to <code>decimals</code> places, and text that isn’t
+a number reverts. Escape drops what was typed.</p>
+<p>Up and Down step by <code>step</code> (ten steps with Shift), Page Up and Down by ten steps, and the stepper buttons step,
+repeating while held. <code>step</code> defaults to one unit of the last place shown. With <code>max</code> at or below <code>min</code> the field is
+unbounded. <code>INPUT</code> fires on every change of value; <code>CHANGE</code> when it settles: on commit, on each key, and when a held
+stepper is released. The field’s own text edits don’t reach the control’s listeners.</p>
+<p><code>rdx_number_set_range</code> changes the range and clamps the value without an event. <code>rdx_number_input</code> returns the text
+field inside, for a placeholder or a style of its own. The role is <code>RD_ROLE_SPIN_BUTTON</code>. Disabled, the field can
+still take focus but refuses edits and steps.</p>
 <h2 id="toasts"><a class="header" href="#toasts">Toasts</a></h2>
 <pre><code class="language-cpp">rd::Node t = rdx::toast(ctx, {.title    = "Exported",
                               .text     = "report.csv is in your Downloads folder.",
@@ -264,6 +281,7 @@ rd::Class(ctx.get(), theme-&gt;check_box).on(RD_STATE_CHECKED, rd::Style().backg
 <tr><td><code>switch_row</code>, <code>switch_track</code>, <code>switch_thumb</code></td><td>Switch row, track, thumb</td></tr>
 <tr><td><code>radio_group</code>, <code>radio_row</code>, <code>radio_ring</code>, <code>radio_dot</code></td><td>Group, option row, ring, dot</td></tr>
 <tr><td><code>slider</code>, <code>slider_track</code>, <code>slider_fill</code>, <code>slider_thumb</code></td><td>Slider, rail, filled part, thumb</td></tr>
+<tr><td><code>number</code>, <code>number_input</code>, <code>number_steppers</code>, <code>number_step</code></td><td>Numeric field, its text, the stepper column, a stepper</td></tr>
 <tr><td><code>label</code></td><td>Text beside a checkbox, switch or option</td></tr>
 <tr><td><code>toast_stack</code>, <code>toast</code>, <code>toast_bar</code>, <code>toast_title</code>, <code>toast_body</code>, <code>toast_close</code></td><td>Toast parts</td></tr>
 <tr><td><code>toast_info</code>, <code>toast_success</code>, <code>toast_warning</code>, <code>toast_error</code></td><td>The bar’s color per kind</td></tr>

@@ -36,7 +36,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-303fe6e0.js";
+            window.path_to_searchindex_js = "../searchindex-21f1d3f6.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-c393df87.js"></script>
@@ -200,6 +200,34 @@ rd::Node sidebar = rdx::pane(split, 0), content = rdx::pane(split, 1);
 <p>Two panes with a handle between them, side by side or (<code>vertical</code>) stacked. Dragging the handle or, with it
 focused, the arrow keys resize the panes, within each pane’s minimum. The first pane’s size is a fraction of the
 splitter, so it follows window resizes; <code>rdx_split_fraction</code> reads it and <code>CHANGE</code> fires when a drag ends.</p>
+<p>For a sidebar, <code>size</code> keeps the first pane at a width in pixels instead, and <code>reverse</code> puts it at the right (or,
+stacked, the bottom). A <code>collapsible</code> first pane snaps shut when dragged below half its minimum and keeps its size
+while shut; dragging the handle back out, double-clicking it, or Enter with it focused opens it again.</p>
+<pre><code class="language-cpp">// A 280px panel that keeps its width as the window resizes and snaps shut when dragged narrow.
+rd::Node panel = rdx::split(ctx, {.size = 280, .min_first = 200, .min_second = 300, .collapsible = true});
+panel.style(rd::Style().height(400_px));
+rd::Node reopen = ctx.create_button("Show panel");
+reopen.on_click([panel] { rdx::set_split_collapsed(panel, false); });
+panel.on(RD_EVENT_CHANGE, [panel, reopen] {
+  reopen.merge_style(rd::Style().display(rdx::split_collapsed(panel) ? RD_DISPLAY_FLEX : RD_DISPLAY_NONE));
+});
+// On a narrow window: stacked, with the panel at the bottom.
+rdx::set_split_direction(panel, true, true);
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Function</th><th>Does</th></tr>
+</thead>
+<tbody>
+<tr><td><code>rdx_split_size</code>, <code>rdx_split_set_size</code></td><td>The first pane’s size in pixels when shown, within the minimums</td></tr>
+<tr><td><code>rdx_split_collapsed</code>, <code>rdx_split_set_collapsed</code></td><td>Whether the first pane is shut; the setter fires nothing</td></tr>
+<tr><td><code>rdx_split_set_direction</code></td><td>Side by side or stacked, and which end the first pane is at</td></tr>
+</tbody>
+</table>
+</div>
+<p>C++: <code>rdx::split_size</code>, <code>rdx::set_split_size</code>, <code>rdx::split_collapsed</code>, <code>rdx::set_split_collapsed</code>,
+<code>rdx::set_split_direction</code>, <code>rdx::split_fraction</code> and <code>rdx::set_split_fraction</code>.</p>
 <h2 id="virtualized-list"><a class="header" href="#virtualized-list">Virtualized list</a></h2>
 <pre><code class="language-cpp">std::vector&lt;std::string&gt; names;
 for (int i = 0; i &lt; 50000; i++) names.push_back("Contact " + std::to_string(i));
