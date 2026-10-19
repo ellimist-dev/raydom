@@ -25,6 +25,23 @@ Two panes with a handle between them, side by side or (`vertical`) stacked. Drag
 focused, the arrow keys resize the panes, within each pane's minimum. The first pane's size is a fraction of the
 splitter, so it follows window resizes; `rdx_split_fraction` reads it and `CHANGE` fires when a drag ends.
 
+For a sidebar, `size` keeps the first pane at a width in pixels instead, and `reverse` puts it at the right (or,
+stacked, the bottom). A `collapsible` first pane snaps shut when dragged below half its minimum and keeps its size
+while shut; dragging the handle back out, double-clicking it, or Enter with it focused opens it again.
+
+```cpp
+{{#include ../../examples/views.cc:collapsible}}
+```
+
+| Function                                   | Does                                                                |
+| ------------------------------------------ | ------------------------------------------------------------------- |
+| `rdx_split_size`, `rdx_split_set_size`     | The first pane's size in pixels when shown, within the minimums     |
+| `rdx_split_collapsed`, `rdx_split_set_collapsed` | Whether the first pane is shut; the setter fires nothing      |
+| `rdx_split_set_direction`                  | Side by side or stacked, and which end the first pane is at        |
+
+C++: `rdx::split_size`, `rdx::set_split_size`, `rdx::split_collapsed`, `rdx::set_split_collapsed`,
+`rdx::set_split_direction`, `rdx::split_fraction` and `rdx::set_split_fraction`.
+
 ## Virtualized list
 
 ```cpp

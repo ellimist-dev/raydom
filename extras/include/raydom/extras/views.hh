@@ -22,6 +22,15 @@ inline rd::Node split(const rd::Context& ctx, const rdx_split_desc& d = {}) {
   return {ctx.get(), rdx_split_create(ctx.get(), &d)};
 }
 inline rd::Node pane(rd::Node split, int i) { return {split.ctx(), rdx_split_pane(split.ctx(), split.handle(), i)}; }
+inline float split_fraction(rd::Node s) { return rdx_split_fraction(s.ctx(), s.handle()); }
+inline bool  set_split_fraction(rd::Node s, float f) { return rdx_split_set_fraction(s.ctx(), s.handle(), f); }
+inline float split_size(rd::Node s) { return rdx_split_size(s.ctx(), s.handle()); }
+inline bool  set_split_size(rd::Node s, float px) { return rdx_split_set_size(s.ctx(), s.handle(), px); }
+inline bool  split_collapsed(rd::Node s) { return rdx_split_collapsed(s.ctx(), s.handle()); }
+inline bool  set_split_collapsed(rd::Node s, bool c) { return rdx_split_set_collapsed(s.ctx(), s.handle(), c); }
+inline bool  set_split_direction(rd::Node s, bool vertical, bool reverse = false) {
+  return rdx_split_set_direction(s.ctx(), s.handle(), vertical, reverse);
+}
 
 namespace detail {
 template <class Fn>

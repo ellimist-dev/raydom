@@ -46,6 +46,7 @@ typedef enum rd_role : uint8_t {
   RD_ROLE_COLUMN_HEADER,
   RD_ROLE_TREE,
   RD_ROLE_TREE_ITEM,
+  RD_ROLE_SPIN_BUTTON,  // a number field with steppers
 } rd_role;
 
 bool rd_node_set_role(rd_ctx* ctx, rd_node node, rd_role role);

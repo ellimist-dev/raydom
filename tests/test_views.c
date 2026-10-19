@@ -97,6 +97,75 @@ static void splits(void) {
   rd_ctx_destroy(ctx);
 }
 
+// A sidebar: a fixed-size, collapsible first pane, at either end.
+static void sidebar(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_node s   = rdx_split_create(ctx, &(rdx_split_desc){.size = 200, .min_first = 120, .min_second = 100, .collapsible = true});
+  rd_node_merge_style(ctx, s, &(rd_style){.width = rd_px(606), .height = rd_px(300)});
+  rd_node_append(ctx, rd_ctx_root(ctx), s);
+  int changes = 0;
+  rd_node_on(ctx, s, RD_EVENT_CHANGE, count, &changes, NULL, 0);
+  rd_ctx_layout(ctx, 800, 600);
+  rd_node first = rdx_split_pane(ctx, s, 0), second = rdx_split_pane(ctx, s, 1);
+  rd_node handle = rd_node_next_sibling(ctx, first);
+  CHECK(near(rd_node_rect(ctx, first).width, 200) && near(rd_node_rect(ctx, second).width, 400));
+
+  // The size is kept in pixels as the splitter grows.
+  rd_node_merge_style(ctx, s, &(rd_style){.width = rd_px(806)});
+  rd_ctx_layout(ctx, 1000, 600);
+  CHECK(near(rd_node_rect(ctx, first).width, 200) && near(rdx_split_size(ctx, s), 200));
+
+  // Dragging below half the minimum collapses the pane; it keeps the size it had before the drag.
+  rd_rect h = rd_node_bounds(ctx, handle);
+  rd_ctx_pointer(ctx, h.x + 3, 100, RD_BUTTON_PRIMARY, 0, 0);
+  rd_ctx_pointer(ctx, 130, 100, RD_BUTTON_PRIMARY, 0, 0);
+  rd_ctx_layout(ctx, 1000, 600);
+  CHECK(near(rd_node_rect(ctx, first).width, 127) && !rdx_split_collapsed(ctx, s));
+  rd_ctx_pointer(ctx, 40, 100, RD_BUTTON_PRIMARY, 0, 0);
+  rd_ctx_pointer(ctx, 40, 100, 0, 0, 0);
+  rd_ctx_layout(ctx, 1000, 600);
+  CHECK(rdx_split_collapsed(ctx, s) && near(rd_node_rect(ctx, second).width, 800) && changes == 1);
+  CHECK(near(rdx_split_size(ctx, s), 200));
+
+  // Enter on the focused handle, then a double-click, toggle it; Left at the minimum collapses it.
+  press(ctx, RD_KEY_ENTER);
+  rd_ctx_layout(ctx, 1000, 600);
+  CHECK(!rdx_split_collapsed(ctx, s) && near(rd_node_rect(ctx, first).width, 200) && changes == 2);
+  h = rd_node_bounds(ctx, handle);
+  for (int j = 0; j < 2; j++) {
+    rd_ctx_pointer(ctx, h.x + 3, 100, RD_BUTTON_PRIMARY, 0, 0);
+    rd_ctx_pointer(ctx, h.x + 3, 100, 0, 0, 0);
+  }
+  CHECK(rdx_split_collapsed(ctx, s) && changes == 3);
+  CHECK(rdx_split_set_collapsed(ctx, s, false) && rdx_split_set_size(ctx, s, 10));
+  rd_ctx_layout(ctx, 1000, 600);
+  CHECK(near(rd_node_rect(ctx, first).width, 120));  // the minimum
+  press(ctx, RD_KEY_LEFT);
+  CHECK(rdx_split_collapsed(ctx, s) && changes == 4);
+
+  // At the right, stacked, and at the bottom: the handle moves the other way.
+  rdx_split_set_collapsed(ctx, s, false);
+  rdx_split_set_size(ctx, s, 200);
+  CHECK(rdx_split_set_direction(ctx, s, false, true));
+  rd_ctx_layout(ctx, 1000, 600);
+  CHECK(near(rd_node_rect(ctx, first).x, 606) && near(rd_node_rect(ctx, first).width, 200));
+  h = rd_node_bounds(ctx, handle);
+  rd_ctx_pointer(ctx, h.x + 3, 100, RD_BUTTON_PRIMARY, 0, 0);
+  rd_ctx_pointer(ctx, 503, 100, RD_BUTTON_PRIMARY, 0, 0);
+  rd_ctx_pointer(ctx, 503, 100, 0, 0, 0);
+  rd_ctx_layout(ctx, 1000, 600);
+  CHECK(near(rd_node_rect(ctx, first).width, 300));
+  press(ctx, RD_KEY_LEFT);  // grows a pane at the right
+  rd_ctx_layout(ctx, 1000, 600);
+  CHECK(near(rd_node_rect(ctx, first).width, 316));
+  CHECK(rdx_split_set_direction(ctx, s, true, true));
+  rd_ctx_layout(ctx, 1000, 600);
+  CHECK(near(rd_node_rect(ctx, first).height, 194) && near(rd_node_rect(ctx, first).y, 106));  // within the minimums
+  CHECK(near(rd_node_rect(ctx, first).width, 806));
+  CHECK(!rdx_split_set_collapsed(ctx, rdx_split_create(ctx, &(rdx_split_desc){0}), true));  // not collapsible
+  rd_ctx_destroy(ctx);
+}
+
 static int fills = 0;
 static void fill_row(rd_ctx* ctx, rd_node row, int index, void* data) {
   (void)data;
@@ -273,6 +342,7 @@ static void trees(void) {
 int main(void) {
   tabs();
   splits();
+  sidebar();
   lists();
   tables();
   trees();

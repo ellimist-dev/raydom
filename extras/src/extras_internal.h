@@ -9,6 +9,7 @@ typedef struct rdx__theme {
   rd_image    check;    // the checkmark, an SVG drawn in currentColor
   rd_image    chevron;  // a select's down arrow, an expanded tree item
   rd_image    chevron_right;  // a collapsed tree item
+  rd_image    chevron_up;     // a numeric input's step up; chevron steps down
 } rdx__theme;
 
 rdx__theme* rdx__theme_get(rd_ctx* ctx);

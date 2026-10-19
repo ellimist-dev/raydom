@@ -15,6 +15,11 @@ static const char CHEVRON_SVG[] =
     "stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'>"
     "<path d='M4 6 L8 10 L12 6'/></svg>";
 
+static const char CHEVRON_UP_SVG[] =
+    "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' width='16' height='16' fill='none' "
+    "stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'>"
+    "<path d='M4 10 L8 6 L12 10'/></svg>";
+
 static const char CHEVRON_RIGHT_SVG[] =
     "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' width='16' height='16' fill='none' "
     "stroke='currentColor' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'>"
@@ -220,6 +225,29 @@ static void define(rd_ctx* ctx, rdx__theme* t) {
                                           .text_overflow = RD_TEXT_OVERFLOW_ELLIPSIS});
   c->select_chevron = cls(ctx, (rd_style){.height = rd_px(14), .color = rd_hex(MUTED)});
 
+  // Numeric input: a field like a select's, the steppers stacked at its right end.
+  c->number = cls(ctx, quick((rd_style){.flex_direction = RD_FLEX_ROW,
+                                  .width          = rd_px(120),
+                                  .border_width   = rd_edges_all(rd_px(1)),
+                                  .border_color   = rd_hex(CARD_LINE),
+                                  .border_radius  = rd_corners_all(rd_px(8)),
+                                  .background     = rd_hex(CARD),
+                                  .overflow_x     = RD_OVERFLOW_HIDDEN,
+                                  .overflow_y     = RD_OVERFLOW_HIDDEN,
+                                  .transition_properties = RD_TRANSITION_COLOR}));
+  state(ctx, c->number, RD_STATE_HOVER, (rd_style){.border_color = rd_hex(LINE)});
+  state(ctx, c->number, RD_STATE_FOCUS_WITHIN, (rd_style){.border_color = rd_hex(ACCENT)});
+  state(ctx, c->number, RD_STATE_DISABLED, (rd_style){.opacity = rd_num(0.45f), .cursor = RD_CURSOR_NOT_ALLOWED});
+  c->number_input    = cls(ctx, (rd_style){.flex_grow = rd_num(1), .min_width = rd_px(0), .padding = rd_edges_vh(rd_px(6), rd_px(10)),
+                                           .color = rd_hex(TEXT), .white_space = RD_WHITE_SPACE_NOWRAP});
+  c->number_steppers = cls(ctx, (rd_style){.width = rd_px(22), .flex_shrink = rd_num(0), .border_width = {.left = rd_px(1)},
+                                           .border_color = rd_hex(CARD_LINE), .user_select = RD_USER_SELECT_NONE});
+  c->number_step     = cls(ctx, quick((rd_style){.flex_grow = rd_num(1), .flex_basis = rd_px(0), .align_items = RD_ALIGN_CENTER,
+                                           .justify_content = RD_ALIGN_CENTER, .color = rd_hex(MUTED),
+                                           .cursor = RD_CURSOR_POINTER}));
+  state(ctx, c->number_step, RD_STATE_HOVER, (rd_style){.background = rd_hex(TRACK), .color = rd_hex(TEXT)});
+  state(ctx, c->number_step, RD_STATE_ACTIVE, (rd_style){.background = rd_hex(TRACK_HI), .color = rd_hex(TEXT)});
+
   c->modal_backdrop = cls(ctx, (rd_style){.position        = RD_POSITION_ABSOLUTE,
                                           .inset           = {rd_px(0), rd_px(0), rd_px(0), rd_px(0)},
                                           .align_items     = RD_ALIGN_CENTER,
@@ -282,8 +310,10 @@ static void define(rd_ctx* ctx, rdx__theme* t) {
   c->tab_panel = cls(ctx, (rd_style){.padding = {.top = rd_px(14)}, .row_gap = rd_px(10)});
 
   c->split        = cls(ctx, (rd_style){.flex_direction = RD_FLEX_ROW, .min_height = rd_px(0)});
+  // Colors only: the handle's size changes with the splitter's direction, which shouldn't animate.
   c->split_handle = cls(ctx, quick((rd_style){.width = rd_px(6), .background = rd_hex(CARD_LINE),
-                                              .cursor = RD_CURSOR_EW_RESIZE, .focusable = RD_FOCUSABLE_TAB}));
+                                              .cursor = RD_CURSOR_EW_RESIZE, .focusable = RD_FOCUSABLE_TAB,
+                                              .transition_properties = RD_TRANSITION_COLOR}));
   state(ctx, c->split_handle, RD_STATE_HOVER, (rd_style){.background = rd_hex(LINE)});
   state(ctx, c->split_handle, RD_STATE_ACTIVE, (rd_style){.background = rd_hex(ACCENT)});
   state(ctx, c->split_handle, RD_STATE_FOCUS_VISIBLE, (rd_style){.background = rd_hex(ACCENT)});
@@ -321,6 +351,7 @@ static void define(rd_ctx* ctx, rdx__theme* t) {
   t->check         = rd_image_load(ctx, CHECK_SVG, sizeof CHECK_SVG - 1);
   t->chevron_right = rd_image_load(ctx, CHEVRON_RIGHT_SVG, sizeof CHEVRON_RIGHT_SVG - 1);
   t->chevron = rd_image_load(ctx, CHEVRON_SVG, sizeof CHEVRON_SVG - 1);
+  t->chevron_up = rd_image_load(ctx, CHEVRON_UP_SVG, sizeof CHEVRON_UP_SVG - 1);
 }
 
 rdx__theme* rdx__theme_get(rd_ctx* ctx) {

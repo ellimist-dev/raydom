@@ -45,6 +45,27 @@ bool    rdx_slider_set_value(rd_ctx* ctx, rd_node slider, float value);
 // event. False, and nothing changes, unless max > min.
 bool    rdx_slider_set_range(rd_ctx* ctx, rd_node slider, float min, float max);
 
+// Numeric input: a text field with stepper buttons. Typing takes digits, a point when there are
+// decimals, and a minus when the range allows negatives; Enter or leaving the field commits the
+// number, clamped to the range and rounded to `decimals` places, and anything unreadable reverts.
+// Escape drops what was typed. Up and Down step (ten steps with Shift), Page Up and Down step ten,
+// and the stepper buttons step, repeating while held. INPUT fires on every change of the value;
+// CHANGE when it settles: on commit, on each key, and when a held stepper is released.
+typedef struct rdx_number_desc {
+  float min, max;  // max <= min: unbounded
+  float value;     // clamped and rounded
+  float step;      // 0: one unit of the last decimal place shown
+  int   decimals;  // places after the point, 0 to 6
+} rdx_number_desc;
+
+rd_node rdx_number_create(rd_ctx* ctx, const rdx_number_desc* desc);
+float   rdx_number_value(const rd_ctx* ctx, rd_node number);
+bool    rdx_number_set_value(rd_ctx* ctx, rd_node number, float value);
+// Any range; max <= min makes it unbounded. The value is clamped into it without an event.
+bool    rdx_number_set_range(rd_ctx* ctx, rd_node number, float min, float max);
+// The text field inside, for a placeholder or its own styling.
+rd_node rdx_number_input(const rd_ctx* ctx, rd_node number);
+
 #ifdef __cplusplus
 }
 #endif

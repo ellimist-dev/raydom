@@ -37,6 +37,14 @@ inline float slider_value(rd::Node n) { return rdx_slider_value(n.ctx(), n.handl
 inline bool  set_slider_value(rd::Node n, float v) { return rdx_slider_set_value(n.ctx(), n.handle(), v); }
 inline bool  set_slider_range(rd::Node n, float min, float max) { return rdx_slider_set_range(n.ctx(), n.handle(), min, max); }
 
+inline rd::Node number(const rd::Context& ctx, const rdx_number_desc& desc = {}) {
+  return {ctx.get(), rdx_number_create(ctx.get(), &desc)};
+}
+inline float    number_value(rd::Node n) { return rdx_number_value(n.ctx(), n.handle()); }
+inline bool     set_number_value(rd::Node n, float v) { return rdx_number_set_value(n.ctx(), n.handle(), v); }
+inline bool     set_number_range(rd::Node n, float min, float max) { return rdx_number_set_range(n.ctx(), n.handle(), min, max); }
+inline rd::Node number_input(rd::Node n) { return {n.ctx(), rdx_number_input(n.ctx(), n.handle())}; }
+
 // rdx_toast_desc with strings; the C layer copies them.
 struct ToastOptions {
   std::string        title;  // empty for none

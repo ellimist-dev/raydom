@@ -19,17 +19,32 @@ int     rdx_tabs_selected(const rd_ctx* ctx, rd_node tabs);
 bool    rdx_tabs_select(rd_ctx* ctx, rd_node tabs, int index);
 
 // Splitter: two panes with a handle between them. Drag the handle, or focus it and use the arrow keys.
-// The first pane's share is a fraction of the splitter, so it follows window resizes.
+// By default the first pane's share is a fraction of the splitter, so it follows window resizes; with
+// `size`, the first pane keeps a size in pixels instead, as a sidebar does. A collapsible first pane
+// snaps shut when dragged below half its minimum, and opens again when dragged back out, when the
+// handle is double-clicked, or with Enter on the handle; it keeps its size while shut. CHANGE fires
+// when a drag ends having changed something, and on each key or double-click change.
 typedef struct rdx_split_desc {
   bool  vertical;  // panes above and below each other
+  bool  reverse;   // the first pane at the right, or the bottom
   float fraction;  // the first pane's share; 0 means 0.5
+  float size;      // > 0: the first pane's size in pixels, kept as the splitter resizes
   float min_first, min_second;  // pixels
+  bool  collapsible, collapsed;  // whether the first pane can collapse, and whether it starts so
 } rdx_split_desc;
 
 rd_node rdx_split_create(rd_ctx* ctx, const rdx_split_desc* desc);
 rd_node rdx_split_pane(const rd_ctx* ctx, rd_node split, int index);  // 0 or 1
 float   rdx_split_fraction(const rd_ctx* ctx, rd_node split);
 bool    rdx_split_set_fraction(rd_ctx* ctx, rd_node split, float fraction);
+// The first pane's size in pixels when shown, whether it's sized by fraction or in pixels. The setter
+// keeps within both panes' minimums once the splitter is laid out, and for a fraction splitter needs it.
+float rdx_split_size(const rd_ctx* ctx, rd_node split);
+bool  rdx_split_set_size(rd_ctx* ctx, rd_node split, float size);
+bool  rdx_split_collapsed(const rd_ctx* ctx, rd_node split);
+bool  rdx_split_set_collapsed(rd_ctx* ctx, rd_node split, bool collapsed);  // false for a non-collapsible one
+// Switches between side by side and stacked, and which end the first pane is at, keeping its size.
+bool rdx_split_set_direction(rd_ctx* ctx, rd_node split, bool vertical, bool reverse);
 
 // Virtualized list: rows of a fixed height, of which only those in view (and a few around them)
 // exist. fill populates a row for an index; rows are reused as the list scrolls, so fill gets a

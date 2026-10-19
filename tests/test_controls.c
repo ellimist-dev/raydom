@@ -1,4 +1,5 @@
 #include <math.h>
+#include <string.h>
 #include <raydom/extras/controls.h>
 #include <raydom/extras/toast.h>
 
@@ -224,10 +225,96 @@ static void toasts(void) {
   rd_ctx_destroy(ctx);
 }
 
+static void type(rd_ctx* ctx, const char* s) {
+  for (; *s; s++) rd_ctx_text(ctx, (uint32_t)*s);
+}
+
+static bool shows(rd_ctx* ctx, rd_node n, const char* want) {
+  size_t      len;
+  const char* s = rd_node_text(ctx, rdx_number_input(ctx, n), &len);
+  return s && len == strlen(want) && !memcmp(s, want, len);
+}
+
+static void numbers(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_font_load_file(ctx, RAYDOM_TEST_FONT);
+  rd_ctx_set_time(ctx, 0);
+  rd_node n = rdx_number_create(ctx, &(rdx_number_desc){.min = 0, .max = 10, .value = 2.345f, .decimals = 2});
+  rd_node_append(ctx, rd_ctx_root(ctx), n);
+  int inputs = 0, changes = 0;
+  rd_node_on(ctx, n, RD_EVENT_INPUT, count, &inputs, NULL, 0);
+  rd_node_on(ctx, n, RD_EVENT_CHANGE, count, &changes, NULL, 0);
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(rd_node_role(ctx, n) == RD_ROLE_SPIN_BUTTON);
+  CHECK(near(rdx_number_value(ctx, n), 2.35f) && shows(ctx, n, "2.35"));  // rounded to the places shown
+
+  // Typing: letters and minus (the range has no negatives) are refused; Enter commits, clamped.
+  rd_node field = rdx_number_input(ctx, n);
+  rd_node_focus(ctx, field);
+  rd_input_select(ctx, field, 0, 4);
+  type(ctx, "x-12.5");
+  CHECK(shows(ctx, n, "12.5") && inputs == 0 && changes == 0);  // the field's edits stay inside
+  press(ctx, RD_KEY_ENTER);
+  CHECK(near(rdx_number_value(ctx, n), 10) && shows(ctx, n, "10.00") && inputs == 1 && changes == 1);
+
+  // Unreadable text reverts on commit; Escape drops what was typed.
+  rd_input_select(ctx, field, 0, 5);
+  type(ctx, "1.2.3");
+  press(ctx, RD_KEY_ENTER);
+  CHECK(near(rdx_number_value(ctx, n), 10) && shows(ctx, n, "10.00") && changes == 1);
+  rd_input_select(ctx, field, 0, 5);
+  type(ctx, "3");
+  press(ctx, RD_KEY_ESCAPE);
+  CHECK(shows(ctx, n, "10.00"));
+
+  // Keys step by one unit of the last place; Shift and Page step ten.
+  press(ctx, RD_KEY_DOWN);
+  CHECK(near(rdx_number_value(ctx, n), 9.99f) && changes == 2);
+  rd_ctx_key(ctx, RD_KEY_DOWN, true, false, RD_MOD_SHIFT);
+  rd_ctx_key(ctx, RD_KEY_DOWN, false, false, RD_MOD_SHIFT);
+  CHECK(near(rdx_number_value(ctx, n), 9.89f));
+  press(ctx, RD_KEY_PAGE_UP);
+  CHECK(near(rdx_number_value(ctx, n), 9.99f) && shows(ctx, n, "9.99"));
+
+  // A held stepper steps at once, then repeats after a pause; CHANGE fires once, on release.
+  rdx_number_set_value(ctx, n, 1);
+  rd_node down = rd_node_last_child(ctx, rd_node_last_child(ctx, n));
+  rd_rect b    = rd_node_bounds(ctx, down);
+  int     before = changes;
+  inputs         = 0;
+  rd_ctx_pointer(ctx, b.x + 4, b.y + b.height / 2, RD_BUTTON_PRIMARY, 0, 0);
+  CHECK(near(rdx_number_value(ctx, n), 0.99f) && inputs == 1);
+  for (double t = 0.05; t < 0.71; t += 0.05) rd_ctx_set_time(ctx, t);  // 0.4 pause, then every 0.06
+  CHECK(rdx_number_value(ctx, n) < 0.95f && inputs > 4 && changes == before);
+  rd_ctx_pointer(ctx, b.x + 4, b.y + b.height / 2, 0, 0, 0);
+  float held = rdx_number_value(ctx, n);
+  rd_ctx_set_time(ctx, 2);
+  CHECK(changes == before + 1 && rdx_number_value(ctx, n) == held);  // stopped
+
+  // Unbounded with negatives, integers; a disabled field takes nothing.
+  rd_node u = rdx_number_create(ctx, &(rdx_number_desc){.value = -3.6f});
+  rd_node_append(ctx, rd_ctx_root(ctx), u);
+  CHECK(near(rdx_number_value(ctx, u), -4) && shows(ctx, u, "-4"));
+  rd_node_focus(ctx, rdx_number_input(ctx, u));
+  press(ctx, RD_KEY_UP);
+  CHECK(near(rdx_number_value(ctx, u), -3));
+  rd_node_set_states(ctx, u, RD_STATE_DISABLED, true);
+  press(ctx, RD_KEY_UP);
+  type(ctx, "7");
+  CHECK(near(rdx_number_value(ctx, u), -3) && shows(ctx, u, "-3"));
+  CHECK(rdx_number_set_range(ctx, u, 0, 5) && near(rdx_number_value(ctx, u), 0));
+  CHECK(!rdx_number_set_value(ctx, u, NAN) && !rdx_number_set_value(ctx, rd_ctx_root(ctx), 1));
+
+  rd_node_destroy(ctx, n);  // with no timers left behind
+  rd_ctx_set_time(ctx, 3);
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   toggles();
   radios();
   sliders();
+  numbers();
   toasts();
   return TEST_RESULT();
 }

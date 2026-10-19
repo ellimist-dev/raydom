@@ -28,6 +28,10 @@ int main() {
   CHECK(rs->flex_direction == RD_FLEX_ROW);
   CHECK(rs->row_gap.value == 8 && rs->column_gap.value == 8);
   CHECK(rs->width.unit == RD_UNIT_PCT && rs->width.value == 100);
+
+  // Corners clockwise from the top left.
+  rd_corners c = rd::Style().border_radius(1_px, 2_px, 3_px, 4_px).get().border_radius;
+  CHECK(c.top_left.value == 1 && c.top_right.value == 2 && c.bottom_right.value == 3 && c.bottom_left.value == 4);
   CHECK(rs->height.unit == rd::auto_.unit);
   return TEST_RESULT();
 }

@@ -113,8 +113,14 @@ bool rdx_tabs_select(rd_ctx* ctx, rd_node root, int index) {
 
 typedef struct split {
   rd_node root, first, handle, second;
-  bool    vertical;
-  float   fraction, min_first, min_second, drag_start;
+  bool    vertical, reverse, collapsible, collapsed;
+  bool    fixed;     // the first pane keeps `size` pixels instead of a share
+  float   fraction;  // the first pane's share, when not fixed
+  float   size;      // the first pane's size in pixels, when fixed
+  float   min_first, min_second;
+  // As a drag began: whether it changed anything, and the size to keep if it collapses the pane.
+  float drag_fraction, drag_size;
+  bool  drag_collapsed;
 } split;
 
 static const char split_key = 0;
@@ -126,30 +132,73 @@ static float total(const rd_ctx* ctx, const split* s) {
                      : r.width - b.border.left - b.border.right - b.padding.left - b.padding.right;
 }
 
-static void apply(rd_ctx* ctx, split* s) {
-  rd_val share = rd_pct(s->fraction * 100);
-  rd_node_merge_style(ctx, s->first, s->vertical ? &(rd_style){.height = share} : &(rd_style){.width = share});
+static float handle_size(const rd_ctx* ctx, const split* s) {
+  rd_rect h = rd_node_rect(ctx, s->handle);
+  return s->vertical ? h.height : h.width;
 }
 
-// Clamps to the panes' minimum sizes, given the splitter's size.
-static float clamp_fraction(const rd_ctx* ctx, const split* s, float f) {
+// The first pane's size in pixels when shown.
+static float first_size(const rd_ctx* ctx, const split* s) { return s->fixed ? s->size : s->fraction * total(ctx, s); }
+
+// Sets the first pane's size in pixels, within both panes' minimums once the splitter has a size.
+static void set_first(const rd_ctx* ctx, split* s, float px) {
   float size = total(ctx, s);
-  if (size <= 0) return fminf(1, fmaxf(0, f));
-  float handle = s->vertical ? rd_node_rect(ctx, s->handle).height : rd_node_rect(ctx, s->handle).width;
-  float lo = s->min_first / size, hi = 1 - (s->min_second + handle) / size;
-  return hi < lo ? lo : fminf(hi, fmaxf(lo, f));
+  if (size > 0) px = fminf(fmaxf(s->min_first, size - s->min_second - handle_size(ctx, s)), fmaxf(s->min_first, px));
+  if (s->fixed)
+    s->size = fmaxf(0, px);
+  else if (size > 0)
+    s->fraction = fminf(1, fmaxf(0, px / size));
+}
+
+static void apply(rd_ctx* ctx, split* s) {
+  rd_val   share = s->fixed ? rd_px(s->size) : rd_pct(s->fraction * 100);
+  rd_style st    = {.display = s->collapsed ? RD_DISPLAY_NONE : RD_DISPLAY_FLEX, .flex_shrink = rd_num(s->fixed ? 1 : 0)};
+  if (s->vertical)
+    st.height = share, st.width = rd_auto();
+  else
+    st.width = share, st.height = rd_auto();
+  rd_node_merge_style(ctx, s->first, &st);
+}
+
+// Direction, the handle's shape, and the minimums along the axis.
+static void orient(rd_ctx* ctx, split* s) {
+  rd_flex_direction dir = s->vertical ? (s->reverse ? RD_FLEX_COLUMN_REVERSE : RD_FLEX_COLUMN)
+                                      : (s->reverse ? RD_FLEX_ROW_REVERSE : RD_FLEX_ROW);
+  rd_node_merge_style(ctx, s->root, &(rd_style){.flex_direction = dir});
+  rd_node_set_style(ctx, s->handle, s->vertical ? &(rd_style){.width = rd_auto(), .height = rd_px(6), .cursor = RD_CURSOR_NS_RESIZE}
+                                                : &(rd_style){0});
+  rd_val none = rd_px(0);
+  rd_node_merge_style(ctx, s->first, &(rd_style){.min_width  = s->vertical ? none : rd_px(s->min_first),
+                                                 .min_height = s->vertical ? rd_px(s->min_first) : none});
+  rd_node_merge_style(ctx, s->second, &(rd_style){.min_width  = s->vertical ? none : rd_px(s->min_second),
+                                                  .min_height = s->vertical ? rd_px(s->min_second) : none});
+  apply(ctx, s);
+}
+
+static void toggle(rd_ctx* ctx, split* s) {
+  s->collapsed = !s->collapsed;
+  apply(ctx, s);
+  rd_node_dispatch(ctx, s->root, RD_EVENT_CHANGE);
 }
 
 static void handle_pointer(rd_ctx* ctx, rd_event* ev, void* data) {
   split* s = data;
+  if (ev->type == RD_EVENT_CLICK) {
+    if (ev->clicks == 2 && s->collapsible) toggle(ctx, s);
+    return;
+  }
   if (ev->type == RD_EVENT_POINTER_DOWN) {
     if (ev->button != RD_BUTTON_PRIMARY) return;
     rd_node_set_pointer_capture(ctx, s->handle);
-    s->drag_start = s->fraction;
+    s->drag_fraction  = s->fraction;
+    s->drag_size      = s->size;
+    s->drag_collapsed = s->collapsed;
     return;
   }
   if (ev->type == RD_EVENT_POINTER_UP) {
-    if (s->fraction != s->drag_start) rd_node_dispatch(ctx, s->root, RD_EVENT_CHANGE);
+    if (!rd_node_eq(rd_ctx_pointer_capture(ctx), s->handle)) return;
+    if (s->fraction != s->drag_fraction || s->size != s->drag_size || s->collapsed != s->drag_collapsed)
+      rd_node_dispatch(ctx, s->root, RD_EVENT_CHANGE);
     return;
   }
   if (!(ev->buttons & RD_BUTTON_PRIMARY) || !rd_node_eq(rd_ctx_pointer_capture(ctx), s->handle)) return;
@@ -157,21 +206,43 @@ static void handle_pointer(rd_ctx* ctx, rd_event* ev, void* data) {
   rd_box  b    = rd_node_box(ctx, s->root);
   float   size = total(ctx, s);
   if (size <= 0) return;
-  float at  = s->vertical ? ev->y - r.y - b.border.top - b.padding.top : ev->x - r.x - b.border.left - b.padding.left;
-  float hsz = s->vertical ? rd_node_rect(ctx, s->handle).height : rd_node_rect(ctx, s->handle).width;
-  s->fraction = clamp_fraction(ctx, s, (at - hsz / 2) / size);
+  float at   = s->vertical ? ev->y - r.y - b.border.top - b.padding.top : ev->x - r.x - b.border.left - b.padding.left;
+  float want = (s->reverse ? size - at : at) - handle_size(ctx, s) / 2;
+  // Below half the minimum, a collapsible pane snaps shut, keeping the size it had before the drag.
+  if (s->collapsible && want < (s->min_first > 0 ? s->min_first / 2 : 16)) {
+    s->collapsed = true;
+    s->fraction  = s->drag_fraction;
+    s->size      = s->drag_size;
+  } else {
+    s->collapsed = false;
+    set_first(ctx, s, want);
+  }
   apply(ctx, s);
 }
 
 static void handle_keys(rd_ctx* ctx, rd_event* ev, void* data) {
-  split* s    = data;
-  int    dir  = s->vertical ? (ev->key == RD_KEY_DOWN) - (ev->key == RD_KEY_UP) : (ev->key == RD_KEY_RIGHT) - (ev->key == RD_KEY_LEFT);
-  float  size = total(ctx, s);
-  if (!dir || size <= 0) return;
+  split* s = data;
+  if (ev->key == RD_KEY_ENTER && s->collapsible) {
+    rd_event_prevent_default(ev);
+    toggle(ctx, s);
+    return;
+  }
+  // +1 grows the first pane.
+  int dir = s->vertical ? (ev->key == RD_KEY_DOWN) - (ev->key == RD_KEY_UP) : (ev->key == RD_KEY_RIGHT) - (ev->key == RD_KEY_LEFT);
+  if (s->reverse) dir = -dir;
+  if (!dir || total(ctx, s) <= 0) return;
   rd_event_prevent_default(ev);
-  float f = clamp_fraction(ctx, s, s->fraction + (float)dir * 16 / size);
-  if (f == s->fraction) return;
-  s->fraction = f;
+  if (s->collapsed) {
+    if (dir < 0) return;
+    s->collapsed = false;  // back at its earlier size
+  } else {
+    float before = first_size(ctx, s);
+    set_first(ctx, s, before + (float)dir * 16);
+    if (first_size(ctx, s) == before) {
+      if (dir > 0 || !s->collapsible) return;
+      s->collapsed = true;  // shrinking past the minimum
+    }
+  }
   apply(ctx, s);
   rd_node_dispatch(ctx, s->root, RD_EVENT_CHANGE);
 }
@@ -182,6 +253,11 @@ rd_node rdx_split_create(rd_ctx* ctx, const rdx_split_desc* desc) {
   if (!s) return (rd_node){0};
   rdx_split_desc d = desc ? *desc : (rdx_split_desc){0};
   s->vertical      = d.vertical;
+  s->reverse       = d.reverse;
+  s->collapsible   = d.collapsible;
+  s->collapsed     = d.collapsible && d.collapsed;
+  s->fixed         = d.size > 0;
+  s->size          = fmaxf(0, d.size);
   s->fraction      = d.fraction > 0 && d.fraction < 1 ? d.fraction : 0.5f;
   s->min_first     = fmaxf(0, d.min_first);
   s->min_second    = fmaxf(0, d.min_second);
@@ -194,26 +270,18 @@ rd_node rdx_split_create(rd_ctx* ctx, const rdx_split_desc* desc) {
     for (int j = 0; j < 4; j++) rd_node_destroy(ctx, nodes[j]);
     return (rd_node){0};
   }
-  rd_event_type types[] = {RD_EVENT_POINTER_DOWN, RD_EVENT_POINTER_MOVE, RD_EVENT_POINTER_UP};
-  for (int j = 0; j < 3; j++) rd_node_on(ctx, s->handle, types[j], handle_pointer, s, NULL, 0);
+  rd_event_type types[] = {RD_EVENT_POINTER_DOWN, RD_EVENT_POINTER_MOVE, RD_EVENT_POINTER_UP, RD_EVENT_CLICK};
+  for (int j = 0; j < 4; j++) rd_node_on(ctx, s->handle, types[j], handle_pointer, s, NULL, 0);
   rd_node_add_class(ctx, s->root, cl->split);
   rd_node_add_class(ctx, s->handle, cl->split_handle);
   rd_node_set_role(ctx, s->handle, RD_ROLE_SPLITTER);
-  if (s->vertical) {
-    rd_node_set_style(ctx, s->root, &(rd_style){.flex_direction = RD_FLEX_COLUMN});
-    rd_node_set_style(ctx, s->handle, &(rd_style){.width = rd_auto(), .height = rd_px(6), .cursor = RD_CURSOR_NS_RESIZE});
-  }
-  rd_style pane = {.min_width = rd_px(0), .min_height = rd_px(0), .overflow_x = RD_OVERFLOW_HIDDEN, .overflow_y = RD_OVERFLOW_HIDDEN};
+  rd_style pane = {.overflow_x = RD_OVERFLOW_HIDDEN, .overflow_y = RD_OVERFLOW_HIDDEN};
   rd_node_set_style(ctx, s->first, &pane);
   pane.flex_grow   = rd_num(1);
   pane.flex_shrink = rd_num(1);
   pane.flex_basis  = rd_px(0);
   rd_node_set_style(ctx, s->second, &pane);
-  rd_node_merge_style(ctx, s->first, s->vertical ? &(rd_style){.min_height = rd_px(s->min_first)}
-                                                 : &(rd_style){.min_width = rd_px(s->min_first)});
-  rd_node_merge_style(ctx, s->second, s->vertical ? &(rd_style){.min_height = rd_px(s->min_second)}
-                                                  : &(rd_style){.min_width = rd_px(s->min_second)});
-  apply(ctx, s);
+  orient(ctx, s);
   rd_node_append(ctx, s->root, s->first);
   rd_node_append(ctx, s->root, s->handle);
   rd_node_append(ctx, s->root, s->second);
@@ -227,13 +295,55 @@ rd_node rdx_split_pane(const rd_ctx* ctx, rd_node root, int index) {
 
 float rdx_split_fraction(const rd_ctx* ctx, rd_node root) {
   split* s = rdx__lookup(ctx, &split_key, root);
-  return s ? s->fraction : 0;
+  if (!s) return 0;
+  float size = total(ctx, s);
+  return !s->fixed ? s->fraction : size > 0 ? s->size / size : 0;
 }
 
 bool rdx_split_set_fraction(rd_ctx* ctx, rd_node root, float fraction) {
   split* s = rdx__lookup(ctx, &split_key, root);
   if (!s) return false;
-  s->fraction = clamp_fraction(ctx, s, fraction);
+  float size = total(ctx, s);
+  if (s->fixed && size <= 0) return false;
+  if (size > 0)
+    set_first(ctx, s, fraction * size);
+  else
+    s->fraction = fminf(1, fmaxf(0, fraction));
   apply(ctx, s);
+  return true;
+}
+
+float rdx_split_size(const rd_ctx* ctx, rd_node root) {
+  split* s = rdx__lookup(ctx, &split_key, root);
+  return s ? first_size(ctx, s) : 0;
+}
+
+bool rdx_split_set_size(rd_ctx* ctx, rd_node root, float size) {
+  split* s = rdx__lookup(ctx, &split_key, root);
+  if (!s || size < 0 || (!s->fixed && total(ctx, s) <= 0)) return false;
+  set_first(ctx, s, size);
+  apply(ctx, s);
+  return true;
+}
+
+bool rdx_split_collapsed(const rd_ctx* ctx, rd_node root) {
+  split* s = rdx__lookup(ctx, &split_key, root);
+  return s && s->collapsed;
+}
+
+bool rdx_split_set_collapsed(rd_ctx* ctx, rd_node root, bool collapsed) {
+  split* s = rdx__lookup(ctx, &split_key, root);
+  if (!s || (collapsed && !s->collapsible)) return false;
+  s->collapsed = collapsed;
+  apply(ctx, s);
+  return true;
+}
+
+bool rdx_split_set_direction(rd_ctx* ctx, rd_node root, bool vertical, bool reverse) {
+  split* s = rdx__lookup(ctx, &split_key, root);
+  if (!s) return false;
+  s->vertical = vertical;
+  s->reverse  = reverse;
+  orient(ctx, s);
   return true;
 }

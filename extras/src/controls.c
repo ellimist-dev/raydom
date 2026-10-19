@@ -1,10 +1,11 @@
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "extras_internal.h"
 
-typedef enum kind : uint8_t { ANY, CHECKBOX, SWITCH, RADIO_GROUP, RADIO, SLIDER } kind;
+typedef enum kind : uint8_t { ANY, CHECKBOX, SWITCH, RADIO_GROUP, RADIO, SLIDER, NUMBER } kind;
 
 typedef struct control {
   rd_node node;
@@ -13,7 +14,10 @@ typedef struct control {
   rd_node group;  // RADIO: its group; RADIO_GROUP: unused
   rd_node rail, fill, thumb;  // SLIDER
   float   min, max, value, step;
-  float   drag_start;  // SLIDER: value when the drag began
+  float   drag_start;  // SLIDER: value when the drag began; NUMBER: when a stepper was pressed
+  rd_node input;       // NUMBER: the text field
+  int     decimals;    // NUMBER
+  rd_timer repeat;     // NUMBER: a held stepper's
 } control;
 
 // Controls by node slot index, so lookups are O(1) and the nodes' userdata stays the application's.
@@ -396,4 +400,229 @@ bool rdx_slider_set_range(rd_ctx* ctx, rd_node slider, float min, float max) {
   c->value = snap(c, c->value);
   show_value(ctx, c);
   return true;
+}
+
+// Numeric input.
+
+static bool bounded(const control* c) { return c->max > c->min; }
+
+static bool disabled(const rd_ctx* ctx, const control* c) { return rd_node_states(ctx, c->node) & RD_STATE_DISABLED; }
+
+// Clamped to the range and rounded to the places shown.
+static float number_fit(const control* c, double v) {
+  if (bounded(c)) v = fmin(c->max, fmax(c->min, v));
+  double k = pow(10, c->decimals);
+  v        = round(v * k) / k;
+  return (float)(v == 0 ? 0 : v);  // no "-0"
+}
+
+static void number_show(rd_ctx* ctx, const control* c) {
+  char s[64];
+  int  n = snprintf(s, sizeof s, "%.*f", c->decimals, (double)c->value);
+  rd_node_set_text(ctx, c->input, s, n > 0 && (size_t)n < sizeof s ? (size_t)n : 0);
+}
+
+// Sets the value and shows it; fires INPUT, and CHANGE with `settle`, if it changed.
+static void number_to(rd_ctx* ctx, control* c, double v, bool settle) {
+  float f = number_fit(c, v);
+  bool  changed = f != c->value;
+  c->value      = f;
+  number_show(ctx, c);
+  if (!changed) return;
+  rd_node_dispatch(ctx, c->node, RD_EVENT_INPUT);
+  if (settle) rd_node_dispatch(ctx, c->node, RD_EVENT_CHANGE);
+}
+
+// Reads the field: the whole of it must be a finite number, or the value stays as it was.
+static void number_commit(rd_ctx* ctx, rd_event* ev, void* data) {
+  rd_event_stop_propagation(ev);  // the field's own CHANGE; the control fires its own
+  control*    c = data;
+  size_t      len;
+  const char* s = rd_node_text(ctx, c->input, &len);
+  char        buf[64];
+  if (!s || len == 0 || len >= sizeof buf) {
+    number_show(ctx, c);
+    return;
+  }
+  memcpy(buf, s, len);
+  buf[len]  = 0;
+  char*  end = NULL;
+  double v   = strtod(buf, &end);
+  if (end == buf || *end || !isfinite(v))
+    number_show(ctx, c);
+  else
+    number_to(ctx, c, v, true);
+}
+
+static void number_keep_inside(rd_ctx* ctx, rd_event* ev, void* data) {
+  (void)ctx;
+  (void)data;
+  rd_event_stop_propagation(ev);  // edits are the field's business; the control reports values
+}
+
+// Digits always; a point with decimals; a minus where the range allows negatives.
+static void number_text(rd_ctx* ctx, rd_event* ev, void* data) {
+  const control* c  = data;
+  uint32_t       cp = ev->codepoint;
+  bool ok = (cp >= '0' && cp <= '9') || (cp == '.' && c->decimals > 0) || (cp == '-' && (!bounded(c) || c->min < 0));
+  if (!ok || disabled(ctx, c)) rd_event_prevent_default(ev);
+}
+
+static float number_step(const control* c) { return c->step > 0 ? c->step : (float)pow(10, -c->decimals); }
+
+static void number_keys(rd_ctx* ctx, rd_event* ev, void* data) {
+  control* c = data;
+  if (disabled(ctx, c)) {
+    if (ev->key != RD_KEY_TAB) rd_event_prevent_default(ev);
+    return;
+  }
+  double step = number_step(c), by;
+  switch (ev->key) {
+    case RD_KEY_UP:
+      by = ev->mods & RD_MOD_SHIFT ? 10 * step : step;
+      break;
+    case RD_KEY_DOWN:
+      by = ev->mods & RD_MOD_SHIFT ? -10 * step : -step;
+      break;
+    case RD_KEY_PAGE_UP:
+      by = 10 * step;
+      break;
+    case RD_KEY_PAGE_DOWN:
+      by = -10 * step;
+      break;
+    case RD_KEY_ESCAPE:
+      rd_event_prevent_default(ev);
+      number_show(ctx, c);  // drops what was typed
+      return;
+    default:
+      return;
+  }
+  rd_event_prevent_default(ev);
+  number_to(ctx, c, (double)c->value + by, true);
+}
+
+// A held stepper: one step on press, then repeats after a pause until release. The timer finds the
+// control through its node, so a control destroyed meanwhile just ends it.
+typedef struct stepping {
+  rd_node  number;
+  int      dir;
+  rd_timer self;
+} stepping;
+
+static void number_repeat(rd_ctx* ctx, void* data) {
+  stepping* s = data;
+  control*  c = find(ctx, s->number, NUMBER);
+  if (!c) {
+    rd_ctx_clear_timer(ctx, s->self);
+    return;
+  }
+  number_to(ctx, c, (double)c->value + s->dir * (double)number_step(c), false);
+}
+
+static void number_start_repeat(rd_ctx* ctx, void* data) {
+  stepping* first = data;
+  control*  c     = find(ctx, first->number, NUMBER);
+  stepping* s     = c ? malloc(sizeof *s) : NULL;
+  if (!s) return;
+  *s       = *first;
+  c->repeat = s->self = rd_ctx_set_timer(ctx, 0.06, RD_TIMER_REPEAT, number_repeat, s, free);
+  number_repeat(ctx, s);
+}
+
+static void number_stepper(rd_ctx* ctx, rd_event* ev, void* data) {
+  rd_node   button = ev->current;
+  stepping* s      = data;
+  control*  c      = find(ctx, s->number, NUMBER);
+  if (!c) return;
+  if (ev->type == RD_EVENT_POINTER_DOWN) {
+    if (ev->button != RD_BUTTON_PRIMARY || disabled(ctx, c)) return;
+    rd_node_set_pointer_capture(ctx, button);
+    c->drag_start = c->value;
+    number_to(ctx, c, (double)c->value + s->dir * (double)number_step(c), false);
+    stepping* first = malloc(sizeof *first);
+    if (!first) return;
+    *first    = *s;
+    c->repeat = rd_ctx_set_timer(ctx, 0.4, 0, number_start_repeat, first, free);
+    return;
+  }
+  if (!rd_node_eq(rd_ctx_pointer_capture(ctx), button)) return;  // POINTER_UP
+  rd_ctx_clear_timer(ctx, c->repeat);
+  c->repeat = (rd_timer){0};
+  if (c->value != c->drag_start) rd_node_dispatch(ctx, c->node, RD_EVENT_CHANGE);
+}
+
+static void add_stepper(rd_ctx* ctx, control* c, rd_node column, int dir, rd_image icon, const rdx_classes* cl) {
+  rd_node b = rd_node_create(ctx);
+  rd_node_add_class(ctx, b, cl->number_step);
+  rd_node_append(ctx, column, b);
+  rd_node img = rd_node_create(ctx);
+  rd_node_set_style(ctx, img, &(rd_style){.height = rd_px(12), .pointer_events = RD_POINTER_EVENTS_NONE});
+  rd_node_set_image(ctx, img, icon);
+  rd_node_append(ctx, b, img);
+  stepping* s = malloc(sizeof *s);
+  if (!s) return;
+  *s = (stepping){c->node, dir, {0}};
+  if (!rd_node_on(ctx, b, RD_EVENT_POINTER_DOWN, number_stepper, s, free, 0).id) {
+    free(s);
+    return;
+  }
+  rd_node_on(ctx, b, RD_EVENT_POINTER_UP, number_stepper, s, NULL, 0);
+}
+
+rd_node rdx_number_create(rd_ctx* ctx, const rdx_number_desc* desc) {
+  rdx__theme* t = rdx__theme_get(ctx);
+  if (!t) return (rd_node){0};
+  rd_node  root = rd_node_create(ctx);
+  control* c    = attach(ctx, root, NUMBER, RD_EVENT_KEY_DOWN, number_keys);
+  if (!c) return (rd_node){0};
+  const rdx_classes* cl = &t->classes;
+  rdx_number_desc    d  = desc ? *desc : (rdx_number_desc){0};
+  c->min      = d.min;
+  c->max      = d.max;
+  c->step     = d.step > 0 ? d.step : 0;
+  c->decimals = d.decimals < 0 ? 0 : d.decimals > 6 ? 6 : d.decimals;
+  rd_node_set_role(ctx, root, RD_ROLE_SPIN_BUTTON);
+  rd_node_add_class(ctx, root, cl->number);
+  c->input = rd_node_create_input(ctx, 0);
+  rd_node_add_class(ctx, c->input, cl->number_input);
+  rd_node_append(ctx, root, c->input);
+  rd_node_on(ctx, c->input, RD_EVENT_TEXT, number_text, c, NULL, 0);
+  rd_node_on(ctx, c->input, RD_EVENT_CHANGE, number_commit, c, NULL, 0);
+  rd_node_on(ctx, c->input, RD_EVENT_INPUT, number_keep_inside, NULL, NULL, 0);
+  rd_node steppers = rd_node_create(ctx);
+  rd_node_add_class(ctx, steppers, cl->number_steppers);
+  rd_node_append(ctx, root, steppers);
+  add_stepper(ctx, c, steppers, 1, t->chevron_up, cl);
+  add_stepper(ctx, c, steppers, -1, t->chevron, cl);
+  c->value = number_fit(c, d.value);
+  number_show(ctx, c);
+  return root;
+}
+
+float rdx_number_value(const rd_ctx* ctx, rd_node number) {
+  control* c = find(ctx, number, NUMBER);
+  return c ? c->value : 0;
+}
+
+bool rdx_number_set_value(rd_ctx* ctx, rd_node number, float value) {
+  control* c = find(ctx, number, NUMBER);
+  if (!c || !isfinite(value)) return false;
+  c->value = number_fit(c, value);
+  number_show(ctx, c);
+  return true;
+}
+
+bool rdx_number_set_range(rd_ctx* ctx, rd_node number, float min, float max) {
+  control* c = find(ctx, number, NUMBER);
+  if (!c) return false;
+  c->min   = min;
+  c->max   = max;
+  c->value = number_fit(c, c->value);
+  number_show(ctx, c);
+  return true;
+}
+
+rd_node rdx_number_input(const rd_ctx* ctx, rd_node number) {
+  control* c = find(ctx, number, NUMBER);
+  return c ? c->input : (rd_node){0};
 }

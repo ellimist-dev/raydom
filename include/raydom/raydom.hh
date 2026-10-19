@@ -120,6 +120,11 @@ public:
   Style& name(rd_val all) {              \
     s_.name = rd_corners_all(all);       \
     return *this;                        \
+  }                                      \
+  /* Clockwise from the top left. */     \
+  Style& name(rd_val tl, rd_val tr, rd_val br, rd_val bl) { \
+    s_.name = {tl, tr, br, bl};          \
+    return *this;                        \
   }
 #define RD_HH_SETTER(name, type, kind, inherited, layout) RD_HH_SETTER_##kind(name, type)
   RD_STYLE_PROPS(RD_HH_SETTER)

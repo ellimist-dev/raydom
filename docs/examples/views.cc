@@ -29,6 +29,19 @@ int main() {
   rd::Node sidebar = rdx::pane(split, 0), content = rdx::pane(split, 1);
   // ANCHOR_END: split
 
+  // ANCHOR: collapsible
+  // A 280px panel that keeps its width as the window resizes and snaps shut when dragged narrow.
+  rd::Node panel = rdx::split(ctx, {.size = 280, .min_first = 200, .min_second = 300, .collapsible = true});
+  panel.style(rd::Style().height(400_px));
+  rd::Node reopen = ctx.create_button("Show panel");
+  reopen.on_click([panel] { rdx::set_split_collapsed(panel, false); });
+  panel.on(RD_EVENT_CHANGE, [panel, reopen] {
+    reopen.merge_style(rd::Style().display(rdx::split_collapsed(panel) ? RD_DISPLAY_FLEX : RD_DISPLAY_NONE));
+  });
+  // On a narrow window: stacked, with the panel at the bottom.
+  rdx::set_split_direction(panel, true, true);
+  // ANCHOR_END: collapsible
+
   // ANCHOR: list
   std::vector<std::string> names;
   for (int i = 0; i < 50000; i++) names.push_back("Contact " + std::to_string(i));

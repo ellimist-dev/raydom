@@ -1,6 +1,6 @@
 # Controls and toasts
 
-`raydom::extras` has form controls (checkbox, switch, radio group, slider) and toasts. They are ordinary nodes built
+`raydom::extras` has form controls (checkbox, switch, radio group, slider, numeric input) and toasts. They are ordinary nodes built
 from core primitives, with a role, keyboard support and a default look, so they mix freely with your own nodes.
 
 ```cpp
@@ -9,9 +9,10 @@ from core primitives, with a role, keyboard support and a default look, so they 
 
 ## Events
 
-A control fires `RD_EVENT_CHANGE` when the user changes it, and a slider also fires `RD_EVENT_INPUT` while it moves.
-Listen with `rd_node_on` or `node.on`; read the value with the getter. Setters (`rdx_set_checked`,
-`rdx_radio_select`, `rdx_slider_set_value`) fire nothing, so code that syncs a control from your model doesn't loop.
+A control fires `RD_EVENT_CHANGE` when the user changes it, and a slider and a numeric input also fire
+`RD_EVENT_INPUT` on every change of value. Listen with `rd_node_on` or `node.on`; read the value with the getter.
+Setters (`rdx_set_checked`, `rdx_radio_select`, `rdx_slider_set_value`, `rdx_number_set_value`) fire nothing, so
+code that syncs a control from your model doesn't loop.
 
 To disable a control, set `RD_STATE_DISABLED` on it: it stops taking input and focus, and the theme dims it.
 
@@ -47,6 +48,26 @@ Dragging or pressing anywhere on the track moves it; the drag continues outside 
 (1% of the range when `step` is 0), Page Up and Page Down a tenth of the range, Home and End to the ends. A zero
 `rdx_slider_desc` is 0 to 100, continuous. With a step, values are `min + n * step`, as for an HTML range input; when
 the range isn't a whole number of steps, the largest value is the last step below `max`. The default width is 200px; set `width` on the slider to change it.
+
+## Numeric input
+
+```cpp
+{{#include ../../examples/controls.cc:number}}
+```
+
+A text field with stepper buttons, for values a slider can't set precisely. Typing takes digits, a decimal point
+when `decimals` is above 0, and a minus sign when the range allows negatives; anything else is refused. Enter or
+leaving the field commits: the number is clamped to the range and rounded to `decimals` places, and text that isn't
+a number reverts. Escape drops what was typed.
+
+Up and Down step by `step` (ten steps with Shift), Page Up and Down by ten steps, and the stepper buttons step,
+repeating while held. `step` defaults to one unit of the last place shown. With `max` at or below `min` the field is
+unbounded. `INPUT` fires on every change of value; `CHANGE` when it settles: on commit, on each key, and when a held
+stepper is released. The field's own text edits don't reach the control's listeners.
+
+`rdx_number_set_range` changes the range and clamps the value without an event. `rdx_number_input` returns the text
+field inside, for a placeholder or a style of its own. The role is `RD_ROLE_SPIN_BUTTON`. Disabled, the field can
+still take focus but refuses edits and steps.
 
 ## Toasts
 
@@ -89,6 +110,7 @@ for the whole context with `rd_class_set` and `rd_class_set_state`, or add your 
 | `switch_row`, `switch_track`, `switch_thumb`         | Switch row, track, thumb                 |
 | `radio_group`, `radio_row`, `radio_ring`, `radio_dot` | Group, option row, ring, dot            |
 | `slider`, `slider_track`, `slider_fill`, `slider_thumb` | Slider, rail, filled part, thumb      |
+| `number`, `number_input`, `number_steppers`, `number_step` | Numeric field, its text, the stepper column, a stepper |
 | `label`                                              | Text beside a checkbox, switch or option |
 | `toast_stack`, `toast`, `toast_bar`, `toast_title`, `toast_body`, `toast_close` | Toast parts |
 | `toast_info`, `toast_success`, `toast_warning`, `toast_error` | The bar's color per kind        |

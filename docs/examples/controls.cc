@@ -34,7 +34,13 @@ int main() {
   volume.on(RD_EVENT_CHANGE, [&] { /* save it */ });  // drag released or key pressed
   // ANCHOR_END: slider
 
-  ctx.root().append(remember).append(sync).append(size).append(volume);
+  // ANCHOR: number
+  rd::Node particles = rdx::number(ctx, {.min = 1000, .max = 100000, .value = 12000, .step = 1000});
+  rd::Node exposure  = rdx::number(ctx, {.min = 0.2f, .max = 3, .value = 1, .step = 0.05f, .decimals = 2});
+  exposure.on(RD_EVENT_INPUT, [&] { /* rdx::number_value(exposure) */ });  // every change
+  // ANCHOR_END: number
+
+  ctx.root().append(remember).append(sync).append(size).append(volume).append(particles).append(exposure);
   ctx.layout(800, 600);
   remember.focus();
   ctx.press(RD_KEY_SPACE);

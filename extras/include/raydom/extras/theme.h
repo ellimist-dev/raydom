@@ -21,6 +21,7 @@ typedef struct rdx_classes {
   rd_class toast_info, toast_success, toast_warning, toast_error;  // on the bar
   rd_class menu, menu_item, menu_check, menu_label, menu_shortcut, menu_separator;  // menus and select lists
   rd_class select, select_value, select_chevron;
+  rd_class number, number_input, number_steppers, number_step;  // numeric inputs: the field, its text, the buttons
   rd_class modal_backdrop, modal, modal_header, modal_title, modal_close, modal_body;
   rd_class tooltip;
   rd_class tabs, tab_bar, tab, tab_panel;
