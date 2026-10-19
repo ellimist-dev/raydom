@@ -2,6 +2,7 @@
 #include <raydom/raydom.h>
 
 #include "check.h"
+#include "internal.h"
 
 static bool near(float a, float b) { return fabsf(a - b) < 0.01f; }
 
@@ -237,7 +238,89 @@ static void test_grid_in_flex_row(void) {
   rd_ctx_destroy(ctx);
 }
 
+static rd_node grid_with(rd_ctx* ctx, rd_node parent, rd_tracks cols, rd_style extra, int items) {
+  rd_node g = rd_node_create(ctx);
+  extra.display               = RD_DISPLAY_GRID;
+  extra.grid_template_columns = cols;
+  extra.grid_auto_rows        = rd_track_of(rd_px(20));
+  rd_node_set_style(ctx, g, &extra);
+  rd_node_append(ctx, parent, g);
+  for (int j = 0; j < items; j++) rd_node_append(ctx, g, rd_node_create(ctx));
+  return g;
+}
+
+static float child_w(rd_ctx* ctx, rd_node g, int k) {
+  rd_node c = rd_node_first_child(ctx, g);
+  for (int j = 0; j < k; j++) c = rd_node_next_sibling(ctx, c);
+  return rd_node_rect(ctx, c).width;
+}
+
+static float child_x(rd_ctx* ctx, rd_node g, int k) {
+  rd_node c = rd_node_first_child(ctx, g);
+  for (int j = 0; j < k; j++) c = rd_node_next_sibling(ctx, c);
+  return rd_node_rect(ctx, c).x;
+}
+
+static void auto_repeat(void) {
+  rd_ctx*   ctx   = rd_ctx_create();
+  rd_node   root  = rd_ctx_root(ctx);
+  rd_track  card  = rd_track_minmax(rd_px(100), rd_fr(1));
+  rd_tracks fill  = rd_tracks_create_auto(ctx, RD_REPEAT_AUTO_FILL, &card, 1);
+  rd_tracks fit   = rd_tracks_create_auto(ctx, RD_REPEAT_AUTO_FIT, &card, 1);
+  rd_style  sized = {.width = rd_px(430), .column_gap = rd_px(10)};
+  CHECK(fill.id && fit.id && fill.id != fit.id && !rd_tracks_create_auto(ctx, RD_REPEAT_NONE, &card, 1).id);
+
+  // 430px: (430 + 10) / (100 + 10) = 4 columns of 100. auto-fill keeps the empty fourth.
+  rd_node a = grid_with(ctx, root, fill, sized, 3);
+  // auto-fit drops the two empty columns: two items share the width.
+  rd_node b = grid_with(ctx, root, fit, sized, 2);
+  // Fixed tracks: 350 / 100 = 3 columns, the fourth item wraps.
+  rd_track  hundred = rd_track_of(rd_px(100));
+  rd_node   c       = grid_with(ctx, root, rd_tracks_create_auto(ctx, RD_REPEAT_AUTO_FILL, &hundred, 1),
+                                (rd_style){.width = rd_px(350)}, 4);
+  // No definite width: the max width decides, in a row where the grid sizes to content.
+  rd_node row = rd_node_create(ctx);
+  rd_node_set_style(ctx, row, &(rd_style){.flex_direction = RD_FLEX_ROW, .align_items = RD_ALIGN_START});
+  rd_node_append(ctx, root, row);
+  rd_tracks fixed = rd_tracks_create_auto(ctx, RD_REPEAT_AUTO_FILL, &hundred, 1);
+  rd_node   d     = grid_with(ctx, row, fixed, (rd_style){.max_width = rd_px(250)}, 1);
+  // ...or the min width: the fewest repetitions that reach it.
+  rd_node   e     = grid_with(ctx, row, fixed, (rd_style){.min_width = rd_px(330)}, 1);
+  // A header spanning every repeated column with line -1.
+  rd_node   f     = grid_with(ctx, root, fill, sized, 0);
+  rd_node   head  = rd_node_create(ctx);
+  rd_node_set_style(ctx, head, &(rd_style){.grid_column_start = rd_line(1), .grid_column_end = rd_line(-1)});
+  rd_node_append(ctx, f, head);
+  rd_ctx_layout(ctx, 800, 2000);
+
+  CHECK(near(child_w(ctx, a, 0), 100) && near(child_x(ctx, a, 2), 220));
+  CHECK(near(child_w(ctx, b, 0), 210) && near(child_x(ctx, b, 1), 220));
+  CHECK(near(child_w(ctx, c, 0), 100) && near(child_x(ctx, c, 3), 0) && near(rd_node_rect(ctx, c).height, 40));
+  CHECK(near(rd_node_rect(ctx, d).width, 200));
+  CHECK(near(rd_node_rect(ctx, e).width, 400));
+  CHECK(near(rd_node_rect(ctx, head).width, 430));
+
+  // Resizing changes the count without new track lists.
+  uint32_t lists = ctx->track_list_count;
+  rd_node_merge_style(ctx, a, &(rd_style){.width = rd_px(700)});  // (700 + 10) / 110: six columns
+  rd_ctx_layout(ctx, 800, 2000);
+  CHECK(near(child_w(ctx, a, 0), (700 - 50) / 6.0f) && ctx->track_list_count == lists);
+  rd_ctx_destroy(ctx);
+}
+
+static void interning(void) {
+  rd_ctx*  ctx  = rd_ctx_create();
+  rd_track a[2] = {rd_track_of(rd_px(100)), rd_track_of(rd_fr(1))};
+  rd_track b[2] = {rd_track_of(rd_px(100)), rd_track_of(rd_fr(2))};
+  rd_tracks x = rd_tracks_create(ctx, a, 2), y = rd_tracks_create(ctx, b, 2), z = rd_tracks_create(ctx, a, 2);
+  CHECK(x.id && y.id && x.id != y.id && z.id == x.id);  // identical lists share a handle
+  CHECK(rd_tracks_create(ctx, a, 1).id != x.id && rd_tracks_create(ctx, NULL, 0).id == rd_tracks_create(ctx, NULL, 0).id);
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
+  interning();
+  auto_repeat();
   test_fixed_and_fr();
   test_placement();
   test_auto_track_content();

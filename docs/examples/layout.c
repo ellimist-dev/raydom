@@ -38,6 +38,17 @@ int main(void) {
   for (int i = 0; i < 6; i++) add(ctx, grid, (rd_style){0});  // auto-placed, row by row
   // ANCHOR_END: grid
 
+  // ANCHOR: cards
+  // Responsive cards: as many columns of at least 260px as fit, sharing the rest.
+  rd_track card  = rd_track_minmax(rd_px(260), rd_fr(1));
+  rd_node  cards = add(ctx, root,
+                       (rd_style){.display               = RD_DISPLAY_GRID,
+                                  .grid_template_columns = rd_tracks_create_auto(ctx, RD_REPEAT_AUTO_FILL, &card, 1),
+                                  .column_gap            = rd_px(20),
+                                  .row_gap               = rd_px(20)});
+  for (int i = 0; i < 5; i++) add(ctx, cards, (rd_style){.height = rd_px(120)});
+  // ANCHOR_END: cards
+
   // ANCHOR: run
   rd_ctx_layout(ctx, 800, 600);  // rd_update does this for you in a raylib app
   rd_rect m = rd_node_rect(ctx, middle);    // relative to the parent's border box
@@ -45,6 +56,8 @@ int main(void) {
   // ANCHOR_END: run
   assert(m.x == 96 && m.width == 800 - 16 - 160 - 16);
   assert(h.width == 800 && rd_node_rect(ctx, left).width == 80 && rd_node_rect(ctx, right).x == 712);
+  // 800px: (800 + 20) / (260 + 20) = 2 columns of 390; five cards make three rows.
+  assert(rd_node_rect(ctx, rd_node_first_child(ctx, cards)).width == 390 && rd_node_rect(ctx, cards).height == 400);
 
   // ANCHOR: absolute
   rd_node badge = add(ctx, bar,

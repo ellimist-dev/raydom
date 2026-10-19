@@ -36,7 +36,7 @@ patch versions don't.
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.1.1)
+    GIT_TAG        v0.2.0)
 FetchContent_MakeAvailable(raydom)
 
 target_link_libraries(your_app PRIVATE raydom::raydom)   # or raydom::extras
@@ -169,6 +169,11 @@ just showcase   # tabs: a tour of every feature, a desktop messaging app, a Paxo
 just consumer   # check that FetchContent and find_package both work
 just clean      # remove build outputs
 ```
+
+## Contributing
+
+`devdocs/` is a book for contributors: architecture, design decisions and tradeoffs, and guides for adding
+properties, events and components. `just devdocs` serves it locally.
 
 ## License
 

@@ -475,6 +475,52 @@ static float item_offset(const grid_item* it, int a) {
   return 0;
 }
 
+// Auto repetition (CSS Grid §7.2.3.2). How many times the list fits the content box: its definite
+// size, else its max size; else the fewest that reach its min size; else once. Each track counts at
+// its max size when that's definite, else its min size; a track with neither repeats the list once.
+static uint32_t repetitions(const rd_track* list, uint32_t n, float definite, float min_inner, float max_inner,
+                            float gap) {
+  float ref = !isnan(definite) ? definite : isfinite(max_inner) ? max_inner : NAN, sum = 0;
+  for (uint32_t j = 0; j < n; j++) {
+    float v = resolve(list[j].max, ref);
+    if (isnan(v)) v = resolve(list[j].min, ref);
+    if (isnan(v)) return 1;
+    sum += v;
+  }
+  float per = sum + gap * (float)n;  // one repetition and the gaps after its tracks
+  if (per <= 0) return 1;
+  float times;
+  if (!isnan(ref))
+    times = floorf((ref + gap) / per);
+  else if (min_inner > 0)
+    times = ceilf((min_inner + gap) / per);
+  else
+    return 1;
+  return (uint32_t)fminf(fmaxf(times, 1), 10000);
+}
+
+// Auto-fit: drops repeated tracks no item occupies. Equivalent to CSS collapsing them and their gaps,
+// because nothing spans them. Renumbers the items that follow.
+static void collapse_empty(grid_item* items, uint32_t n, int a, rd_track* list, uint32_t* explicit_count, uint32_t* nt) {
+  uint32_t count = *explicit_count;
+  bool*    used  = calloc(count ? count : 1, sizeof *used);
+  if (!used) return;
+  for (uint32_t j = 0; j < n; j++)
+    for (int32_t t = items[j].start[a]; t < items[j].start[a] + items[j].span[a]; t++)
+      if (t >= 0 && (uint32_t)t < count) used[t] = true;
+  uint32_t kept = 0;
+  for (uint32_t t = 0; t < count; t++)
+    if (used[t]) list[kept++] = list[t];
+  for (uint32_t j = 0; j < n; j++) {
+    int32_t removed = 0;
+    for (int32_t t = 0; t < items[j].start[a] && (uint32_t)t < count; t++) removed += !used[t];
+    items[j].start[a] -= removed;
+  }
+  *nt -= count - kept;
+  *explicit_count = kept;
+  free(used);
+}
+
 rd_size rd__layout_grid(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, bool perform) {
   rd_slot*        s  = &ctx->slots[i];
   rd_node_layout* L  = &ctx->layouts[i];
@@ -499,6 +545,17 @@ rd_size rd__layout_grid(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, bool pe
       rd_tracks_get(ctx, st->grid_template_rows, &explicit_count[1]),
   };
   rd_track implicit[2] = {st->grid_auto_columns, st->grid_auto_rows};
+  rd_repeat repeat[2]   = {rd__tracks_repeat(ctx, st->grid_template_columns), rd__tracks_repeat(ctx, st->grid_template_rows)};
+  rd_track* expanded[2] = {NULL, NULL};
+  for (int a = 0; a < 2; a++) {
+    if (repeat[a] == RD_REPEAT_NONE || !explicit_count[a]) continue;
+    uint32_t times = repetitions(list[a], explicit_count[a], definite[a], mn[a] - pb[a], mx[a] - pb[a], gap[a]);
+    expanded[a]    = malloc((size_t)times * explicit_count[a] * sizeof(rd_track));
+    if (!expanded[a]) continue;  // falls back to one repetition
+    for (uint32_t r = 0; r < times; r++) memcpy(&expanded[a][(size_t)r * explicit_count[a]], list[a], explicit_count[a] * sizeof(rd_track));
+    list[a] = expanded[a];
+    explicit_count[a] *= times;
+  }
 
   uint32_t n = 0;
   for (uint32_t c = s->first_child; c; c = ctx->slots[c].next_sibling) n += in_flow(&ctx->styles[c].computed);
@@ -528,6 +585,8 @@ rd_size rd__layout_grid(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, bool pe
   for (uint32_t j = 0; ok && j < n; j++)
     for (int a = 0; a < 2; a++)
       if ((uint32_t)(items[j].start[a] + items[j].span[a]) > nt[a]) nt[a] = (uint32_t)(items[j].start[a] + items[j].span[a]);
+  for (int a = 0; ok && a < 2; a++)
+    if (repeat[a] == RD_REPEAT_AUTO_FIT && expanded[a]) collapse_empty(items, n, a, expanded[a], &explicit_count[a], &nt[a]);
 
   grid_track* tracks[2] = {
       nt[0] ? calloc(nt[0], sizeof(grid_track)) : NULL,
@@ -537,6 +596,8 @@ rd_size rd__layout_grid(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, bool pe
     free(items);
     free(tracks[0]);
     free(tracks[1]);
+    free(expanded[0]);
+    free(expanded[1]);
     return (rd_size){finalize_axis(pb[0], k->wm, k->aw, mn[0], mx[0]), finalize_axis(pb[1], k->hm, k->ah, mn[1], mx[1])};
   }
 
@@ -596,5 +657,7 @@ rd_size rd__layout_grid(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, bool pe
   free(items);
   free(tracks[0]);
   free(tracks[1]);
+  free(expanded[0]);
+  free(expanded[1]);
   return size;
 }

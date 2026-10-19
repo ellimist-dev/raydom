@@ -58,6 +58,8 @@ Dragging or pressing anywhere on the track moves it; the drag continues outside 
 | `kind`     | `INFO` (zero), `SUCCESS`, `WARNING`, `ERROR`: the color of the bar on the left |
 | `seconds`  | How long it stays; 0 means 4, negative until closed                        |
 
+In C++, `rdx::toast` takes `rdx::ToastOptions`, the same fields with `std::string` for the title and text.
+
 Toasts live in the [overlay](../guide/overlay.md), one stack per position, 16px from the window's edges, newest
 nearest the edge. A stack keeps the newest five. Hovering a toast pauses its countdown, which restarts when the
 pointer leaves; the × button closes it, as does `rdx_toast_close`. `rdx_toast_show` returns the toast's node, so

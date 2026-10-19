@@ -31,7 +31,7 @@ typedef struct vlist {
   tree*         tree;   // set for a tree
 } vlist;
 
-static const char list_key = 0, hook_key = 0;
+static const char list_key = 0;
 
 static void vlist_free(void* p);
 
@@ -102,12 +102,8 @@ static void update(rd_ctx* ctx, vlist* l) {
   l->refill = false;
 }
 
-static void hook(rd_ctx* ctx, void* data) {
-  (void)data;
-  void** all;
-  int    n = rdx__all(ctx, &list_key, &all);
-  for (int j = 0; j < n; j++) update(ctx, all[j]);
-}
+// Each list's layout hook: lives as long as the list's node, and skips while it's detached.
+static void hook(rd_ctx* ctx, void* data) { update(ctx, data); }
 
 static vlist* find(const rd_ctx* ctx, rd_node n) { return rdx__lookup(ctx, &list_key, n); }
 
@@ -194,13 +190,8 @@ static vlist* list_new(rd_ctx* ctx, const rdx_list_desc* desc, rd_role row_role)
   l->row_role     = row_role;
   l->node         = rd_node_create(ctx);
   l->spacer       = rd_node_create(ctx);
-  // One hook per context updates every list.
-  if (!rd_ctx_extension(ctx, &hook_key)) {
-    rd_ctx_on_layout(ctx, hook, NULL, NULL);
-    rd_ctx_set_extension(ctx, &hook_key, (void*)&hook_key, NULL);
-  }
   if (!rd_node_on(ctx, l->node, RD_EVENT_KEY_DOWN, list_keys, l, vlist_free, 0).id ||
-      !rdx__track(ctx, &list_key, l->node, l)) {
+      !rdx__track(ctx, &list_key, l->node, l) || !rd_node_on_layout(ctx, l->node, hook, l, NULL)) {
     rd_node_destroy(ctx, l->node);
     rd_node_destroy(ctx, l->spacer);
     return NULL;

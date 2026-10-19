@@ -329,26 +329,55 @@ static bool reserve(void** p, uint32_t* cap, uint32_t need, size_t elem) {
   return true;
 }
 
-rd_tracks rd_tracks_create(rd_ctx* ctx, const rd_track* tracks, uint32_t count) {
+static bool same_tracks(const rd_track* a, const rd_track* b, uint32_t n) {
+  for (uint32_t j = 0; j < n; j++)
+    if (!eq_track(a[j], b[j])) return false;
+  return true;
+}
+
+static rd_tracks intern(rd_ctx* ctx, const rd_track* tracks, uint32_t count, rd_repeat repeat) {
   if (!ctx || (count && !tracks)) return (rd_tracks){0};
+  // Interned by content: an identical list gets the existing handle, so rebuilding lists (on every
+  // resize, say) doesn't grow the pool. Handles can't be freed, because styles copy them by value.
+  for (uint32_t id = 0; id < ctx->track_list_count; id++) {
+    const uint32_t* l = &ctx->track_lists[(size_t)id * 3];
+    if (l[1] == count && l[2] == (uint32_t)repeat && same_tracks(&ctx->track_pool[l[0]], tracks, count))
+      return (rd_tracks){id + 1, true};
+  }
   if (!reserve((void**)&ctx->track_pool, &ctx->track_pool_cap, ctx->track_pool_len + count, sizeof *tracks) ||
-      !reserve((void**)&ctx->track_lists, &ctx->track_list_cap, (ctx->track_list_count + 1) * 2, sizeof(uint32_t)))
+      !reserve((void**)&ctx->track_lists, &ctx->track_list_cap, (ctx->track_list_count + 1) * 3, sizeof(uint32_t)))
     return (rd_tracks){0};
   if (count) memcpy(&ctx->track_pool[ctx->track_pool_len], tracks, count * sizeof *tracks);
-  size_t at                = (size_t)ctx->track_list_count * 2;
-  ctx->track_lists[at]     = ctx->track_pool_len;
-  ctx->track_lists[at + 1] = count;
+  uint32_t* l = &ctx->track_lists[(size_t)ctx->track_list_count * 3];
+  l[0]        = ctx->track_pool_len;
+  l[1]        = count;
+  l[2]        = (uint32_t)repeat;
   ctx->track_pool_len += count;
   ctx->track_list_count++;
   return (rd_tracks){ctx->track_list_count, true};
 }
 
+rd_tracks rd_tracks_create(rd_ctx* ctx, const rd_track* tracks, uint32_t count) {
+  return intern(ctx, tracks, count, RD_REPEAT_NONE);
+}
+
+rd_tracks rd_tracks_create_auto(rd_ctx* ctx, rd_repeat repeat, const rd_track* tracks, uint32_t count) {
+  if (repeat != RD_REPEAT_AUTO_FILL && repeat != RD_REPEAT_AUTO_FIT) return (rd_tracks){0};
+  if (!count) return (rd_tracks){0};
+  return intern(ctx, tracks, count, repeat);
+}
+
 const rd_track* rd_tracks_get(const rd_ctx* ctx, rd_tracks tracks, uint32_t* count) {
   *count = 0;
   if (!ctx || tracks.id == 0 || tracks.id > ctx->track_list_count) return NULL;
-  size_t at = (size_t)(tracks.id - 1) * 2;
-  *count    = ctx->track_lists[at + 1];
-  return *count ? &ctx->track_pool[ctx->track_lists[at]] : NULL;
+  const uint32_t* l = &ctx->track_lists[(size_t)(tracks.id - 1) * 3];
+  *count            = l[1];
+  return *count ? &ctx->track_pool[l[0]] : NULL;
+}
+
+rd_repeat rd__tracks_repeat(const rd_ctx* ctx, rd_tracks tracks) {
+  if (!ctx || tracks.id == 0 || tracks.id > ctx->track_list_count) return RD_REPEAT_NONE;
+  return (rd_repeat)ctx->track_lists[(size_t)(tracks.id - 1) * 3 + 2];
 }
 
 static rd_class_data* class_get(const rd_ctx* ctx, rd_class cls) {

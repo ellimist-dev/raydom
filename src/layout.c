@@ -621,21 +621,67 @@ static bool tree_dirty(const rd_ctx* ctx) {
   return r->flags & (RD_FLAG_LAYOUT_DIRTY | RD_FLAG_STYLE_DIRTY | RD_FLAG_SUBTREE_STYLE_DIRTY);
 }
 
+static bool attached(const rd_ctx* ctx, uint32_t i) {
+  while (ctx->slots[i].parent) i = ctx->slots[i].parent;
+  return i == ctx->root;
+}
+
+// Hooks whose node went away during the run: destroyed and removed now that none is executing.
+static void sweep_hooks(rd_ctx* ctx) {
+  uint32_t kept = 0;
+  for (uint32_t j = 0; j < ctx->hook_count; j++) {
+    rd__hook h = ctx->hooks[j];
+    if (!h.dead) {
+      ctx->hooks[kept++] = h;
+      continue;
+    }
+    if (h.destroy) h.destroy(h.data);
+  }
+  ctx->hook_count = kept;
+}
+
 void rd_ctx_layout(rd_ctx* ctx, float width, float height) {
   if (!ctx) return;
   rd__anim_tick(ctx);
   layout_pass(ctx, width, height);
-  for (uint32_t j = 0; j < ctx->hook_count; j++) ctx->hooks[j].fn(ctx, ctx->hooks[j].data);
+  ctx->hooks_running = true;
+  for (uint32_t j = 0, n = ctx->hook_count; j < n; j++) {
+    rd__hook h = ctx->hooks[j];  // a hook may add hooks, which reallocates the array
+    if (h.dead) continue;
+    if (!rd_node_is_null(h.node) && !attached(ctx, h.node.index)) continue;  // detached views wait
+    h.fn(ctx, h.data);
+  }
+  ctx->hooks_running = false;
+  sweep_hooks(ctx);
   if (tree_dirty(ctx)) layout_pass(ctx, width, height);
 }
 
-bool rd_ctx_on_layout(rd_ctx* ctx, rd_layout_hook fn, void* data, rd_destroy_fn destroy) {
-  if (!ctx || !fn) return false;
+static bool add_hook(rd_ctx* ctx, rd__hook h) {
   rd__hook* p = realloc(ctx->hooks, (ctx->hook_count + 1) * sizeof *p);
   if (!p) return false;
   ctx->hooks                    = p;
-  ctx->hooks[ctx->hook_count++] = (rd__hook){fn, data, destroy};
+  ctx->hooks[ctx->hook_count++] = h;
   return true;
+}
+
+bool rd_ctx_on_layout(rd_ctx* ctx, rd_layout_hook fn, void* data, rd_destroy_fn destroy) {
+  return ctx && fn && add_hook(ctx, (rd__hook){fn, data, destroy, {0}, false});
+}
+
+bool rd_node_on_layout(rd_ctx* ctx, rd_node node, rd_layout_hook fn, void* data, rd_destroy_fn destroy) {
+  rd_slot* s = rd__slot(ctx, node);
+  if (!s || !fn || !add_hook(ctx, (rd__hook){fn, data, destroy, node, false})) return false;
+  ctx->slots[node.index].flags |= RD_FLAG_HAS_HOOK;
+  return true;
+}
+
+void rd__hooks_drop_node(rd_ctx* ctx, uint32_t i) {
+  for (uint32_t j = 0; j < ctx->hook_count; j++) {
+    rd__hook* h = &ctx->hooks[j];
+    if (h->dead || rd_node_is_null(h->node) || h->node.index != i) continue;
+    h->dead = true;  // a hook may be destroying its own node: free its data once the run ends
+  }
+  if (!ctx->hooks_running) sweep_hooks(ctx);
 }
 
 rd_rect rd_node_rect(const rd_ctx* ctx, rd_node node) {

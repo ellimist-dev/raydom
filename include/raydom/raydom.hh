@@ -43,6 +43,16 @@ struct Track {
 
 inline Track minmax(rd_val min, rd_val max) { return Track(rd_track_minmax(min, max)); }
 
+// repeat(rd::auto_fill, {...}) and repeat(rd::auto_fit, {...}): as many repetitions as fit; pass to
+// Context::tracks. See rd_tracks_create_auto.
+inline constexpr rd_repeat auto_fill = RD_REPEAT_AUTO_FILL;
+inline constexpr rd_repeat auto_fit  = RD_REPEAT_AUTO_FIT;
+struct AutoRepeat {
+  rd_repeat          mode;
+  std::vector<Track> tracks;
+};
+inline AutoRepeat repeat(rd_repeat mode, std::initializer_list<Track> tracks) { return {mode, tracks}; }
+
 inline std::vector<Track> repeat(int count, std::initializer_list<Track> tracks) {
   std::vector<Track> out;
   out.reserve(static_cast<std::size_t>(count) * tracks.size());
@@ -168,11 +178,11 @@ public:
   rd_class handle() const { return handle_; }
   explicit operator bool() const { return handle_.id != 0; }
 
-  Class& set(const Style& base) {
+  const Class& set(const Style& base) const {
     rd_class_set(ctx_, handle_, &base.get());
     return *this;
   }
-  Class& on(rd_state state, const Style& style) {
+  const Class& on(rd_state state, const Style& style) const {
     rd_class_set_state(ctx_, handle_, state, &style.get());
     return *this;
   }
@@ -236,40 +246,40 @@ public:
   Node          prev_sibling() const { return wrap(rd_node_prev_sibling(ctx_, handle_)); }
   std::uint32_t child_count() const { return rd_node_child_count(ctx_, handle_); }
 
-  Node& append(Node child) {
+  const Node& append(Node child) const {
     [[maybe_unused]] bool ok = rd_node_append(ctx_, handle_, child.handle_);
     assert(ok);
     return *this;
   }
 
-  Node& insert_before(Node child, Node ref) {
+  const Node& insert_before(Node child, Node ref) const {
     [[maybe_unused]] bool ok = rd_node_insert_before(ctx_, handle_, child.handle_, ref.handle_);
     assert(ok);
     return *this;
   }
 
-  Node& style(const Style& s) {
+  const Node& style(const Style& s) const {
     rd_node_set_style(ctx_, handle_, &s.get());
     return *this;
   }
-  Node& merge_style(const Style& s) {
+  const Node& merge_style(const Style& s) const {
     rd_node_merge_style(ctx_, handle_, &s.get());
     return *this;
   }
-  Node& clear_style() {
+  const Node& clear_style() const {
     rd_node_set_style(ctx_, handle_, nullptr);
     return *this;
   }
-  Node& add_class(Class c) {
+  const Node& add_class(Class c) const {
     rd_node_add_class(ctx_, handle_, c.handle());
     return *this;
   }
-  Node& remove_class(Class c) {
+  const Node& remove_class(Class c) const {
     rd_node_remove_class(ctx_, handle_, c.handle());
     return *this;
   }
   bool  has_class(Class c) const { return rd_node_has_class(ctx_, handle_, c.handle()); }
-  Node& set_state(rd_state s, bool on) {
+  const Node& set_state(rd_state s, bool on) const {
     rd_node_set_states(ctx_, handle_, s, on);
     return *this;
   }
@@ -284,17 +294,17 @@ public:
   rd_size content_size() const { return rd_node_content_size(ctx_, handle_); }
   float   baseline() const { return rd_node_baseline(ctx_, handle_); }
   rd_vec2 scroll() const { return rd_node_scroll(ctx_, handle_); }
-  Node&   scroll_to(float x, float y) {
+  const Node&   scroll_to(float x, float y) const {
     rd_node_set_scroll(ctx_, handle_, x, y);
     return *this;
   }
 
-  Node& text(std::string_view s) {
+  const Node& text(std::string_view s) const {
     rd_node_set_text(ctx_, handle_, s.data(), s.size());
     return *this;
   }
   // Ranges are byte offsets into the text; an empty list clears them.
-  Node& highlights(const std::vector<rd_highlight>& ranges) {
+  const Node& highlights(const std::vector<rd_highlight>& ranges) const {
     rd_node_set_highlights(ctx_, handle_, ranges.data(), ranges.size());
     return *this;
   }
@@ -308,7 +318,7 @@ public:
 
   // f(float width, rd_measure_mode, float height, rd_measure_mode) -> rd_size
   template <class F>
-  Node& measure(F&& f) {
+  const Node& measure(F&& f) const {
     using Fn = std::decay_t<F>;
     Fn* p    = new (std::nothrow) Fn(std::forward<F>(f));
     if (!p) return *this;
@@ -318,13 +328,13 @@ public:
     if (!rd_node_set_measure(ctx_, handle_, call, p, [](void* d) { delete static_cast<Fn*>(d); })) delete p;
     return *this;
   }
-  Node& clear_measure() {
+  const Node& clear_measure() const {
     rd_node_set_measure(ctx_, handle_, nullptr, nullptr, nullptr);
     return *this;
   }
   // f(const rd_paint_info&), called during draw. See rd_node_set_paint.
   template <class F>
-  Node& paint(F&& f) {
+  const Node& paint(F&& f) const {
     using Fn = std::decay_t<F>;
     Fn* p    = new (std::nothrow) Fn(std::forward<F>(f));
     if (!p) return *this;
@@ -333,14 +343,14 @@ public:
     return *this;
   }
 
-  Node& mark_layout_dirty() {
+  const Node& mark_layout_dirty() const {
     rd_node_mark_layout_dirty(ctx_, handle_);
     return *this;
   }
 
   // f(Event&) or f(). Null listener on failure.
   template <class F>
-  rd_listener on(rd_event_type type, F&& f, bool capture = false) {
+  rd_listener on(rd_event_type type, F&& f, bool capture = false) const {
     using Fn = std::decay_t<F>;
     Fn* p    = new (std::nothrow) Fn(std::forward<F>(f));
     if (!p) return {};
@@ -358,40 +368,40 @@ public:
     return l;
   }
   template <class F>
-  Node& on_click(F&& f) {
+  const Node& on_click(F&& f) const {
     on(RD_EVENT_CLICK, std::forward<F>(f));
     return *this;
   }
   bool off(rd_listener l) const { return rd_node_off(ctx_, l); }
 
-  Node& capture_pointer() {
+  const Node& capture_pointer() const {
     rd_node_set_pointer_capture(ctx_, handle_);
     return *this;
   }
-  Node& release_pointer() {
+  const Node& release_pointer() const {
     rd_node_release_pointer_capture(ctx_, handle_);
     return *this;
   }
 
-  Node& make_input(bool multiline = false) {
+  const Node& make_input(bool multiline = false) const {
     rd_node_make_input(ctx_, handle_, multiline ? RD_INPUT_MULTILINE : 0);
     return *this;
   }
   bool  is_input() const { return rd_node_is_input(ctx_, handle_); }
-  Node& placeholder(std::string_view s) {
+  const Node& placeholder(std::string_view s) const {
     rd_node_set_placeholder(ctx_, handle_, s.data(), s.size());
     return *this;
   }
-  Node& select(std::size_t anchor, std::size_t caret) {
+  const Node& select(std::size_t anchor, std::size_t caret) const {
     rd_input_select(ctx_, handle_, anchor, caret);
     return *this;
   }
   // Null clears it. See rd_node_set_anchor.
-  Node& anchor(const rd_anchor& a) {
+  const Node& anchor(const rd_anchor& a) const {
     rd_node_set_anchor(ctx_, handle_, &a);
     return *this;
   }
-  Node& clear_anchor() {
+  const Node& clear_anchor() const {
     rd_node_set_anchor(ctx_, handle_, nullptr);
     return *this;
   }
@@ -404,32 +414,32 @@ public:
   }
 
   // Null image clears it.
-  Node& image(rd_image img) {
+  const Node& image(rd_image img) const {
     rd_node_set_image(ctx_, handle_, img);
     return *this;
   }
   rd_image image() const { return rd_node_image(ctx_, handle_); }
 
   // Class variants also apply for the parent's states. See rd_node_set_share_states.
-  Node& share_states(bool share = true) {
+  const Node& share_states(bool share = true) const {
     rd_node_set_share_states(ctx_, handle_, share);
     return *this;
   }
   // Fires an event at the node; false if a listener prevented the default.
-  bool dispatch(rd_event_type type) { return rd_node_dispatch(ctx_, handle_, type); }
+  bool dispatch(rd_event_type type) const { return rd_node_dispatch(ctx_, handle_, type); }
 
   // Animates to `to` over seconds; see rd_node_animate. done(), if given, runs afterward and is owned
   // by the timer.
-  Node& animate(const Style& to, double seconds, rd_easing easing = RD_EASING_EASE) {
+  const Node& animate(const Style& to, double seconds, rd_easing easing = RD_EASING_EASE) const {
     rd_node_animate(ctx_, handle_, nullptr, &to.get(), seconds, easing, nullptr, nullptr);
     return *this;
   }
-  Node& animate(const Style& from, const Style& to, double seconds, rd_easing easing = RD_EASING_EASE) {
+  const Node& animate(const Style& from, const Style& to, double seconds, rd_easing easing = RD_EASING_EASE) const {
     rd_node_animate(ctx_, handle_, &from.get(), &to.get(), seconds, easing, nullptr, nullptr);
     return *this;
   }
   template <class F>
-  Node& animate(const Style& to, double seconds, rd_easing easing, F&& done) {
+  const Node& animate(const Style& to, double seconds, rd_easing easing, F&& done) const {
     using Fn = std::decay_t<F>;
     Fn* p    = new (std::nothrow) Fn(std::forward<F>(done));
     if (!p) return animate(to, seconds, easing);
@@ -440,22 +450,33 @@ public:
     return *this;
   }
 
-  Node& role(rd_role r) {
+  // f() after every layout while this node lives; see rd_node_on_layout. The callable is owned by the hook.
+  template <class F>
+  const Node& on_layout(F&& f) const {
+    using Fn = std::decay_t<F>;
+    Fn* p    = new (std::nothrow) Fn(std::forward<F>(f));
+    if (!p) return *this;
+    rd_layout_hook call = [](rd_ctx*, void* d) { (*static_cast<Fn*>(d))(); };
+    if (!rd_node_on_layout(ctx_, handle_, call, p, [](void* d) { delete static_cast<Fn*>(d); })) delete p;
+    return *this;
+  }
+
+  const Node& role(rd_role r) const {
     rd_node_set_role(ctx_, handle_, r);
     return *this;
   }
   rd_role role() const { return rd_node_role(ctx_, handle_); }
 
   // False if the node can't take focus.
-  bool focus() { return rd_node_focus(ctx_, handle_); }
+  bool focus() const { return rd_node_focus(ctx_, handle_); }
   bool focused() const { return alive() && rd_node_eq(rd_ctx_focused(ctx_), handle_); }
 
-  void detach() { rd_node_detach(ctx_, handle_); }
-  void destroy() { rd_node_destroy(ctx_, handle_); }
+  void detach() const { rd_node_detach(ctx_, handle_); }
+  void destroy() const { rd_node_destroy(ctx_, handle_); }
 
   // Null on allocation failure or dead node.
   template <class T, class... Args>
-  T* emplace_userdata(Args&&... args) {
+  T* emplace_userdata(Args&&... args) const {
     T* p = new (std::nothrow) T(std::forward<Args>(args)...);
     if (p && !rd_node_set_userdata(ctx_, handle_, p, [](void* d) { delete static_cast<T*>(d); })) {
       delete p;
@@ -584,6 +605,11 @@ public:
   // Interns a track list. tracks_none() on allocation failure.
   rd_tracks tracks(std::initializer_list<Track> list) const { return tracks(list.begin(), list.size()); }
   rd_tracks tracks(const std::vector<Track>& list) const { return tracks(list.data(), list.size()); }
+  rd_tracks tracks(const AutoRepeat& r) const {
+    static_assert(sizeof(Track) == sizeof(rd_track));
+    return rd_tracks_create_auto(ctx_, r.mode, reinterpret_cast<const rd_track*>(r.tracks.data()),
+                                 static_cast<std::uint32_t>(r.tracks.size()));
+  }
 
   void compute_styles() const { rd_ctx_compute_styles(ctx_); }
   void layout(float width, float height) const { rd_ctx_layout(ctx_, width, height); }

@@ -168,6 +168,58 @@ static void grow(rd_ctx* ctx, void* data) {
   }
 }
 
+typedef struct owned {
+  rd_node node;
+  int     runs, destroyed;
+  bool    self_destruct;
+} owned;
+
+static void owned_hook(rd_ctx* ctx, void* data) {
+  owned* o = data;
+  o->runs++;
+  if (o->self_destruct) rd_node_destroy(ctx, o->node);  // its data must survive until the hook returns
+}
+
+static void owned_free(void* data) { ((owned*)data)->destroyed++; }
+
+static void node_hooks(void) {
+  rd_ctx* ctx  = rd_ctx_create();
+  rd_node view = add(ctx, rd_ctx_root(ctx), (rd_style){0});
+  owned   o    = {view, 0, 0, false};
+  CHECK(rd_node_on_layout(ctx, view, owned_hook, &o, owned_free));
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(o.runs == 1);
+
+  rd_node_detach(ctx, view);  // detached: skipped
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(o.runs == 1);
+  rd_node_append(ctx, rd_ctx_root(ctx), view);
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(o.runs == 2);
+
+  rd_node_destroy(ctx, view);  // removed with its node, and its data destroyed
+  CHECK(o.destroyed == 1);
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(o.runs == 2 && o.destroyed == 1);
+
+  // A hook that destroys its own node: destroyed after the run, once.
+  rd_node v2 = add(ctx, rd_ctx_root(ctx), (rd_style){0});
+  owned   q  = {v2, 0, 0, true};
+  rd_node_on_layout(ctx, v2, owned_hook, &q, owned_free);
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(q.runs == 1 && q.destroyed == 1 && !rd_node_alive(ctx, v2));
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(q.runs == 1);
+
+  // Still alive at context destruction: destroyed then.
+  rd_node v3 = add(ctx, rd_ctx_root(ctx), (rd_style){0});
+  owned   r  = {v3, 0, 0, false};
+  rd_node_on_layout(ctx, v3, owned_hook, &r, owned_free);
+  CHECK(!rd_node_on_layout(ctx, v2, owned_hook, &r, owned_free));  // dead node
+  rd_ctx_destroy(ctx);
+  CHECK(r.destroyed == 1);
+}
+
 static void hooks(void) {
   rd_ctx* ctx  = rd_ctx_create();
   rd_node list = add(ctx, rd_ctx_root(ctx), (rd_style){.height = rd_px(100), .overflow_y = RD_OVERFLOW_SCROLL});
@@ -194,6 +246,7 @@ static void hooks(void) {
 int main(void) {
   layering();
   hooks();
+  node_hooks();
   anchoring();
   return TEST_RESULT();
 }

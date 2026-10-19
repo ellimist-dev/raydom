@@ -36,8 +36,18 @@ inline rd::Node slider(const rd::Context& ctx, const rdx_slider_desc& desc = {})
 inline float slider_value(rd::Node n) { return rdx_slider_value(n.ctx(), n.handle()); }
 inline bool  set_slider_value(rd::Node n, float v) { return rdx_slider_set_value(n.ctx(), n.handle(), v); }
 
-inline rd::Node toast(const rd::Context& ctx, const rdx_toast_desc& desc) {
-  return {ctx.get(), rdx_toast_show(ctx.get(), &desc)};
+// rdx_toast_desc with strings; the C layer copies them.
+struct ToastOptions {
+  std::string        title;  // empty for none
+  std::string        text;
+  rdx_toast_position position = RDX_TOAST_BOTTOM_RIGHT;
+  rdx_toast_kind     kind     = RDX_TOAST_INFO;
+  double             seconds  = 0;  // 0 means 4; negative stays until closed
+};
+
+inline rd::Node toast(const rd::Context& ctx, const ToastOptions& o) {
+  rdx_toast_desc d{detail::opt(o.title), o.text.c_str(), o.position, o.kind, o.seconds};
+  return {ctx.get(), rdx_toast_show(ctx.get(), &d)};
 }
 inline void close_toast(rd::Node n) { rdx_toast_close(n.ctx(), n.handle()); }
 

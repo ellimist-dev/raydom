@@ -1,0 +1,17 @@
+[book]
+title = "raydom internals"
+description = "How raydom is built: architecture, design decisions, and how to change it."
+authors = ["ellimist-dev"]
+language = "en"
+src = "src"
+
+[build]
+build-dir = "book"
+create-missing = false
+
+[output.html]
+git-repository-url = "https://github.com/ellimist-dev/raydom"
+
+[output.html.fold]
+enable = true
+level = 1

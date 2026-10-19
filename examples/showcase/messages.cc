@@ -473,7 +473,7 @@ rd::Node build(rd::Context& ctx, Messages& m) {
     submit(m);
     m.input.focus();
   });
-  rd_ctx_on_layout(ctx.get(), follow, &m, nullptr);
+  rd_node_on_layout(ctx.get(), m.log.handle(), follow, &m, nullptr);
   open(m, 0);
   return split;
 }

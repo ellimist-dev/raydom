@@ -1,5 +1,6 @@
 # Publishes the book to the gh-pages branch: each tag vX.Y.Z to /vX.Y.Z/, main to /dev/, and the newest
-# tag also to /latest/. Folders from earlier tags are never rebuilt.
+# tag also to /latest/. Folders from earlier tags are never rebuilt. The contributor book (devdocs/)
+# goes to /internals/ from main.
 name: docs
 
 on:
@@ -35,6 +36,7 @@ jobs:
         run: |
           mdbook build docs
           python3 docs/tools/llms.py
+          mdbook build devdocs
 
       - name: Check out gh-pages
         run: |
@@ -54,6 +56,8 @@ jobs:
         run: |
           name=$([ "$REF_TYPE" = tag ] && echo "$REF_NAME" || echo dev)
           rm -rf "site/$name" && cp -R docs/book/html "site/$name"
+          # The contributor book tracks main only.
+          if [ "$REF_TYPE" != tag ]; then rm -rf site/internals && cp -R devdocs/book site/internals; fi
 
           newest=$(ls site | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
           if [ "$REF_TYPE" = tag ] && [ "$name" = "$newest" ]; then

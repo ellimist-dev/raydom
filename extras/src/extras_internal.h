@@ -22,7 +22,5 @@ void rdx__part(rd_ctx* ctx, rd_node part, rd_class cls);
 // listener's data), so a node that's gone means its object is gone; lookups check that first.
 bool  rdx__track(rd_ctx* ctx, const void* key, rd_node node, void* obj);
 void* rdx__lookup(const rd_ctx* ctx, const void* key, rd_node node);
-// Every live object under key, for hooks that visit them all. Returns the count; *out is owned by the registry.
-int   rdx__all(rd_ctx* ctx, const void* key, void*** out);
 
 #endif

@@ -17,6 +17,10 @@ build-web:
 docs:
     mdbook serve docs --open
 
+# Serves the contributor book (devdocs/) and opens it.
+devdocs:
+    mdbook serve devdocs --open --port 3001
+
 # Builds the book as published, with llms.txt and Markdown copies, into docs/book/html.
 docs-build:
     mdbook build docs && python3 docs/tools/llms.py
@@ -30,7 +34,7 @@ clean:
 
 # Removes the build directories entirely; the next build re-downloads raylib.
 distclean:
-    rm -rf build build-web docs/book
+    rm -rf build build-web docs/book devdocs/book
 
 # Builds tests/consumer against raydom through FetchContent and through an installed package.
 consumer:

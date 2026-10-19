@@ -48,6 +48,7 @@ static void slot_free(rd_ctx* ctx, uint32_t i) {
   rd_slot*      s  = &ctx->slots[i];
   void*         ud = s->userdata;
   rd_destroy_fn fn = s->destroy;
+  if (s->flags & RD_FLAG_HAS_HOOK) rd__hooks_drop_node(ctx, i);
   rd__style_slot_free(ctx, i);
   rd__layout_slot_free(ctx, i);
   rd__events_slot_free(ctx, i);

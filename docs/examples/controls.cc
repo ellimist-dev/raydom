@@ -52,7 +52,8 @@ int main() {
                                 .text     = "report.csv is in your Downloads folder.",
                                 .position = RDX_TOAST_TOP_RIGHT,
                                 .kind     = RDX_TOAST_SUCCESS});
-  rdx::toast(ctx, {.text = "Connection lost", .kind = RDX_TOAST_ERROR, .seconds = -1});  // stays until closed
+  std::string host = "db.internal";
+  rdx::toast(ctx, {.text = "Lost connection to " + host, .kind = RDX_TOAST_ERROR, .seconds = -1});  // until closed
   // ANCHOR_END: toast
   assert(t.alive());
   ctx.set_time(4.0);  // the toast's four seconds are up: it fades out

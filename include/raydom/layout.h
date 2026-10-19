@@ -43,7 +43,11 @@ void rd_ctx_layout(rd_ctx* ctx, float width, float height);
 // scrolled to the bottom. If hooks change the tree, layout runs once more before rd_ctx_layout returns;
 // hooks don't run again for that pass.
 typedef void (*rd_layout_hook)(rd_ctx* ctx, void* data);
+// For the context's lifetime.
 bool rd_ctx_on_layout(rd_ctx* ctx, rd_layout_hook fn, void* data, rd_destroy_fn destroy);
+// For node's lifetime: removed, and destroy(data) run, when the node is destroyed. Skipped while the node
+// is detached from the root. Prefer this for hooks that belong to a view.
+bool rd_node_on_layout(rd_ctx* ctx, rd_node node, rd_layout_hook fn, void* data, rd_destroy_fn destroy);
 
 // Border box relative to the parent's border box.
 rd_rect rd_node_rect(const rd_ctx* ctx, rd_node node);

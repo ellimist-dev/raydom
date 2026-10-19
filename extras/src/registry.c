@@ -57,11 +57,3 @@ void* rdx__lookup(const rd_ctx* ctx, const void* key, rd_node node) {
     if (rd_node_eq(r->nodes[j], node)) return r->objs[j];
   return NULL;
 }
-
-int rdx__all(rd_ctx* ctx, const void* key, void*** out) {
-  registry* r = rd_ctx_extension(ctx, key);
-  if (!r) return 0;
-  prune(ctx, r);
-  *out = r->objs;
-  return (int)r->len;
-}

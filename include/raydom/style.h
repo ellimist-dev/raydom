@@ -396,8 +396,21 @@ static inline rd_corners rd_corners_all(rd_val v) {
   return c;
 }
 
-// Copies the tracks. The list lives until the context is destroyed.
+// Copies the tracks. The list lives until the context is destroyed; creating an identical list again
+// returns the same handle, so rebuilding lists doesn't grow memory.
 rd_tracks rd_tracks_create(rd_ctx* ctx, const rd_track* tracks, uint32_t count);
+
+// CSS repeat(auto-fill, ...) and repeat(auto-fit, ...): the tracks repeat as many times as fit the
+// grid's content box (its definite size, else its max size, else enough to reach its min size, else
+// once), each track counted at its max size if that's definite, else its min size; a track with
+// neither repeats once. AUTO_FIT then removes the repetitions no item occupies, and their gaps, so the
+// remaining tracks share the space. The repeated tracks are the whole list.
+typedef enum rd_repeat : uint8_t {
+  RD_REPEAT_NONE,
+  RD_REPEAT_AUTO_FILL,
+  RD_REPEAT_AUTO_FIT,
+} rd_repeat;
+rd_tracks rd_tracks_create_auto(rd_ctx* ctx, rd_repeat repeat, const rd_track* tracks, uint32_t count);
 // Null and 0 for `none` or an unknown handle.
 const rd_track* rd_tracks_get(const rd_ctx* ctx, rd_tracks tracks, uint32_t* count);
 

@@ -22,6 +22,18 @@ int main() {
     CHECK(seen.size() == 3);
     CHECK(seen[0] == a && seen[1] == b && seen[2] == c);
 
+    // Node and Class are handles: their setters are const, so a copy captured by value in a
+    // non-mutable lambda, or a const Node, can change the node.
+    const rd::Node label = ctx.create_text("before");
+    auto           set   = [label] { label.text("after").merge_style(rd::Style().width(rd::px(10))); };
+    set();
+    CHECK(label.text() == "after" && label.computed()->width.value == 10);
+    const rd::Class look = ctx.create_class();
+    look.set(rd::Style().height(rd::px(4))).on(RD_STATE_HOVER, rd::Style().height(rd::px(8)));
+    label.add_class(look);
+    CHECK(label.computed()->height.value == 4);
+    label.destroy();
+
     b.emplace_userdata<Tracker>(&dtors);
     CHECK(b.userdata<Tracker>()->count == &dtors);
     b.destroy();

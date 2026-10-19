@@ -9,6 +9,7 @@ enum : uint32_t {
   RD_FLAG_STYLE_DIRTY         = 0x2u,
   RD_FLAG_SUBTREE_STYLE_DIRTY = 0x4u,
   RD_FLAG_LAYOUT_DIRTY        = 0x8u,
+  RD_FLAG_HAS_HOOK            = 0x10u,  // has a node-scoped layout hook to drop when freed
 };
 
 enum { RD_STATE_COUNT        = 7,
@@ -107,6 +108,8 @@ typedef struct rd__hook {
   rd_layout_hook fn;
   void*          data;
   rd_destroy_fn  destroy;
+  rd_node        node;  // null for a context hook
+  bool           dead;  // its node went away while hooks were running; dropped after the run
 } rd__hook;
 
 typedef struct rd__extension {
@@ -154,7 +157,8 @@ struct rd_ctx {
   rd__chain       anchored;
   rd__chain       animating;  // nodes with an rd__anim
   struct rd__hook* hooks;
-  uint32_t         hook_count;  // nodes with an anchor, in the order they got one
+  uint32_t         hook_count;
+  bool             hooks_running;  // nodes with an anchor, in the order they got one
 
   rd_class_data* classes;
   uint32_t       class_count;
@@ -163,7 +167,7 @@ struct rd_ctx {
   // Track lists are spans of track_pool, append-only.
   rd_track* track_pool;
   uint32_t  track_pool_len, track_pool_cap;
-  uint32_t* track_lists;  // pairs: offset, count
+  uint32_t* track_lists;  // triples: offset, count, rd_repeat
   uint32_t  track_list_count, track_list_cap;
 
   struct rd__font** fonts;
@@ -265,6 +269,8 @@ void       rd__timers_free(rd_ctx* ctx);
 void       rd__transition(rd_ctx* ctx, uint32_t i, rd_style* next);
 void       rd__anim_tick(rd_ctx* ctx);
 void       rd__anim_free(rd_node_style* ns);
-float      rd__natural_height(rd_ctx* ctx, uint32_t i);  // border-box height with height: auto
+float      rd__natural_height(rd_ctx* ctx, uint32_t i);
+void       rd__hooks_drop_node(rd_ctx* ctx, uint32_t i);
+rd_repeat  rd__tracks_repeat(const rd_ctx* ctx, rd_tracks tracks);  // the node's layout hooks, when it's freed  // border-box height with height: auto
 
 #endif

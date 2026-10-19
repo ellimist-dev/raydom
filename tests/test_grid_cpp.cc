@@ -24,5 +24,19 @@ int main() {
   CHECK(a.rect().x == 0 && a.rect().y == 50 && a.rect().width == 100 && a.rect().height == 20);
   CHECK(b.rect().x == 110 && b.rect().width == 210);
   CHECK(grid.rect().height == 70);
+  {
+    // A responsive card grid: as many 260px-or-wider columns as fit.
+    rd::Context c2;
+    rd::Node    cards = c2.create(rd::Style()
+                                      .display(RD_DISPLAY_GRID)
+                                      .width(860_px)
+                                      .column_gap(20_px)
+                                      .grid_template_columns(c2.tracks(rd::repeat(rd::auto_fill, {rd::minmax(260_px, 1_fr)}))));
+    for (int j = 0; j < 5; j++) cards.append(c2.create(rd::Style().height(10_px)));
+    c2.root().append(cards);
+    c2.layout(1000, 800);
+    CHECK(cards.first_child().rect().width > 270 && cards.first_child().rect().width < 274);  // three columns
+    CHECK(c2.tracks(rd::repeat(rd::auto_fit, {100_px})).id != c2.tracks(rd::repeat(rd::auto_fill, {100_px})).id);
+  }
   return TEST_RESULT();
 }
