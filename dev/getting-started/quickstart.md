@@ -95,7 +95,7 @@ project(hello LANGUAGES C CXX)
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.0)
+    GIT_TAG        v0.2.1)
 FetchContent_MakeAvailable(raydom)
 
 add_executable(hello main.cc)
