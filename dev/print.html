@@ -37,7 +37,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-a8891df0.js";
+            window.path_to_searchindex_js = "searchindex-09ae4d7f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c393df87.js"></script>
@@ -215,7 +215,7 @@ behave as described for this version.</p>
 <pre><code class="language-cmake">include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.1.1)
+    GIT_TAG        v0.2.0)
 FetchContent_MakeAvailable(raydom)
 
 target_link_libraries(your_app PRIVATE raydom::raydom)
@@ -229,7 +229,7 @@ it links <code>raydom::raydom</code> for you.</p>
 cmake --build build
 cmake --install build --prefix /your/prefix
 </code></pre>
-<pre><code class="language-cmake">find_package(raydom 0.1 CONFIG REQUIRED)
+<pre><code class="language-cmake">find_package(raydom 0.2 CONFIG REQUIRED)
 target_link_libraries(your_app PRIVATE raydom::raydom)
 </code></pre>
 <p>The package’s version check accepts any patch release of the requested minor version while raydom is below 1.0.
@@ -368,7 +368,7 @@ project(hello LANGUAGES C CXX)
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.1.1)
+    GIT_TAG        v0.2.0)
 FetchContent_MakeAvailable(raydom)
 
 add_executable(hello main.cc)
@@ -653,6 +653,28 @@ explicit grid; <code>rd_span(n)</code> spans tracks. Items without placement are
 implicit tracks sized by <code>grid_auto_rows</code> and <code>grid_auto_columns</code>.</p>
 <p>The algorithm follows <a href="https://www.w3.org/TR/css-grid-1/#layout-algorithm">CSS Grid §11</a>. Named lines, named areas
 and <code>dense</code> packing are not implemented.</p>
+<h3 id="auto-repeated-tracks"><a class="header" href="#auto-repeated-tracks">Auto-repeated tracks</a></h3>
+<pre><code class="language-c">// Responsive cards: as many columns of at least 260px as fit, sharing the rest.
+rd_track card  = rd_track_minmax(rd_px(260), rd_fr(1));
+rd_node  cards = add(ctx, root,
+                     (rd_style){.display               = RD_DISPLAY_GRID,
+                                .grid_template_columns = rd_tracks_create_auto(ctx, RD_REPEAT_AUTO_FILL, &amp;card, 1),
+                                .column_gap            = rd_px(20),
+                                .row_gap               = rd_px(20)});
+for (int i = 0; i &lt; 5; i++) add(ctx, cards, (rd_style){.height = rd_px(120)});
+</code></pre>
+<p><code>rd_tracks_create_auto</code> is CSS’s <code>repeat(auto-fill, ...)</code> and <code>repeat(auto-fit, ...)</code>: the list repeats as many times
+as fits the grid’s content width, so the column count follows the window. Each track counts at its max size when
+that’s a length, else its min size, which is why <code>minmax(260px, 1fr)</code> means “at least 260px”. Without a definite
+width, the grid’s max width decides, then its min width; otherwise the list appears once.</p>
+<ul>
+<li><code>RD_REPEAT_AUTO_FILL</code> keeps empty repetitions: three cards in a four-column row leave a gap.</li>
+<li><code>RD_REPEAT_AUTO_FIT</code> drops repetitions no item occupies, so the cards stretch to fill the row.</li>
+</ul>
+<p>The whole list repeats; fixed tracks before or after a repeat aren’t supported. C++:
+<code>ctx.tracks(rd::repeat(rd::auto_fill, {rd::minmax(260_px, 1_fr)}))</code>.</p>
+<p>Track lists are interned: creating a list identical to an existing one returns the same handle, so code that
+rebuilds lists doesn’t grow memory.</p>
 <h2 id="running-layout-and-reading-geometry"><a class="header" href="#running-layout-and-reading-geometry">Running layout and reading geometry</a></h2>
 <pre><code class="language-c">rd_ctx_layout(ctx, 800, 600);  // rd_update does this for you in a raylib app
 rd_rect m = rd_node_rect(ctx, middle);    // relative to the parent's border box
@@ -702,14 +724,21 @@ track pages toward the pointer. Presses on a bar never reach the content under i
 </code></pre>
 <p>Leave room with <code>padding</code> if content shouldn’t sit under the bar.</p>
 <h2 id="layout-hooks"><a class="header" href="#layout-hooks">Layout hooks</a></h2>
-<p><code>rd_ctx_on_layout(ctx, fn, data, destroy)</code> runs <code>fn</code> after every layout, with that layout’s geometry and scroll
-offsets. It’s for content that depends on its own geometry: a virtualized list binding the rows that scrolled into
-view, a chat log staying scrolled to its end. If hooks change the tree, layout runs once more before
-<code>rd_ctx_layout</code> returns, so the change shows in the same frame; hooks don’t run for that second pass.</p>
+<p>Layout hooks run after every layout, with that layout’s geometry and scroll offsets. They’re for content that
+depends on its own geometry: a virtualized list binding the rows that scrolled into view, a chat log staying
+scrolled to its end. If hooks change the tree, layout runs once more before <code>rd_ctx_layout</code> returns, so the change
+shows in the same frame; hooks don’t run for that second pass.</p>
+<p><code>rd_node_on_layout(ctx, node, fn, data, destroy)</code> ties a hook to a node: destroying the node removes the hook and
+runs <code>destroy(data)</code>, and the hook is skipped while the node is detached. That’s the right lifetime for a hook that
+belongs to a view, and it can’t leak. C++: <code>node.on_layout([&amp;] { ... })</code>. <code>rd_ctx_on_layout</code> adds a hook for the
+context’s whole lifetime.</p>
 <pre><code class="language-c">static void stick_to_bottom(rd_ctx* ctx, void* data) {
   rd_node log = *(rd_node*)data;
   rd_node_set_scroll(ctx, log, 0, 1e9f);  // clamped to the content just laid out
 }
+
+static rd_node log_node;  // the hook's data must live as long as the hook
+rd_node_on_layout(ctx, log_node, stick_to_bottom, &amp;log_node, NULL);  // removed with the log
 </code></pre>
 <h2 id="custom-measurement"><a class="header" href="#custom-measurement">Custom measurement</a></h2>
 <p>A leaf node can report its own size with <code>rd_node_set_measure</code>. The callback receives a width and height, each with
@@ -1381,6 +1410,8 @@ are reported the same way as in C: null handles and <code>false</code>.</p>
 </table>
 </div>
 <p><code>get()</code> and <code>handle()</code> return the C values, so C and C++ calls can be mixed freely on one context.</p>
+<p><code>rd::Node</code> and <code>rd::Class</code> are handles, so their setters are <code>const</code>, as with <code>std::span</code>: they change the node in
+the context, not the handle. A node captured by value in a lambda, or a <code>const rd::Node</code>, can be changed directly.</p>
 <h2 id="styles"><a class="header" href="#styles">Styles</a></h2>
 <p><code>rd::Style</code> has one chainable setter per property, named as in the <a href="#style-properties">reference</a>, plus
 overloads for common shapes:</p>
@@ -1496,7 +1527,8 @@ volume.on(RD_EVENT_CHANGE, [&amp;] { /* save it */ });  // drag released or key 
                               .text     = "report.csv is in your Downloads folder.",
                               .position = RDX_TOAST_TOP_RIGHT,
                               .kind     = RDX_TOAST_SUCCESS});
-rdx::toast(ctx, {.text = "Connection lost", .kind = RDX_TOAST_ERROR, .seconds = -1});  // stays until closed
+std::string host = "db.internal";
+rdx::toast(ctx, {.text = "Lost connection to " + host, .kind = RDX_TOAST_ERROR, .seconds = -1});  // until closed
 </code></pre>
 <div class="table-wrapper">
 <table>
@@ -1512,6 +1544,7 @@ rdx::toast(ctx, {.text = "Connection lost", .kind = RDX_TOAST_ERROR, .seconds = 
 </tbody>
 </table>
 </div>
+<p>In C++, <code>rdx::toast</code> takes <code>rdx::ToastOptions</code>, the same fields with <code>std::string</code> for the title and text.</p>
 <p>Toasts live in the <a href="#overlay-and-anchoring">overlay</a>, one stack per position, 16px from the window’s edges, newest
 nearest the edge. A stack keeps the newest five. Hovering a toast pauses its countdown, which restarts when the
 pointer leaves; the × button closes it, as does <code>rdx_toast_close</code>. <code>rdx_toast_show</code> returns the toast’s node, so
@@ -2078,6 +2111,7 @@ independent <code>rd_val</code>, so <code>.padding.left = rd_px(4)</code> sets o
 <tr><td><code>rd_track_of(v)</code></td><td>A track sized <code>v</code>; <code>fr</code> becomes <code>minmax(auto, fr)</code></td></tr>
 <tr><td><code>rd_track_minmax(min, max)</code></td><td>A track between two sizes</td></tr>
 <tr><td><code>rd_tracks_create(ctx, a, n)</code></td><td>Interns a track list; returns a handle</td></tr>
+<tr><td><code>rd_tracks_create_auto(ctx, mode, a, n)</code></td><td><code>repeat(auto-fill, ...)</code> or <code>repeat(auto-fit, ...)</code></td></tr>
 <tr><td><code>rd_tracks_none()</code></td><td>No explicit tracks</td></tr>
 <tr><td><code>rd_line(n)</code></td><td>A grid line, 1-based; negative from the end</td></tr>
 <tr><td><code>rd_span(n)</code></td><td>Span <code>n</code> tracks</td></tr>
@@ -2094,7 +2128,7 @@ and it is why <code>rd_node_merge_style</code> can tell which fields to copy.</p
 <h2 id="layout-2"><a class="header" href="#layout-2">Layout</a></h2>
 <ul>
 <li>No <code>display: block</code> or <code>inline</code>; every container is flex or grid. Text nodes are leaves.</li>
-<li>Grid: no named lines, no named areas, no <code>dense</code> auto-flow, no <code>repeat(auto-fill)</code>.</li>
+<li>Grid: no named lines, no named areas, no <code>dense</code> auto-flow; an auto repeat must be the whole track list.</li>
 <li>No <code>position: fixed</code> or <code>sticky</code>, and no <code>z-index</code>. Children draw in tree order, later siblings on top; content
 that must sit above everything goes in the <a href="#overlay-and-anchoring">overlay</a>.</li>
 <li>No <code>aspect_ratio</code>, no <code>transform</code>. Animate <code>inset</code> to move a node without reflowing its neighbors.</li>
@@ -2146,7 +2180,7 @@ raydom code, in a form that is cheap to retrieve.</p>
 </table>
 </div>
 <p>Use the copy under the version that matches the project’s <code>GIT_TAG</code> or <code>find_package</code> version, for example
-<code>/v0.1.1/llms-full.txt</code>. <code>/latest/</code> follows the newest release; <code>/dev/</code> follows the main branch and may
+<code>/v0.2.0/llms-full.txt</code>. <code>/latest/</code> follows the newest release; <code>/dev/</code> follows the main branch and may
 describe unreleased API.</p>
 <p>The headers are the ground truth. <code>include/raydom/*.h</code> documents every function in a comment above it, and
 <code>include/raydom/style.h</code> defines every style property in the <code>RD_STYLE_PROPS</code> X-macro.</p>

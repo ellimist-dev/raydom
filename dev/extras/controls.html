@@ -36,7 +36,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-a8891df0.js";
+            window.path_to_searchindex_js = "../searchindex-09ae4d7f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-c393df87.js"></script>
@@ -220,7 +220,8 @@ volume.on(RD_EVENT_CHANGE, [&amp;] { /* save it */ });  // drag released or key 
                               .text     = "report.csv is in your Downloads folder.",
                               .position = RDX_TOAST_TOP_RIGHT,
                               .kind     = RDX_TOAST_SUCCESS});
-rdx::toast(ctx, {.text = "Connection lost", .kind = RDX_TOAST_ERROR, .seconds = -1});  // stays until closed
+std::string host = "db.internal";
+rdx::toast(ctx, {.text = "Lost connection to " + host, .kind = RDX_TOAST_ERROR, .seconds = -1});  // until closed
 </code></pre>
 <div class="table-wrapper">
 <table>
@@ -236,6 +237,7 @@ rdx::toast(ctx, {.text = "Connection lost", .kind = RDX_TOAST_ERROR, .seconds = 
 </tbody>
 </table>
 </div>
+<p>In C++, <code>rdx::toast</code> takes <code>rdx::ToastOptions</code>, the same fields with <code>std::string</code> for the title and text.</p>
 <p>Toasts live in the <a href="../guide/overlay.html">overlay</a>, one stack per position, 16px from the window’s edges, newest
 nearest the edge. A stack keeps the newest five. Hovering a toast pauses its countdown, which restarts when the
 pointer leaves; the × button closes it, as does <code>rdx_toast_close</code>. <code>rdx_toast_show</code> returns the toast’s node, so

@@ -36,7 +36,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-a8891df0.js";
+            window.path_to_searchindex_js = "../searchindex-09ae4d7f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-c393df87.js"></script>
@@ -189,7 +189,7 @@
 <pre><code class="language-cmake">include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.1.1)
+    GIT_TAG        v0.2.0)
 FetchContent_MakeAvailable(raydom)
 
 target_link_libraries(your_app PRIVATE raydom::raydom)
@@ -203,7 +203,7 @@ it links <code>raydom::raydom</code> for you.</p>
 cmake --build build
 cmake --install build --prefix /your/prefix
 </code></pre>
-<pre><code class="language-cmake">find_package(raydom 0.1 CONFIG REQUIRED)
+<pre><code class="language-cmake">find_package(raydom 0.2 CONFIG REQUIRED)
 target_link_libraries(your_app PRIVATE raydom::raydom)
 </code></pre>
 <p>The package’s version check accepts any patch release of the requested minor version while raydom is below 1.0.

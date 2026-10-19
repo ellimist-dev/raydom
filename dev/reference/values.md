@@ -40,6 +40,7 @@ independent `rd_val`, so `.padding.left = rd_px(4)` sets one side and leaves the
 | `rd_track_of(v)`           | A track sized `v`; `fr` becomes `minmax(auto, fr)` |
 | `rd_track_minmax(min, max)`| A track between two sizes                     |
 | `rd_tracks_create(ctx, a, n)` | Interns a track list; returns a handle     |
+| `rd_tracks_create_auto(ctx, mode, a, n)` | `repeat(auto-fill, ...)` or `repeat(auto-fit, ...)` |
 | `rd_tracks_none()`         | No explicit tracks                            |
 | `rd_line(n)`               | A grid line, 1-based; negative from the end   |
 | `rd_span(n)`               | Span `n` tracks                               |

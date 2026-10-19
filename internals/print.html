@@ -1,0 +1,1333 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>raydom internals</title>
+        <meta name="robots" content="noindex">
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="How raydom is built: architecture, design decisions, and how to change it.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-86bc52c8.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-0c2227d3.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">raydom internals</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/ellimist-dev/raydom" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
+<p>This book is for people changing raydom: how it is put together, why it is put together that way, and how to
+extend it without breaking the parts that depend on each other. The user book (<code>docs/</code>, published per release)
+describes what raydom does; this one describes how.</p>
+<p>It tracks <code>main</code>. Where it names a function or a file, the name is real; where behavior is subtle, the chapter says
+which test pins it down.</p>
+<h2 id="what-raydom-is-structurally"><a class="header" href="#what-raydom-is-structurally">What raydom is, structurally</a></h2>
+<ul>
+<li><strong>A C23 core</strong> (<code>src/</code>, <code>include/raydom/*.h</code>): a retained tree of nodes, a style system, flexbox and grid layout,
+text shaping and wrapping, event dispatch, animation, and a renderer on raylib. One static library,
+<code>raydom::raydom</code>.</li>
+<li><strong>A C++20 layer</strong> (<code>include/raydom/raydom.hh</code>): header-only wrappers that add RAII for the context, builder-style
+styles, and lambda callbacks. No exceptions.</li>
+<li><strong>Extras</strong> (<code>extras/</code>): components built only on the public core API (controls, popups, views, toasts, a network
+view, native file dialogs), in a second library, <code>raydom::extras</code>.</li>
+<li><strong>Docs</strong> (<code>docs/</code>): the user book, whose code samples are programs compiled and run by the test suite.</li>
+<li><strong>The showcase</strong> (<code>examples/showcase/</code>): one application with a feature tour, a desktop messaging app and a
+Paxos simulation, used as the integration test you look at.</li>
+</ul>
+<h2 id="map-of-the-repository"><a class="header" href="#map-of-the-repository">Map of the repository</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Path</th><th>Contents</th></tr>
+</thead>
+<tbody>
+<tr><td><code>include/raydom/</code></td><td>Public C headers, one per subsystem, and <code>raydom.hh</code></td></tr>
+<tr><td><code>src/</code></td><td>The core; <code>*_internal.h</code> are private headers</td></tr>
+<tr><td><code>src/external/</code></td><td>Vendored stb_truetype, stb_image, nanosvg</td></tr>
+<tr><td><code>extras/</code></td><td><code>raydom::extras</code>: headers, sources, vendored nativefiledialog</td></tr>
+<tr><td><code>tests/</code></td><td>One test program per subsystem, and <code>consumer/</code> for packaging</td></tr>
+<tr><td><code>docs/</code></td><td>The user book, its example programs and its tools</td></tr>
+<tr><td><code>devdocs/</code></td><td>This book</td></tr>
+<tr><td><code>examples/showcase/</code></td><td>The showcase</td></tr>
+<tr><td><code>cmake/</code></td><td>raylib discovery, the version header, the package config</td></tr>
+<tr><td><code>.github/workflows/</code></td><td>Docs publishing</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="reading-order"><a class="header" href="#reading-order">Reading order</a></h2>
+<p><a href="#overview">Overview</a> first: it walks one frame through every subsystem. Then the chapter for
+whatever you are changing, and <a href="#design-decisions-and-tradeoffs">Design decisions</a> before arguing with any of them.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="workflow"><a class="header" href="#workflow">Workflow</a></h1>
+<p>Everything runs through the <code>Justfile</code>.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Command</th><th>Does</th></tr>
+</thead>
+<tbody>
+<tr><td><code>just build</code></td><td>Configures with <code>RAYDOM_SANITIZE=ON</code> and builds library, tests, examples</td></tr>
+<tr><td><code>just test</code></td><td><code>build</code>, then <code>ctest --output-on-failure</code></td></tr>
+<tr><td><code>just showcase</code></td><td>Runs the showcase</td></tr>
+<tr><td><code>just lint</code></td><td>clang-tidy over <code>src/</code> and <code>tests/</code> with the repo’s <code>.clang-tidy</code></td></tr>
+<tr><td><code>just consumer</code></td><td>Builds <code>tests/consumer</code> against raydom via FetchContent and via an installed package</td></tr>
+<tr><td><code>just docs</code></td><td>Serves the user book with live reload</td></tr>
+<tr><td><code>just docs-build</code></td><td>Builds the user book as published, with <code>llms.txt</code></td></tr>
+<tr><td><code>just devdocs</code></td><td>Serves this book</td></tr>
+<tr><td><code>just clean</code></td><td>Removes build outputs, keeps the configuration and downloaded raylib</td></tr>
+<tr><td><code>just distclean</code></td><td>Removes build directories entirely</td></tr>
+<tr><td><code>just build-web</code></td><td>Emscripten build</td></tr>
+</tbody>
+</table>
+</div>
+<p>The first configure downloads raylib 6.0 into <code>build/_deps</code>. The tests and the showcase use a font from raylib’s
+examples (<code>anonymous_pro_bold.ttf</code>), which is why they need a downloaded raylib rather than an installed one.</p>
+<h2 id="sanitizers-are-on-by-default"><a class="header" href="#sanitizers-are-on-by-default">Sanitizers are on by default</a></h2>
+<p><code>just build</code> compiles the library, tests and examples with AddressSanitizer and UBSan. Most memory bugs in this
+codebase have surfaced as a sanitizer report in an ordinary test run, so leave them on while developing. Release
+builds and installs don’t use them; the flags are private to raydom’s targets.</p>
+<h2 id="before-sending-a-change"><a class="header" href="#before-sending-a-change">Before sending a change</a></h2>
+<ol>
+<li><code>just test</code>: every test, including the documentation examples, passes.</li>
+<li><code>just lint</code>: no new findings in the files you touched.</li>
+<li><code>just consumer</code> if you changed CMake, headers, or anything that affects linking.</li>
+<li>If behavior changed, update the user book and, where relevant, this book. If a style property changed, the
+property reference regenerates from the source, but its description lives in <code>docs/tools/preprocess.py</code>.</li>
+<li>Look at the showcase for anything visual. Screenshots help in review; see below.</li>
+</ol>
+<p>There is no CI for tests yet; the workflow in <code>.github/</code> only publishes documentation. Run the suite locally.</p>
+<h2 id="screenshots"><a class="header" href="#screenshots">Screenshots</a></h2>
+<p>The showcase has a scripted mode for screenshots, used during development to check visual changes without clicking:</p>
+<pre><code class="language-sh">RAYDOM_SCREENSHOT=out.png RAYDOM_TAB=1 RAYDOM_CLICK="745,748" RAYDOM_TYPE="hello|" RAYDOM_FRAME=60 ./build/examples/showcase
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Variable</th><th>Effect</th></tr>
+</thead>
+<tbody>
+<tr><td><code>RAYDOM_SCREENSHOT</code></td><td>Saves this file and exits</td></tr>
+<tr><td><code>RAYDOM_TAB</code></td><td>Opens a top-level tab: 0 Tour, 1 Messages, 2 Network</td></tr>
+<tr><td><code>RAYDOM_SCROLL</code></td><td>Scrolls the tour</td></tr>
+<tr><td><code>RAYDOM_CLICK</code></td><td>Clicks at <code>x,y</code>, several separated by <code>;</code>, on frame 1</td></tr>
+<tr><td><code>RAYDOM_MOUSE</code></td><td>Leaves the pointer at <code>x,y</code></td></tr>
+<tr><td><code>RAYDOM_TABS</code></td><td>Presses Tab this many times</td></tr>
+<tr><td><code>RAYDOM_TYPE</code></td><td>Types text; `</td></tr>
+<tr><td><code>RAYDOM_DRAG</code></td><td>Drags from <code>x0,y0</code> to <code>x1,y1</code></td></tr>
+<tr><td><code>RAYDOM_FRAME</code></td><td>Captures this frame (default 3), to let animations and timers finish</td></tr>
+</tbody>
+</table>
+</div>
+<p>On a high-DPI display the screenshot is at device pixels with the window in one quadrant; crop the bottom-left
+<code>2 x width</code> by <code>2 x height</code> region.</p>
+<h2 id="docs-locally"><a class="header" href="#docs-locally">Docs locally</a></h2>
+<p>The user book needs mdbook 0.5 (<code>brew install mdbook</code>) and Python 3, used by its preprocessor. See
+<a href="#documentation">Documentation</a>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="conventions"><a class="header" href="#conventions">Conventions</a></h1>
+<h2 id="naming"><a class="header" href="#naming">Naming</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Prefix</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>rd_</code></td><td>Public core API</td></tr>
+<tr><td><code>RD_</code></td><td>Public enumerators and macros</td></tr>
+<tr><td><code>rd__</code></td><td>Internal to the core, shared between core files (<code>src/*_internal.h</code>)</td></tr>
+<tr><td><code>rdx_</code>, <code>RDX_</code></td><td>Public extras API</td></tr>
+<tr><td><code>rdx__</code></td><td>Internal to extras (<code>extras/src/extras_internal.h</code>)</td></tr>
+<tr><td><code>rd::</code>, <code>rdx::</code></td><td>C++ layers</td></tr>
+</tbody>
+</table>
+</div>
+<p>Everything else in a <code>.c</code> file is <code>static</code>. Internal headers are not installed.</p>
+<p>Names are snake_case in C and C++. Types are lowercase (<code>rd_node</code>, <code>rd_style</code>). File-local types drop the prefix
+(<code>vlist</code>, <code>popup</code>).</p>
+<h2 id="files"><a class="header" href="#files">Files</a></h2>
+<ul>
+<li>C sources are <code>.c</code>, C headers <code>.h</code>; C++ sources <code>.cc</code>, headers <code>.hh</code>.</li>
+<li>One public header per subsystem; <code>raydom.h</code> includes them all.</li>
+<li>A subsystem’s private interface goes in <code>src/&lt;name&gt;_internal.h</code> when more than one file uses it, otherwise it
+stays <code>static</code>.</li>
+</ul>
+<h2 id="style"><a class="header" href="#style">Style</a></h2>
+<ul>
+<li>clang-format with the repository’s <code>.clang-format</code>. It sets no column limit; keep lines near 120 by hand.</li>
+<li>Comments are few and say why, or what a reader can’t see from the code: invariants, units, ownership, the CSS
+section an algorithm follows. Don’t narrate code.</li>
+<li>Public headers document each function in one or two lines above it: what it does, what it returns on failure,
+who owns what.</li>
+</ul>
+<h2 id="errors"><a class="header" href="#errors">Errors</a></h2>
+<p>The core never aborts on bad input. A function that can fail returns <code>false</code>, a null handle, or does nothing, and
+says so in its header comment. Stale node handles are always safe to pass. Allocation failure is handled where it
+is reasonable to recover (a list that can’t grow keeps its old contents), and <code>assert</code> is reserved for invariants
+the library itself maintains.</p>
+<p>The C++ layer never throws. It allocates callables with <code>new (std::nothrow)</code> and reports failure the same way as C.
+Code that builds with <code>-fno-exceptions</code> must keep building.</p>
+<h2 id="ownership"><a class="header" href="#ownership">Ownership</a></h2>
+<ul>
+<li>The context owns everything created through it. <code>rd_ctx_destroy</code> frees it all, in a defined order (see
+<a href="#destruction">The context and the tree</a>).</li>
+<li>Anything raydom keeps a pointer to has a destroy callback (<code>rd_destroy_fn</code>) next to it: userdata, listener data,
+measure and paint data, timer data, extension data.</li>
+<li><strong>Node userdata belongs to the application.</strong> Nothing in the core or extras may store its own data there; the
+showcase reads userdata on hovered nodes as its own type, and a component that wrote an index into it crashed it.
+Components keep state in their own tables (see <a href="#state">Extras</a>).</li>
+</ul>
+<h2 id="tests"><a class="header" href="#tests">Tests</a></h2>
+<p>Every behavior change comes with a test. Tests are plain C or C++ programs using <code>tests/check.h</code>; see
+<a href="#writing-tests">Writing tests</a>.</p>
+<h2 id="commits"><a class="header" href="#commits">Commits</a></h2>
+<p>Small, focused commits with a message that says what changed and why. Keep vendored code unmodified; upstream fixes
+instead (see <a href="#vendored-code-stays-unmodified">Design decisions</a>).</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="build-and-packaging"><a class="header" href="#build-and-packaging">Build and packaging</a></h1>
+<h2 id="targets"><a class="header" href="#targets">Targets</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Target</th><th>Alias</th><th>Contents</th></tr>
+</thead>
+<tbody>
+<tr><td><code>raydom</code></td><td><code>raydom::raydom</code></td><td>The core: <code>src/*.c</code> plus vendored stb and nanosvg, compiled in</td></tr>
+<tr><td><code>raydom_extras</code></td><td><code>raydom::extras</code></td><td><code>extras/src/*.c</code>, the file dialog backend; links <code>raydom</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Both are static libraries. <code>raydom</code> publicly requires <code>c_std_23</code> and <code>cxx_std_20</code>, links raylib publicly, and on
+macOS the frameworks raylib needs. Warnings (<code>-Wall -Wextra</code>) and sanitizers are private.</p>
+<h2 id="raylib"><a class="header" href="#raylib">raylib</a></h2>
+<p><code>cmake/fetch_raylib.cmake</code> provides a <code>raylib</code> target, in order: an existing target in the parent project, an
+installed raylib 6.0 from <code>find_package</code>, then a download with FetchContent (unless <code>RAYDOM_FETCH_RAYLIB=OFF</code>).
+Projects that already build raylib get theirs used, not a second copy.</p>
+<h2 id="vendored-code"><a class="header" href="#vendored-code">Vendored code</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Code</th><th>Where</th><th>Linkage</th></tr>
+</thead>
+<tbody>
+<tr><td>stb_truetype</td><td><code>src/external/</code></td><td><code>STBTT_STATIC</code>: no exported symbols</td></tr>
+<tr><td>stb_image</td><td><code>src/external/</code></td><td><code>STB_IMAGE_STATIC</code></td></tr>
+<tr><td>nanosvg, nanosvgrast</td><td><code>src/external/</code></td><td>Public functions renamed with <code>#define</code> before inclusion</td></tr>
+<tr><td>nativefiledialog-extended</td><td><code>extras/src/external/nfd/</code></td><td>One platform backend compiled into extras</td></tr>
+</tbody>
+</table>
+</div>
+<p>raylib bundles its own stb libraries, and applications may bundle nanosvg; the static and renamed linkage keeps
+them from colliding. The vendored files are unmodified so they can be updated by copying; <code>VERSION</code> files record
+where they came from.</p>
+<h2 id="platforms"><a class="header" href="#platforms">Platforms</a></h2>
+<ul>
+<li>The core uses only C23 and raylib, and builds wherever raylib does, including Emscripten.</li>
+<li>The file dialog backend is Objective-C on macOS, so the top-level <code>CMakeLists.txt</code> enables <code>OBJC</code> right after
+<code>project()</code> when extras and dialogs are on. Enabling it inside <code>extras/</code> fails (<code>CMAKE_OBJC_COMPILE_OBJECT</code> is
+missing for targets in that directory).</li>
+<li>On Linux the dialog backend is xdg-desktop-portal over libdbus (<code>pkg-config dbus-1</code>). <code>RAYDOM_FILE_DIALOG=OFF</code>
+compiles a stub that returns errors, so the API stays available.</li>
+</ul>
+<h2 id="options"><a class="header" href="#options">Options</a></h2>
+<p><code>RAYDOM_BUILD_EXTRAS</code>, <code>RAYDOM_FILE_DIALOG</code>, <code>RAYDOM_FETCH_RAYLIB</code>, <code>RAYDOM_INSTALL</code>, <code>RAYDOM_BUILD_TESTS</code>,
+<code>RAYDOM_BUILD_EXAMPLES</code>, <code>RAYDOM_SANITIZE</code>. Tests, examples and install rules default to on only when raydom is the
+top-level project, so a project embedding it with FetchContent builds just the libraries.</p>
+<h2 id="installing"><a class="header" href="#installing">Installing</a></h2>
+<p><code>RAYDOM_INSTALL=ON</code> installs the libraries, headers (including the generated <code>version.h</code>) and a CMake package:
+<code>raydomConfig.cmake</code> calls <code>find_dependency(raylib)</code> and imports <code>raydom::raydom</code> and <code>raydom::extras</code>. The version
+file uses <code>SameMinorVersion</code> while the major version is 0 and <code>SameMajorVersion</code> after.</p>
+<p>Platform libraries the extras need (AppKit, UniformTypeIdentifiers, ole32, dbus-1) are attached as plain link
+names, so they survive export without imported targets.</p>
+<p><code>just consumer</code> is the packaging test: it builds <code>tests/consumer</code> both ways and runs it.</p>
+<h2 id="versioning"><a class="header" href="#versioning">Versioning</a></h2>
+<p>Semantic versioning; the version lives in <code>project(raydom VERSION ...)</code> and flows into <code>version.h</code>, the package
+version file and the docs. Before 1.0 a minor release may break the API, and changing the numeric value of a public
+enumerator counts as breaking.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="overview"><a class="header" href="#overview">Overview</a></h1>
+<h2 id="layers"><a class="header" href="#layers">Layers</a></h2>
+<pre><code class="language-text"> application
+     │
+     ├── raydom::extras   controls, popups, views, toasts, network view, file dialogs
+     │        │           (public core API only, plus rd_ctx_extension and layout hooks)
+     ▼        ▼
+ raydom.hh ── C++ wrappers, header-only
+     │
+ raydom core (C23)
+   tree ─ styles ─ layout ─ text ─ events/input ─ display list ─ renderer
+     │                                                │
+     └────────────── timers, animation ───────────────┘
+                                                      ▼
+                                                   raylib
+</code></pre>
+<p>The core is the only part that knows the private structures. Extras and the C++ layer use the public headers, so
+anything they need is something an application could need too; when extras needed per-context storage or a
+post-layout callback, those became public core features (<code>rd_ctx_set_extension</code>, <code>rd_ctx_on_layout</code>) rather than
+private back doors.</p>
+<p>Only <code>src/render.c</code> calls raylib. Everything else is plain C, which is why layout, text, events and animation run
+headless in tests.</p>
+<h2 id="one-frame"><a class="header" href="#one-frame">One frame</a></h2>
+<p>A raylib application calls <code>rd_update</code>, then <code>rd_draw</code> inside <code>BeginDrawing</code>/<code>EndDrawing</code>. Here is what happens,
+in order:</p>
+<pre><code class="language-text">rd_update
+ ├─ rd_ctx_set_time(GetTime())   clock; fires due timers
+ ├─ keyboard and text input       KEY_DOWN/UP and TEXT dispatch, editing
+ ├─ rd_ctx_pointer(mouse)         scrollbars, hover, POINTER_*, CLICK, WHEEL, focus
+ ├─ rd_ctx_layout(screen size)
+ │   ├─ rd__anim_tick             animations into computed styles
+ │   ├─ rd_ctx_compute_styles     dirty subtrees only; starts transitions
+ │   ├─ rd__layout_node(root)     flex and grid, with caches
+ │   ├─ rd__place_anchored        overlay popups next to their anchors
+ │   ├─ layout hooks              rd_ctx_on_layout callbacks
+ │   └─ second pass               only if a hook dirtied the tree
+ ├─ apply the mouse cursor
+ └─ raylib event waiting          on while idle, off while timers or animations run
+rd_draw
+ ├─ rd__display_list              the laid-out tree into commands
+ └─ execute commands              SDF shader, glyph atlas, images, scissor
+</code></pre>
+<p>The <a href="#subsystems-at-a-glance">table below</a> says which file owns each step.</p>
+<p>Each stage reads what the previous one produced and marks dirty flags for the next. Nothing is recomputed eagerly:
+mutating the tree or styles from a listener only sets flags, and the next <code>rd_ctx_layout</code> does the work once.</p>
+<h2 id="data-flow"><a class="header" href="#data-flow">Data flow</a></h2>
+<pre><code class="language-text">inline style + classes + states + parent   ──build──▶  target style
+target style + animations                   ──transition──▶  computed (shown) style
+computed style + tree + measure callbacks   ──layout──▶  rects, scroll ranges, baselines
+rects + computed styles + text layout       ──display list──▶  commands
+commands                                     ──renderer──▶  pixels
+</code></pre>
+<p>The <strong>computed style is what is shown</strong>, not what was asked for: during a transition it holds the interpolated
+value, and layout and drawing read it without knowing an animation exists.</p>
+<h2 id="subsystems-at-a-glance"><a class="header" href="#subsystems-at-a-glance">Subsystems at a glance</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>File(s)</th><th>Owns</th></tr>
+</thead>
+<tbody>
+<tr><td><code>tree.c</code></td><td>The context, slots, handles, tree links, userdata, extensions, destruction</td></tr>
+<tr><td><code>style.c</code></td><td>The style X-macro machinery, classes, state variants, computation, dirty flags</td></tr>
+<tr><td><code>anim.c</code></td><td>Transitions, explicit animations, the animation tick</td></tr>
+<tr><td><code>layout.c</code>, <code>grid.c</code></td><td>The measure contract, flexbox, grid, caches, absolute positioning, layout hooks</td></tr>
+<tr><td><code>overlay.c</code></td><td>The overlay node and anchored placement</td></tr>
+<tr><td><code>text.c</code>, <code>font.c</code></td><td>Text storage, tokens, line breaking, fonts, metrics</td></tr>
+<tr><td><code>input.c</code>, <code>selection.c</code></td><td>Editable text, undo, the document selection</td></tr>
+<tr><td><code>events.c</code></td><td>Listeners, dispatch, pointer, hover, focus, keyboard routing, wheel, scrollbar input, cursors</td></tr>
+<tr><td><code>display.c</code></td><td>Display list, hit-testing, scrolling, scrollbar geometry</td></tr>
+<tr><td><code>render.c</code></td><td>raylib integration: drawing, glyph atlas, textures, <code>rd_update</code></td></tr>
+<tr><td><code>image.c</code></td><td>Image decoding, SVG parsing and rasterizing, image nodes</td></tr>
+<tr><td><code>timer.c</code></td><td>Timers</td></tr>
+<tr><td><code>role.c</code></td><td>Roles and the semantic constructors</td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="the-context-and-the-tree"><a class="header" href="#the-context-and-the-tree">The context and the tree</a></h1>
+<h2 id="slots-and-parallel-arrays"><a class="header" href="#slots-and-parallel-arrays">Slots and parallel arrays</a></h2>
+<p><code>rd_ctx</code> (<code>src/internal.h</code>) stores nodes in <strong>parallel arrays indexed by slot</strong>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Array</th><th>Element</th><th>Contents</th></tr>
+</thead>
+<tbody>
+<tr><td><code>slots</code></td><td><code>rd_slot</code></td><td>Generation, flags, tree links, child count, userdata</td></tr>
+<tr><td><code>styles</code></td><td><code>rd_node_style</code></td><td>Computed style, inline style, classes, states, animation</td></tr>
+<tr><td><code>layouts</code></td><td><code>rd_node_layout</code></td><td>Rect, insets, scroll, caches, measure/paint callbacks, anchor</td></tr>
+<tr><td><code>events</code></td><td><code>rd_node_events</code></td><td>Listeners</td></tr>
+</tbody>
+</table>
+</div>
+<p>A node is a slot index plus everything at that index in each array. Splitting by subsystem keeps each pass’s data
+dense: layout walks <code>slots</code> and <code>layouts</code> and rarely touches <code>events</code>. Slot 0 is never used, so index 0 means
+“none” in tree links.</p>
+<p>Tree links are indices (<code>parent</code>, <code>first_child</code>, <code>last_child</code>, <code>next_sibling</code>, <code>prev_sibling</code>), a doubly linked
+child list per node, so append, insert and detach are O(1) and nothing is ever reallocated per node.</p>
+<h2 id="handles"><a class="header" href="#handles">Handles</a></h2>
+<p><code>rd_node</code> is <code>{index, gen}</code>. Destroying a node clears its slot’s <code>ALIVE</code> flag and puts the slot on a free list;
+reusing the slot bumps its generation. Either way a stale handle stops matching. <code>rd__slot(ctx, n)</code> returns the slot only when the handle is
+live; every public function starts with it, which is why stale handles are safe everywhere.</p>
+<p>The free list threads through <code>next_sibling</code> of dead slots, so it costs no extra memory.</p>
+<p>Arrays grow by doubling. Code must not hold a pointer into <code>ctx-&gt;slots</code> (or any per-node array) across anything that
+can create a node; re-index after.</p>
+<h2 id="mutation"><a class="header" href="#mutation">Mutation</a></h2>
+<p><code>rd_node_insert_before</code> refuses cycles (walks up from the parent) and the root; moving a node unlinks it first.
+Every mutation marks dirty flags (<code>rd__mark_layout_dirty</code>, <code>rd__mark_style_dirty</code>) rather than recomputing.</p>
+<p>The overlay is kept the root’s last child: inserting at the end of the root inserts before it. See
+<a href="#the-overlay">Layout</a>.</p>
+<h2 id="destroying-during-dispatch"><a class="header" href="#destroying-during-dispatch">Destroying during dispatch</a></h2>
+<p>Listeners may destroy any node, including the one whose listener is running. While <code>ctx-&gt;dispatch_depth</code> is
+non-zero, <code>rd_node_destroy</code> detaches the node at once (so it stops being laid out, drawn and hit-tested) and pushes
+it on <code>pending_destroy</code>. When the outermost dispatch ends, <code>flush_deferred</code> destroys those that are still detached;
+one a later listener re-attached is spared. Listeners removed during dispatch are flagged and compacted at the same
+point. This is what makes <code>ev-&gt;current</code> valid for the whole listener call.</p>
+<h2 id="extensions"><a class="header" href="#extensions">Extensions</a></h2>
+<p><code>rd_ctx_set_extension(ctx, key, data, destroy)</code> stores one pointer per key, where the key is an address the caller
+owns. Extras keep their theme, registries and popup manager here; it’s a short linear list, looked up rarely.</p>
+<h2 id="destruction"><a class="header" href="#destruction">Destruction</a></h2>
+<p><code>rd_ctx_destroy</code> frees in an order chosen so callbacks see a consistent world:</p>
+<ol>
+<li>For every live slot: style, layout and event data (running measure, paint and listener destroy callbacks), then
+the userdata destroy callback. Slots keep their <code>ALIVE</code> flag during this loop, so a destroy callback that clears
+a timer or looks up a handle still works.</li>
+<li>Style storage and fonts.</li>
+<li>Layout hook destroy callbacks.</li>
+<li>Extension destroy callbacks, after the nodes, because extensions often hold state keyed by nodes.</li>
+<li>Images, then timers (running their destroy callbacks).</li>
+<li>GPU resources (only if the raylib window still exists) and event storage.</li>
+</ol>
+<p>Destroy callbacks must not mutate the tree; they may free memory, clear timers, and read handles.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="styles"><a class="header" href="#styles">Styles</a></h1>
+<h2 id="one-list-of-properties"><a class="header" href="#one-list-of-properties">One list of properties</a></h2>
+<p>Every style property is one line of the <code>RD_STYLE_PROPS(X)</code> X-macro in <code>include/raydom/style.h</code>:</p>
+<pre><code class="language-c">X(name, type, kind, inherited, affects_layout)
+</code></pre>
+<p>Everything that needs a per-property case expands this list instead of naming properties:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Expansion</th><th>Where</th><th>Produces</th></tr>
+</thead>
+<tbody>
+<tr><td><code>RD_STYLE_FIELD_</code></td><td><code>style.h</code></td><td>The <code>rd_style</code> struct</td></tr>
+<tr><td><code>MERGE_##kind</code></td><td><code>style.c</code></td><td><code>rd_style_merge</code>: copy set fields</td></tr>
+<tr><td><code>EQ_##kind</code>, <code>style_diff</code></td><td><code>style.c</code></td><td>Change detection, flagged inherited and layout</td></tr>
+<tr><td><code>SET_##kind</code></td><td><code>style.c</code> (debug)</td><td><code>rd__style_check_defaults</code>: the default style sets every field</td></tr>
+<tr><td>inherited copy in <code>build</code></td><td><code>style.c</code></td><td>Inheritance from the parent’s computed style</td></tr>
+<tr><td><code>P_##name</code>, <code>PROPS[]</code></td><td><code>anim.c</code></td><td>Property ids, offsets, sizes and kinds for transitions</td></tr>
+<tr><td><code>RD_HH_SETTER_##kind</code></td><td><code>raydom.hh</code></td><td>One chainable setter per property, plus overloads per kind</td></tr>
+<tr><td>regex over the macro</td><td><code>docs/tools/preprocess.py</code></td><td>The property reference</td></tr>
+</tbody>
+</table>
+</div>
+<p>The <strong>kind</strong> says how a property is merged, compared and animated: <code>VAL</code> (<code>rd_val</code>), <code>COLOR</code>, <code>EDGES</code>,
+<code>CORNERS</code>, <code>SHADOW</code>, <code>ENUM</code>, <code>TRACKS</code>, <code>TRACK</code>, <code>GRID_LINE</code>, <code>FONT</code>. Adding a kind means adding a case to each
+expansion; adding a property of an existing kind is one line plus a default. See
+<a href="#adding-a-style-property">Adding a style property</a>.</p>
+<h2 id="zero-means-unset"><a class="header" href="#zero-means-unset">Zero means unset</a></h2>
+<p>Every field type reserves zero for “unset”: <code>RD_UNIT_UNSET</code>, enum value 0, <code>rd_color.set == false</code>, an
+<code>rd_grid_line</code> with kind 0. That single rule gives:</p>
+<ul>
+<li>partial styles from designated initializers (<code>&amp;(rd_style){.width = rd_px(10)}</code>),</li>
+<li><code>rd_style_merge</code> that copies only what’s set,</li>
+<li>classes and variants that layer without knowing about each other.</li>
+</ul>
+<p>The cost is that “the value 0” needs a unit or a <code>set</code> flag: <code>rd_px(0)</code> is set, <code>{0}</code> is not; transparent is
+<code>rd_rgba(0,0,0,0)</code> with <code>set = true</code>. <code>default_style</code> in <code>style.c</code> sets every field, which a debug-build assertion
+checks at context creation, so a new property without a default fails immediately.</p>
+<h2 id="computing-a-style"><a class="header" href="#computing-a-style">Computing a style</a></h2>
+<p><code>build(ctx, i, parent, out)</code>:</p>
+<ol>
+<li><code>out = default_style</code>.</li>
+<li>Copy inherited properties from the parent’s <strong>computed</strong> style.</li>
+<li>Merge each class’s base style, in the order classes were added.</li>
+<li>For each state bit in precedence order (bit order of <code>rd_state</code>), merge each class’s variant for that state.
+The states used are the node’s own, or’ed with its parents’ while <code>share_states</code> chains upward.</li>
+<li>Merge the inline style.</li>
+</ol>
+<p>Then <code>rd__transition</code> (see <a href="#time-timers-animation-hooks">Time</a>) may replace animated properties with their current values, and the
+result is compared with the previous computed style.</p>
+<h2 id="dirty-tracking"><a class="header" href="#dirty-tracking">Dirty tracking</a></h2>
+<ul>
+<li><code>RD_FLAG_STYLE_DIRTY</code> on a node: its own inputs changed (inline style, classes, states, parent).</li>
+<li><code>RD_FLAG_SUBTREE_STYLE_DIRTY</code> on its ancestors: something below needs computing. <code>rd__mark_style_dirty</code> stops
+climbing at the first ancestor that already has it.</li>
+</ul>
+<p><code>compute_rec</code> walks from the root, descending only into subtrees flagged dirty, and recomputes flagged nodes. The
+diff decides what else happens:</p>
+<ul>
+<li>any change: paint dirty;</li>
+<li>a layout-affecting change: <code>rd__mark_layout_dirty</code> on the node;</li>
+<li>an inherited change: children recompute even if not flagged.</li>
+</ul>
+<p>State changes are cheap when nothing cares: <code>rd_node_set_states</code> marks the node dirty only if one of its classes
+has a variant for the changed state (and marks sharing children). Hovering over a tree of unstyled nodes recomputes
+nothing.</p>
+<p>Changing a class (<code>rd_class_set</code>, <code>rd_class_set_state</code>) scans every slot for nodes using it: O(nodes), acceptable
+because classes change rarely, usually at startup.</p>
+<h2 id="storage"><a class="header" href="#storage">Storage</a></h2>
+<ul>
+<li>Inline styles are heap-allocated per node only when set.</li>
+<li>Classes live in <code>ctx-&gt;classes</code> for the context’s lifetime; a node keeps a small array of class ids.</li>
+<li>Track lists are interned by content into an append-only pool: <code>rd_tracks_create</code> returns the existing handle for an
+identical list (including its repeat mode), so rebuilding lists is free. A style holds the handle by value, which is
+why lists can’t be freed or reference counted: raydom can’t see the copies in inline styles, classes and variants.</li>
+</ul>
+<h2 id="computed-style-access"><a class="header" href="#computed-style-access">Computed style access</a></h2>
+<p><code>rd_node_computed_style</code> computes pending styles first, then returns a pointer into <code>ctx-&gt;styles</code>, valid until the
+next node creation (which may reallocate the array). Internally, code reads <code>ctx-&gt;styles[i].computed</code> directly and
+must call <code>rd_ctx_compute_styles</code> first when it can run outside layout: <code>rd_ctx_focus_next</code> and <code>rd_node_focus</code> do,
+because a node created this frame has no computed <code>focusable</code> yet.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="layout"><a class="header" href="#layout">Layout</a></h1>
+<h2 id="the-measure-contract"><a class="header" href="#the-measure-contract">The measure contract</a></h2>
+<p>All layout goes through one function:</p>
+<pre><code class="language-c">rd_size rd__layout_node(rd_ctx* ctx, uint32_t i, rd_layout_key k, bool perform);
+</code></pre>
+<p><code>rd_layout_key</code> is the question asked of a node: available width and height, each with a mode, and the containing
+block size for percentages.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Mode</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>EXACTLY</code></td><td>The border box is this size</td></tr>
+<tr><td><code>AT_MOST</code></td><td>Fit content, up to this size</td></tr>
+<tr><td><code>UNDEFINED</code></td><td>Max-content: size freely (available size is NaN)</td></tr>
+<tr><td><code>MIN_CONTENT</code></td><td>The smallest size without overflow</td></tr>
+</tbody>
+</table>
+</div>
+<p>With <code>perform</code> false it’s a measurement and returns a size; with <code>perform</code> true it lays out the subtree and sets
+child rects. A node’s own <code>width</code>, <code>height</code>, <code>min_*</code> and <code>max_*</code> are resolved by its <strong>parent</strong> (or the absolute or
+anchoring code) into the key; <code>rd__layout_node</code> itself answers for the content. Forgetting this in a new caller is
+the classic bug: a fixed-height node measured with <code>AT_MOST</code> reports its content height. Copy the resolution from
+<code>rd__layout_absolute</code>.</p>
+<p>This is Yoga’s model: one recursive function, intrinsic sizes on demand, no separate pre-pass.</p>
+<h2 id="caches"><a class="header" href="#caches">Caches</a></h2>
+<p>Each node keeps one <strong>layout</strong> entry (the last <code>perform</code>) and four <strong>measure</strong> entries (round robin), each keyed by
+<code>rd_layout_key</code>:</p>
+<ul>
+<li>A hit returns the stored size without recursion. Flex and grid ask the same questions repeatedly (measure for
+basis, measure for cross size, then perform), so this is what keeps layout near-linear.</li>
+<li><code>normalize_key</code> drops the containing block from the key when the node has no percentage padding or min/max, and
+sets available sizes to NaN for <code>UNDEFINED</code>/<code>MIN_CONTENT</code>, so equivalent questions share an entry.</li>
+<li><code>RD_FLAG_LAYOUT_DIRTY</code> invalidates a node’s entries the next time it is asked anything.
+<code>rd__mark_layout_dirty</code> marks the node and <strong>every ancestor</strong>, without stopping early: subtrees layout never
+visits (display none, measured leaves, detached) keep stale flags, so an already-dirty node doesn’t prove its
+ancestors are.</li>
+</ul>
+<p>The cost model: an unchanged frame is one <code>perform</code> call on the root that hits the cache. A change re-lays out the
+path to the root and whatever the changed sizes affect.</p>
+<h2 id="flexbox"><a class="header" href="#flexbox">Flexbox</a></h2>
+<p><code>layout_flex</code> follows CSS Flexbox §9: collect items (skipping absolute and <code>display: none</code>), resolve flex basis
+(measuring content when <code>auto</code>), break into lines when wrapping, resolve flexible lengths (§9.7, with min/max
+freezing), determine cross sizes and stretch, then justify and align. Differences from CSS are deliberate and
+documented for users: <code>flex_direction</code> defaults to column, <code>flex_shrink</code> to 0, and automatic minimum sizes are 0.</p>
+<h2 id="grid"><a class="header" href="#grid">Grid</a></h2>
+<p><code>grid.c</code> follows CSS Grid: placement (§8.5, sparse auto-placement over an occupancy map), then track sizing (§11):
+intrinsic contributions (§11.5) and fr expansion (§11.7), each axis sized against the other’s result. An indefinite
+axis is sized to content, clamped, and re-run at the clamped size when that differs. Named lines, named areas and
+dense packing aren’t implemented.</p>
+<p><strong>Auto repetition</strong> (§7.2.3.2): a list created with <code>rd_tracks_create_auto</code> is expanded per layout. <code>repetitions</code>
+computes the count from the content box (definite size, else max size, else the min size to reach, else one), with
+each track at its max size when that’s a length, else its min size. The expanded list replaces the explicit list
+before placement, so line numbers (including negative ones) refer to it. For auto-fit, <code>collapse_empty</code> removes the
+repeated tracks no item occupies after placement and renumbers later items. Removal is equivalent to CSS’s
+collapsing (zero size and merged gaps) because nothing spans those tracks, and it leaves track sizing untouched.</p>
+<h2 id="text-and-measured-leaves"><a class="header" href="#text-and-measured-leaves">Text and measured leaves</a></h2>
+<p>A node with a measure callback is a leaf: <code>layout_leaf</code> calls <code>measure_fn(data, w, wmode, h, hmode)</code> with content
+box sizes. Text nodes, inputs and image nodes are measured leaves whose callbacks live in <code>text.c</code> and <code>image.c</code>;
+<code>rd__is_text</code> and <code>rd__node_image</code> identify them by comparing the callback pointer, so there’s no type field to
+keep in sync.</p>
+<h2 id="absolute-positioning"><a class="header" href="#absolute-positioning">Absolute positioning</a></h2>
+<p><code>rd__layout_absolute</code> positions an absolute child against its parent’s padding box after the flow pass, resolving
+<code>inset</code>, margins and the node’s own size (stretching between opposite insets when no size is set).</p>
+<h2 id="the-overlay"><a class="header" href="#the-overlay">The overlay</a></h2>
+<p><code>rd_ctx_overlay</code> creates a node that is the root’s last child. Its geometry is fixed during <strong>style computation</strong>:
+<code>build</code> forces position absolute, zero inset and margin, and auto sizes, whatever classes or inline styles say. So
+the overlay always covers the root, and layout needs no special case. Hit-testing skips the overlay node itself so
+it doesn’t block the page; its children are hit-tested first because it’s the last child.</p>
+<h2 id="anchoring"><a class="header" href="#anchoring">Anchoring</a></h2>
+<p><code>rd__place_anchored</code> runs after the main pass. For each node with an anchor, in the order they were anchored, it
+reads the anchor’s bounds from this layout, chooses a side (flipping when only the other side fits), aligns,
+shifts into the root, and writes the node’s rect relative to its parent. <code>match_width</code> re-lays out the node at the
+anchor’s width, resolving the node’s own height and bounds the way absolute layout does.</p>
+<p>Placing after layout means anchoring never affects other nodes’ sizes, and a submenu anchored to an item of an
+anchored menu works because the menu was placed first.</p>
+<h2 id="layout-hooks-and-the-second-pass"><a class="header" href="#layout-hooks-and-the-second-pass">Layout hooks and the second pass</a></h2>
+<p>Hooks are context-wide (<code>rd_ctx_on_layout</code>) or node-scoped (<code>rd_node_on_layout</code>). A node-scoped hook sets
+<code>RD_FLAG_HAS_HOOK</code> on its slot; freeing the slot drops its hooks. A hook can destroy its own node while hooks are
+running, so dropping only marks the hook dead, and <code>sweep_hooks</code> runs destroy callbacks and compacts the list after
+the run. The loop copies each hook before calling it because a hook may add hooks, reallocating the array. Hooks
+whose node is detached are skipped.</p>
+<p><code>rd_ctx_layout</code> runs the hooks after placing anchors. If any hook left the root dirty (layout or style), it runs
+one more pass. Hooks don’t run on that pass, which bounds the work at two passes per frame. Virtualized lists bind
+rows here; a hook that would need a third pass is doing something layout should do.</p>
+<h2 id="scrolling"><a class="header" href="#scrolling">Scrolling</a></h2>
+<p>Scroll offsets live in <code>rd_node_layout.scroll</code> and are clamped to the content (<code>rd_node_content_size</code>: the padding
+box plus children’s margin boxes) during layout and whenever set. Offsets don’t dirty layout: drawing and
+hit-testing subtract them, so scrolling is cheap.</p>
+<h2 id="natural-height"><a class="header" href="#natural-height">Natural height</a></h2>
+<p><code>rd__natural_height</code> measures a node as if <code>height</code> were auto at its current width, for transitions to
+<code>height: auto</code>. It temporarily changes the computed height, measures, restores it, and marks the node dirty,
+because the measurement went into the caches under a key that doesn’t include style.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="text"><a class="header" href="#text">Text</a></h1>
+<h2 id="fonts"><a class="header" href="#fonts">Fonts</a></h2>
+<p><code>font.c</code> wraps stb_truetype. A font is loaded once into the context (copied or borrowed), gets an id, and caches
+codepoint-to-glyph lookups and advances. Kerning comes from the font’s <code>kern</code>/GPOS pair tables. There is no
+shaping: no ligatures, contextual forms or bidirectional reordering. That’s the biggest limit of the text stack;
+see <a href="#known-limits-and-debt">Known limits</a>.</p>
+<h2 id="text-nodes"><a class="header" href="#text-nodes">Text nodes</a></h2>
+<p><code>rd_node_set_text</code> attaches an <code>rd_text</code> to the node as its measure data. It holds the UTF-8, the decoded
+codepoints, and byte offsets per codepoint.</p>
+<p>Two caches sit in <code>rd_text</code>:</p>
+<ul>
+<li><strong>Tokens</strong> for the current font, size and <code>white_space</code>: words, spaces and newlines with widths. CJK characters are
+single-character words, which gives them a break opportunity on each side.</li>
+<li><strong>Lines</strong> for the last width: greedy breaking (<code>break_lines</code>) over the tokens. Trailing spaces belong to a line but
+hang outside its width; collapsible spaces at a line start are dropped.</li>
+</ul>
+<p>Measuring (<code>text_measure</code>) runs line breaking at the available width, or with no limit for max-content; min-content
+is the widest word. <code>line_clamp</code> caps the measured line count; <code>text_overflow</code> adds the ellipsis when drawing.</p>
+<p>Byte offsets are the public unit everywhere (selection, highlights, input carets) because applications index their
+own strings in bytes; codepoint indices stay internal.</p>
+<h2 id="inputs"><a class="header" href="#inputs">Inputs</a></h2>
+<p><code>rd_node_make_input</code> adds an <code>rd__input</code> to the text: anchor and caret (bytes), a goal column for vertical movement,
+horizontal scroll for single-line inputs, and undo/redo stacks of snapshots. Consecutive typing merges into one
+undo step. Inputs keep all whitespace regardless of style. Key handling (<code>rd__input_key</code>) runs as the default action
+of <code>KEY_DOWN</code> on a focused input, so a listener can <code>prevent_default</code> any key.</p>
+<h2 id="the-document-selection"><a class="header" href="#the-document-selection">The document selection</a></h2>
+<p><code>selection.c</code> keeps an anchor and focus (node and byte offset) across text nodes. Ordering across nodes uses a
+pre-order numbering computed lazily while a selection exists (<code>rd__selection_prepare</code>). Dragging maps the pointer to
+the nearest selectable text (vertical distance first), and copying collects the selected text one line per node.</p>
+<h2 id="drawing-text"><a class="header" href="#drawing-text">Drawing text</a></h2>
+<p>Text is drawn by the renderer from the same line layout, glyph by glyph from the atlas (see
+<a href="#glyph-atlas">Rendering</a>), at baselines snapped to device pixels.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="events-and-input"><a class="header" href="#events-and-input">Events and input</a></h1>
+<h2 id="listeners-and-dispatch"><a class="header" href="#listeners-and-dispatch">Listeners and dispatch</a></h2>
+<p>Listeners are stored per node (<code>rd_node_events</code>) with an id, flags (capture) and a destroy callback. <code>rd_node_off</code>
+during dispatch flags the listener removed; storage is compacted when dispatch ends.</p>
+<p><code>dispatch</code> builds the path from the target to the root <strong>before</strong> calling anything, then runs capture listeners
+root-to-parent, the target’s capture listeners, the target’s bubble listeners, and bubble listeners up to the root.
+Fixing the path first means listeners can reshape the tree without changing who receives the event. Listeners added
+to a node during its own invocation don’t run for that event: <code>invoke</code> reads the count up front.</p>
+<p><code>fire</code> returns whether the default action was prevented; default actions (focus on press, scrolling, editing,
+Tab, Enter-to-click) run in the caller after dispatch, which is what makes <code>rd_event_prevent_default</code> work for all of
+them. <code>rd_node_dispatch</code> is <code>fire</code> made public, for components announcing <code>INPUT</code> and <code>CHANGE</code>.</p>
+<h2 id="pointer"><a class="header" href="#pointer">Pointer</a></h2>
+<p><code>rd_ctx_pointer(x, y, buttons, wheel)</code> is the only pointer entry point; <code>rd_update</code> feeds it from raylib. In order:</p>
+<ol>
+<li><strong>Scrollbars first.</strong> <code>scrollbar_pointer</code> checks for a bar under the pointer on the nearest scroll container
+above the hit node, or an active bar drag. If it handles the pointer, the content sees nothing: no pointer events,
+no focus change, no selection.</li>
+<li><strong>Hover.</strong> The hovered leaf is the hit node, or the pointer-capture node. <code>update_hover</code> diffs the old and new
+ancestor chains: <code>POINTER_LEAVE</code> deepest-first on nodes losing hover, <code>POINTER_ENTER</code> outermost-first on nodes
+gaining it, and <code>RD_STATE_HOVER</code> on the chain.</li>
+<li><strong>Move.</strong> <code>POINTER_MOVE</code>, then input drag-selection or document drag-selection.</li>
+<li><strong>Buttons.</strong> Per changed button: <code>POINTER_DOWN</code> (with <code>RD_STATE_ACTIVE</code> on the chain, and unless prevented,
+pointer focus and starting a selection), <code>POINTER_UP</code>, and <code>CLICK</code> on the common ancestor of the press and
+release targets for the primary button.</li>
+<li><strong>Wheel.</strong> A gesture latches to the scroll container chosen at its start (<code>wheel_latch</code>) until the wheel pauses
+(<code>LATCH_SECONDS</code>) or the pointer moves, so a horizontal scroll inside a vertical list doesn’t get stolen halfway.</li>
+</ol>
+<p>Disabled subtrees receive no down, up or click.</p>
+<h2 id="focus"><a class="header" href="#focus">Focus</a></h2>
+<p><code>can_focus</code> accepts inputs, interactive roles (button, link, checkbox, radio, switch, slider, menu item, combo box,
+tab, splitter) and nodes with <code>focusable</code>, if displayed and not disabled. Tab collects focusable nodes in tree order
+within the focus scope (<code>rd_ctx_set_focus_scope</code>). <code>keyboard_modality</code> records whether focus last moved by keyboard,
+which decides <code>RD_STATE_FOCUS_VISIBLE</code>. Focus changes fire <code>BLUR</code>, <code>FOCUS_OUT</code>, <code>FOCUS</code>, <code>FOCUS_IN</code>, after the states
+are set, so a <code>FOCUS</code> listener can read <code>FOCUS_VISIBLE</code>. A focused node that gets destroyed, detached, hidden or
+disabled loses focus silently (<code>focus_valid</code>).</p>
+<h2 id="keyboard"><a class="header" href="#keyboard">Keyboard</a></h2>
+<p><code>rd_ctx_key</code> dispatches <code>KEY_DOWN</code>/<code>KEY_UP</code> to the focused node or the root. Default actions, unless prevented:
+editing in an input, selection keys outside inputs, Tab navigation, and Enter or Space as <code>CLICK</code> on a focused
+non-input. <code>rd_ctx_text</code> dispatches <code>TEXT</code> and inserts into a focused input.</p>
+<h2 id="cursors"><a class="header" href="#cursors">Cursors</a></h2>
+<p><code>rd_ctx_cursor</code> resolves the cursor from state at the time it’s asked: a selection drag forces text; a scrollbar
+under the pointer forces default; otherwise the hovered node’s computed <code>cursor</code>, with <code>AUTO</code> resolved by role and
+content. <code>rd_update</code> applies it through raylib only when it changes.</p>
+<h2 id="hit-testing"><a class="header" href="#hit-testing">Hit-testing</a></h2>
+<p><code>rd__hit</code> walks the laid-out tree back to front (last child first), honoring clips, <code>display: none</code>,
+<code>pointer_events: none</code>, and skipping the overlay node itself. Measured leaves don’t hit-test their children.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="rendering"><a class="header" href="#rendering">Rendering</a></h1>
+<h2 id="the-display-list"><a class="header" href="#the-display-list">The display list</a></h2>
+<p><code>rd__display_list</code> walks the laid-out tree and emits commands into a reusable array:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Command</th><th>Draws</th></tr>
+</thead>
+<tbody>
+<tr><td><code>SHADOW</code></td><td>A blurred rounded box</td></tr>
+<tr><td><code>RECT</code></td><td>Background and border of a box, rounded or not</td></tr>
+<tr><td><code>TEXT</code></td><td>A text node’s lines</td></tr>
+<tr><td><code>PLACEHOLDER</code></td><td>An empty input’s placeholder</td></tr>
+<tr><td><code>FILL</code></td><td>A plain rectangle: selection, highlight, caret</td></tr>
+<tr><td><code>CLIP</code></td><td>Sets the scissor; the enclosing clip is restored by a second <code>CLIP</code></td></tr>
+<tr><td><code>PAINT</code></td><td>A canvas callback</td></tr>
+<tr><td><code>IMAGE</code></td><td>An image placed by <code>object_fit</code>, with its source rectangle</td></tr>
+</tbody>
+</table>
+</div>
+<p>The walk applies opacity multiplicatively down the tree, culls nodes outside the current clip, and draws scrollbars
+after a scroll container’s children. Commands carry everything the renderer needs except text layout and textures,
+which it reads from the context.</p>
+<p>The list is rebuilt every <code>rd_draw</code>. That’s a deliberate simplicity: building it is a linear walk with no allocation
+in the steady state, much cheaper than the GPU work, and it means there’s no retained render state to invalidate.</p>
+<p>Keeping the display list separate from raylib is also what lets <code>tests/test_render.c</code> check drawing headlessly.</p>
+<h2 id="the-renderer"><a class="header" href="#the-renderer">The renderer</a></h2>
+<p><code>render.c</code> executes commands with raylib and <code>rlgl</code>:</p>
+<ul>
+<li><strong>Rounded boxes and shadows</strong> use one fragment shader evaluating a signed distance to a rounded rectangle with
+per-corner radii and per-side borders, antialiased over one device pixel. Shadows are the same shape with a
+blur. Boxes without corner radii skip the shader and draw with raylib’s batched rectangles, borders included.</li>
+<li><strong>Pixel snapping.</strong> Rect edges and text baselines snap to device pixels (<code>snap(v, dpi)</code>), so borders and text stay
+crisp at fractional DPI.</li>
+<li><strong>Images</strong> draw with <code>DrawTexturePro</code>, or through the same shader in a textured mode when the box has radii, so
+rounded corners clip them.</li>
+<li><strong>Clipping</strong> is the GPU scissor, in screen pixels.</li>
+<li><strong>Canvases</strong>: <code>PAINT</code> flushes the batch, ends any scissor, calls the application’s callback with the content box
+and the clip, then restores state.</li>
+</ul>
+<h2 id="glyph-atlas"><a class="header" href="#glyph-atlas">Glyph atlas</a></h2>
+<p>Text is drawn glyph by glyph from one 2048×2048 RGBA texture. Glyphs rasterize on first use (stb_truetype coverage
+into the alpha channel) at the device-pixel size, and are found in an open-addressing table keyed by font, size in
+quarter pixels and glyph. Packing is shelf-based; when the atlas fills, it’s cleared and refilled on demand. That
+favors simplicity over long-lived caching: a UI rarely shows more distinct glyphs than fit, and clearing is
+correct, just a hitch.</p>
+<h2 id="images-and-svg"><a class="header" href="#images-and-svg">Images and SVG</a></h2>
+<p>Decoding (stb_image) and SVG parsing (nanosvg) happen in <code>image.c</code> at load, with no GPU, so image nodes lay out
+headlessly. The texture is created on first draw and the CPU pixels freed. SVGs keep their parsed form and
+rasterize in <code>draw_image</code> at the drawn size times the display scale, again whenever drawn larger (capped at 4096
+pixels per side); mipmaps cover smaller uses. Images with <code>currentColor</code> are drawn tinted by the node’s color.</p>
+<h2 id="gpu-lifetime"><a class="header" href="#gpu-lifetime">GPU lifetime</a></h2>
+<p>The shader, atlas and textures belong to the context and are released in <code>rd_ctx_destroy</code> only if the window still
+exists, which is why the user docs insist on destroying the context before <code>CloseWindow</code>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="time-timers-animation-hooks"><a class="header" href="#time-timers-animation-hooks">Time: timers, animation, hooks</a></h1>
+<h2 id="the-clock"><a class="header" href="#the-clock">The clock</a></h2>
+<p>The context has one clock, <code>ctx-&gt;now</code>, set by <code>rd_ctx_set_time</code> (from <code>GetTime()</code> in <code>rd_update</code>, by hand in
+tests). Nothing reads the system time. Everything time-based in the library is therefore deterministic under test:
+set the time, lay out, assert.</p>
+<h2 id="timers"><a class="header" href="#timers">Timers</a></h2>
+<p><code>timer.c</code> keeps an array of timers with generational handles. <code>rd_ctx_set_time</code> runs due timers in due order. Two
+rules keep callbacks safe:</p>
+<ul>
+<li>A timer set during a run gets that run’s epoch and doesn’t fire until the next clock update, so a callback that
+sets a zero-delay timer can’t loop forever within a frame.</li>
+<li>A timer cleared from its own callback is marked and finished after the callback returns, so its data stays valid.</li>
+</ul>
+<p>A repeating timer that falls behind fires once and skips ahead rather than bursting.</p>
+<h2 id="event-waiting"><a class="header" href="#event-waiting">Event waiting</a></h2>
+<p>raylib’s <code>EnableEventWaiting</code> blocks in <code>glfwWaitEvents</code> without a timeout, so nothing can wake it at a time.
+<code>rd_set_event_waiting</code> hands the switch to raydom: <code>rd_update</code> disables waiting while a timer is pending or anything
+animates, and re-enables it when neither is true. Idle UIs cost nothing; a repeating timer keeps frames running.</p>
+<h2 id="transitions"><a class="header" href="#transitions">Transitions</a></h2>
+<p>Animation state is per node (<code>rd__anim</code>, allocated only while something animates), listed in <code>ctx-&gt;animating</code>.</p>
+<p><strong>Starting.</strong> <code>rd__transition</code> runs inside style computation, right after <code>build</code> produces the new target style.
+For each animatable property (kinds <code>VAL</code>, <code>COLOR</code>, <code>EDGES</code>, <code>CORNERS</code>, <code>SHADOW</code>):</p>
+<ul>
+<li>already animating toward the same target: keep showing the current value;</li>
+<li>target differs from what’s shown, the property’s group is in <code>transition_properties</code>, and the duration is
+positive: record from (what’s shown), to, start, duration and easing, and show the start value;</li>
+<li>otherwise: stop any animation and show the target.</li>
+</ul>
+<p>Lengths animate only between equal units. <code>height</code> between <code>auto</code> and px is special-cased: from <code>auto</code> starts at the
+laid-out height; to <code>auto</code> re-measures the natural height every frame and ends as <code>auto</code>.</p>
+<p><strong>Ticking.</strong> <code>rd__anim_tick</code> runs first in <code>rd_ctx_layout</code>. It writes interpolated values straight into the
+computed styles, marks layout dirty for layout properties and restyles children for inherited ones, and frees
+state when nothing is left.</p>
+<p>Because animated values live in the computed style, layout, hit-testing, anchoring and drawing need no knowledge of
+animation, which is how layout properties animate “for free” (at the cost of a relayout per frame for the moving
+part of the tree).</p>
+<p><strong>Explicit animations.</strong> <code>rd_node_animate</code> records a pending request (duration, easing, which properties, optional
+start values, the call time) and merges <code>to</code> into the inline style. The next computation consumes the request as
+transitions with those parameters, starting at the call time. <code>done</code> is an ordinary timer.</p>
+<p><strong>Easing</strong> is CSS’s cubic-bezier, solved with Newton’s method and a bisection fallback.</p>
+<h2 id="layout-hooks"><a class="header" href="#layout-hooks">Layout hooks</a></h2>
+<p>See <a href="#layout-hooks-and-the-second-pass">Layout</a>. They’re here in spirit: they let code react to this
+frame’s geometry within the frame, the way a virtualized list must.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="the-c-layer"><a class="header" href="#the-c-layer">The C++ layer</a></h1>
+<p><code>include/raydom/raydom.hh</code> is header-only and adds no state: every wrapper holds the context pointer and a handle.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Type</th><th>Owns</th></tr>
+</thead>
+<tbody>
+<tr><td><code>rd::Context</code></td><td>The context (RAII, move-only)</td></tr>
+<tr><td><code>rd::Node</code></td><td>Nothing: <code>{rd_ctx*, rd_node}</code>; setters are <code>const</code></td></tr>
+<tr><td><code>rd::Class</code></td><td>Nothing: <code>{rd_ctx*, rd_class}</code>; setters are <code>const</code></td></tr>
+<tr><td><code>rd::Style</code></td><td>An <code>rd_style</code> value, with a setter per property</td></tr>
+<tr><td><code>rd::Event</code></td><td>A view of an <code>rd_event*</code>, valid during the listener</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="handles-are-const"><a class="header" href="#handles-are-const">Handles are const</a></h2>
+<p><code>rd::Node</code> and <code>rd::Class</code> setters are <code>const</code> and return <code>const Node&amp;</code> / <code>const Class&amp;</code> for chaining. They change
+the node or class in the context, not the handle, like <code>std::span</code>’s element access. This lets a lambda that
+captures a node by value call setters without <code>mutable</code> or a copy. New methods on handle types follow suit.</p>
+<h2 id="callables"><a class="header" href="#callables">Callables</a></h2>
+<p>Lambdas go through one pattern: allocate the decayed callable with <code>new (std::nothrow)</code>, pass a captureless trampoline
+as the C callback and the allocation as data, and pass a deleter as the destroy callback. If registration fails, the
+wrapper deletes the allocation itself. The C side owns the callable from then on, so captures live exactly as long as
+the listener, timer or measure function.</p>
+<h2 id="setters-from-the-x-macro"><a class="header" href="#setters-from-the-x-macro">Setters from the X-macro</a></h2>
+<p><code>rd::Style</code> gets its setters by expanding <code>RD_STYLE_PROPS</code>, with extra overloads per kind (edges from one, two or
+four values; corners from one; tracks from an <code>rd_val</code>; shadows from numbers). A new property gets its C++ setter
+without touching <code>raydom.hh</code>.</p>
+<h2 id="no-exceptions"><a class="header" href="#no-exceptions">No exceptions</a></h2>
+<p>The layer compiles with <code>-fno-exceptions</code>. Allocation failures return null handles or <code>false</code>, as in C. Keep it
+that way: applications on platforms without exceptions are a target.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="extras"><a class="header" href="#extras">Extras</a></h1>
+<p><code>raydom::extras</code> is a second library built only on the public core API. That constraint is the point: if a
+component needs something the core doesn’t offer publicly, the core gains a public feature that applications can use
+too. Per-context storage (<code>rd_ctx_set_extension</code>), post-layout callbacks (<code>rd_ctx_on_layout</code>), firing events
+(<code>rd_node_dispatch</code>), shared states, the checked state, focus scopes and roles all arrived this way.</p>
+<h2 id="files-1"><a class="header" href="#files-1">Files</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>File</th><th>Contents</th></tr>
+</thead>
+<tbody>
+<tr><td><code>theme.c</code></td><td><code>rdx_theme</code>: every component’s classes, created on first use; SVG icons</td></tr>
+<tr><td><code>registry.c</code></td><td><code>rdx__track</code> / <code>rdx__lookup</code>: objects by node</td></tr>
+<tr><td><code>controls.c</code></td><td>Checkbox, switch, radio group, slider</td></tr>
+<tr><td><code>toast.c</code></td><td>Toasts</td></tr>
+<tr><td><code>popups.c</code></td><td>The popup manager, menus, context menus, select, modal, tooltip</td></tr>
+<tr><td><code>views.c</code></td><td>Tabs, splitter</td></tr>
+<tr><td><code>lists.c</code></td><td>Virtualized list, table, tree</td></tr>
+<tr><td><code>graph.c</code></td><td>The network view</td></tr>
+<tr><td><code>dialog.c</code></td><td>File dialogs over nativefiledialog-extended</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="patterns-every-component-follows"><a class="header" href="#patterns-every-component-follows">Patterns every component follows</a></h2>
+<p><strong>A component is a node.</strong> Creating one returns its root node, which the application appends anywhere. Internal
+parts are child nodes with classes from the theme.</p>
+<p><strong>State lives outside the node.</strong> A component’s state struct is the data of one of its listeners, with a destroy
+callback that frees it, so it’s freed exactly when the node is destroyed. Getters find the state through a registry
+keyed by node handle (<code>rdx__lookup</code>); the registry checks the node is alive before returning a pointer, which is the
+only proof the state hasn’t been freed. Controls use an index by slot number for O(1) lookup; the rest use the
+generic registry. <strong>Never use node userdata</strong>: it belongs to the application (see
+<a href="#ownership">Conventions</a>).</p>
+<p><strong>Changes are events.</strong> The component fires <code>RD_EVENT_CHANGE</code> (and <code>INPUT</code> for continuous controls) on its root
+with <code>rd_node_dispatch</code>, when the user changes it. Setters fire nothing, so an application syncing a component from
+its model can’t cause a feedback loop.</p>
+<p><strong>Looks are classes.</strong> <code>rdx_theme(ctx)</code> returns <code>rdx_classes</code>, one class per part. Parts call <code>rdx__part</code>, which
+adds the class and <code>rd_node_set_share_states</code>, so a part’s variants follow the component’s states: the box of a
+checkbox looks hovered while the pointer is anywhere on its row. State variants on parts are the main restyling
+surface; components set inline styles only for per-instance geometry (a slider’s fill width, a tree row’s indent).</p>
+<p><strong>Keyboard behavior matches the platform’s native control:</strong> roving focus in radio groups and tab bars, arrows,
+Home/End and Page keys in lists and sliders, Escape closing popups.</p>
+<h2 id="the-popup-manager"><a class="header" href="#the-popup-manager">The popup manager</a></h2>
+<p><code>popups.c</code> keeps one manager per context with the open popups (bottom to top), and registers four listeners on the
+root, once, in the capture phase:</p>
+<ul>
+<li><code>POINTER_DOWN</code>: close popups from the top until reaching one containing the target (or whose anchor contains it),
+or a modal.</li>
+<li><code>WHEEL</code>: close menus and lists the wheel isn’t inside.</li>
+<li><code>KEY_DOWN</code>: Escape closes the topmost popup and stops the event.</li>
+<li><code>POINTER_MOVE</code>: close tooltips whose owner was destroyed.</li>
+</ul>
+<p>Closing returns focus to the popup’s opener if focus was inside it, and for modals restores the previous focus
+scope and calls <code>on_close</code>. Capture-phase listeners on the root run before anything else sees the input, which is
+how outside presses close a menu before the press reaches what’s under it.</p>
+<h2 id="virtualized-lists"><a class="header" href="#virtualized-lists">Virtualized lists</a></h2>
+<p>A list is a scroll container holding a spacer as tall as all rows and a pool of absolutely positioned row nodes. Each
+list has a node-scoped layout hook (<code>rd_node_on_layout</code>), removed with the list and skipped while it’s detached: compute the visible range from this layout’s scroll offset and
+size (plus three rows of overscan each side), release pooled rows outside it (<code>display: none</code>), and bind rows for
+indices without one: empty the row, position it, call the application’s fill callback. Bound rows that stay in range
+are left alone, so scrolling costs only the rows entering view. Tables and trees are lists with their own fill
+callbacks.</p>
+<p>Fixed row height is what makes this O(visible): any row’s position is <code>index * height</code>.</p>
+<h2 id="toasts"><a class="header" href="#toasts">Toasts</a></h2>
+<p>Each position has a stack node in the overlay. Toasts slide in with <code>rd_node_animate</code> from an offset margin, and
+close by animating opacity, height and padding to zero (height from <code>auto</code>, so the stack closes up smoothly), then
+destroying themselves with a timer. A per-context list of live toasts lets <code>rdx_toast_close</code> find a toast’s state.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="documentation"><a class="header" href="#documentation">Documentation</a></h1>
+<p>There are two books:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Book</th><th>Path</th><th>Audience</th><th>Published at</th></tr>
+</thead>
+<tbody>
+<tr><td>User book</td><td><code>docs/</code></td><td>Applications</td><td><code>/&lt;tag&gt;/</code>, <code>/latest/</code>, <code>/dev/</code></td></tr>
+<tr><td>This book</td><td><code>devdocs/</code></td><td>Contributors</td><td><code>/internals/</code>, from <code>main</code></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="samples-are-tests"><a class="header" href="#samples-are-tests">Samples are tests</a></h2>
+<p>Every code sample in the user book is an <code>{{#include}}</code> of an anchored region of a program in <code>docs/examples/</code>. CMake
+builds every program there; programs that don’t open a window also run as tests (<code>doc_&lt;name&gt;_&lt;ext&gt;</code>). A sample that
+stops compiling or stops doing what the prose says fails <code>ctest</code>. Write new samples the same way: put the snippet
+between <code>// ANCHOR: name</code> and <code>// ANCHOR_END: name</code> in a program that asserts what the chapter claims.</p>
+<h2 id="the-preprocessor"><a class="header" href="#the-preprocessor">The preprocessor</a></h2>
+<p><code>docs/tools/preprocess.py</code> is an mdbook preprocessor that:</p>
+<ul>
+<li>replaces <code>{{version}}</code> and <code>{{version_minor}}</code> with the version from <code>CMakeLists.txt</code>;</li>
+<li>replaces <code>{{properties}}</code> with the property reference, generated from the <code>RD_STYLE_PROPS</code> X-macro and the
+defaults in <code>src/style.c</code>;</li>
+<li>dedents included code blocks.</li>
+</ul>
+<p>Each property needs a description in <code>DESCRIPTIONS</code> and a section in <code>GROUPS</code>; the build fails otherwise, so a new
+property can’t ship undocumented.</p>
+<h2 id="machine-readable-output"><a class="header" href="#machine-readable-output">Machine-readable output</a></h2>
+<p><code>docs/tools/llms.py</code> runs after <code>mdbook build docs</code>: it copies the Markdown renderer’s output next to each HTML page
+and writes <code>llms.txt</code> (a page index) and <code>llms-full.txt</code> (the whole book). Each page needs a one-line description in
+<code>DESCRIPTIONS</code>, again enforced.</p>
+<h2 id="publishing"><a class="header" href="#publishing">Publishing</a></h2>
+<p><code>.github/workflows/docs.yml</code> builds on pushes to <code>main</code> (into <code>/dev/</code>) and on <code>v*</code> tags (into <code>/&lt;tag&gt;/</code>, and
+<code>/latest/</code> when it’s the newest tag), maintains <code>versions.json</code> for the version menu, and commits to <code>gh-pages</code>.
+Tag folders are never rebuilt, so each version’s docs describe that version.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="design-decisions-and-tradeoffs"><a class="header" href="#design-decisions-and-tradeoffs">Design decisions and tradeoffs</a></h1>
+<p>Each entry: what was decided, why, what it costs, and what would make it worth revisiting.</p>
+<h2 id="retained-mode-not-immediate-mode"><a class="header" href="#retained-mode-not-immediate-mode">Retained mode, not immediate mode</a></h2>
+<p>raylib has raygui, an immediate-mode toolkit. raydom keeps a tree because layout (flexbox, grid, text wrapping)
+needs the whole tree to size anything, animation needs state across frames, and accessibility needs a structure to
+describe. <strong>Cost:</strong> applications manage node lifetimes and mirror their state into the tree. <strong>Revisit:</strong> never; it
+is the premise.</p>
+<h2 id="a-c-core-with-a-c-layer"><a class="header" href="#a-c-core-with-a-c-layer">A C core with a C++ layer</a></h2>
+<p>C23 is callable from everything and keeps the library easy to embed; the C++ layer recovers ergonomics (RAII,
+lambdas, builders) without making C users pay. <strong>Cost:</strong> every feature is written twice at the API surface, and the
+C API is verbose. <strong>Revisit:</strong> if the C++ layer starts needing state the C API can’t express.</p>
+<h2 id="generational-handles-instead-of-pointers"><a class="header" href="#generational-handles-instead-of-pointers">Generational handles instead of pointers</a></h2>
+<p><code>rd_node</code> is a value with a generation. Stale handles are detectable, so a destroyed node is a no-op everywhere
+instead of a use-after-free, and handles can be stored and copied freely. <strong>Cost:</strong> a check on every call, and
+public structs hold handles instead of pointers. <strong>Revisit:</strong> no.</p>
+<h2 id="parallel-arrays-by-subsystem"><a class="header" href="#parallel-arrays-by-subsystem">Parallel arrays by subsystem</a></h2>
+<p>Node data is split into <code>slots</code>, <code>styles</code>, <code>layouts</code>, <code>events</code> rather than one struct per node, so each pass touches
+dense memory and subsystems don’t share a struct definition. <strong>Cost:</strong> a node’s data is spread out, and arrays
+reallocate together, so no pointer into them survives node creation. <strong>Revisit:</strong> if profiling shows the split
+hurting a pass that reads several arrays per node.</p>
+<h2 id="zero-means-unset-and-one-x-macro"><a class="header" href="#zero-means-unset-and-one-x-macro">Zero means unset, and one X-macro</a></h2>
+<p>Partial styles as C designated initializers, merging that copies only what’s set, and every per-property operation
+generated from one list. <strong>Cost:</strong> “value zero” needs a unit or flag (<code>rd_px(0)</code>), and adding a value <em>kind</em> touches
+several expansions. <strong>Revisit:</strong> no; it’s what makes the C API pleasant.</p>
+<h2 id="css-semantics-with-deliberate-differences"><a class="header" href="#css-semantics-with-deliberate-differences">CSS semantics, with deliberate differences</a></h2>
+<p>Flexbox and grid follow the CSS specs closely, so knowledge and bug reports transfer. The defaults differ where CSS’s
+are web-specific: <code>flex_direction</code> column (most UI stacks vertically), <code>flex_shrink</code> 0 (items keep their size unless
+asked; CSS’s shrink-by-default is a frequent surprise), automatic minimum size 0. <strong>Cost:</strong> CSS users must learn the
+differences, documented in the user book. <strong>Revisit:</strong> if users trip on them more than they would on CSS’s.</p>
+<h2 id="classes-and-state-variants-no-selectors"><a class="header" href="#classes-and-state-variants-no-selectors">Classes and state variants, no selectors</a></h2>
+<p>Styles come from defaults, inheritance, classes in order, state variants, and the inline style. No selectors, no
+specificity, no cascade across the tree. Selector matching is the expensive, surprising part of CSS; classes plus
+variants cover component styling, and <code>share_states</code> covers the one common descendant case (<code>.row:hover .box</code>).
+<strong>Cost:</strong> no structural selectors (<code>:nth-child</code>, <code>.a .b</code>); applications add classes instead. <strong>Revisit:</strong> if
+component authors keep reaching for descendant selectors beyond what <code>share_states</code> gives.</p>
+<h2 id="one-recursive-measure-function-with-caches"><a class="header" href="#one-recursive-measure-function-with-caches">One recursive measure function with caches</a></h2>
+<p>Layout follows Yoga’s model: <code>rd__layout_node(key, perform)</code> answers “how big would you be?” and “lay yourself out”,
+with per-node caches. It’s simple to extend (grid, text and images plug in as measured leaves) and near-linear with
+caching. <strong>Cost:</strong> callers must resolve a node’s own size properties into the key, and cache keys must capture every
+input (see <code>normalize_key</code>). <strong>Revisit:</strong> if a layout mode can’t be expressed as measure-then-perform.</p>
+<h2 id="lazy-recomputation"><a class="header" href="#lazy-recomputation">Lazy recomputation</a></h2>
+<p>Mutations set dirty flags; work happens once in <code>rd_ctx_layout</code>. Listeners can make many changes cheaply, and an
+unchanged frame costs almost nothing. <strong>Cost:</strong> geometry read between a mutation and the next layout is stale, and
+some internal paths (focus) must compute styles on demand.</p>
+<h2 id="a-display-list-rebuilt-every-frame"><a class="header" href="#a-display-list-rebuilt-every-frame">A display list, rebuilt every frame</a></h2>
+<p>Drawing walks the tree into commands, then a renderer executes them. The split keeps raylib in one file, allows
+headless render tests, and leaves room for other backends. Rebuilding every frame avoids retained render state and
+its invalidation bugs. <strong>Cost:</strong> a full tree walk per frame even when nothing changed; <code>paint_dirty</code> is tracked but
+not yet used to skip it. <strong>Revisit:</strong> for very large trees, by skipping unchanged frames first.</p>
+<h2 id="an-sdf-shader-for-boxes"><a class="header" href="#an-sdf-shader-for-boxes">An SDF shader for boxes</a></h2>
+<p>Rounded corners, borders and shadows come from one fragment shader computing distance to a rounded rectangle, not
+from tessellated meshes. Antialiasing is exact and per-corner radii and per-side borders are cheap. <strong>Cost:</strong> a
+batch flush per rounded box; square boxes avoid it. <strong>Revisit:</strong> if batch flushes dominate frame time.</p>
+<h2 id="stb_truetype-no-shaping"><a class="header" href="#stb_truetype-no-shaping">stb_truetype, no shaping</a></h2>
+<p>Fonts and text use stb_truetype: small, static, no dependencies, which fits single-binary apps. <strong>Cost:</strong> no
+ligatures, contextual forms or bidirectional text; Arabic and Indic scripts render incorrectly. <strong>Revisit:</strong> when
+those scripts matter; HarfBuzz is the answer and would be the largest dependency by far, so likely as an option.</p>
+<h2 id="the-overlay-is-a-child-of-the-root"><a class="header" href="#the-overlay-is-a-child-of-the-root">The overlay is a child of the root</a></h2>
+<p>Popups need to draw above everything and escape clipping. A second root would have meant special cases in every
+ancestor walk (event paths, focus, selection order, “is this displayed”). As the root’s forced-last child with fixed
+geometry, the overlay needs none. <strong>Cost:</strong> it appears among the root’s children, and the “always last” rule lives in
+<code>rd_node_insert_before</code>.</p>
+<h2 id="overlay-scrollbars"><a class="header" href="#overlay-scrollbars">Overlay scrollbars</a></h2>
+<p>Scrollbars draw over the content edge and take no layout space, like macOS. Showing or hiding a bar never reflows
+content, and layout didn’t change. <strong>Cost:</strong> a bar can cover content; layouts add padding where it matters.
+<strong>Revisit:</strong> if classic gutter bars become a requirement, as an option.</p>
+<h2 id="animation-lives-in-the-computed-style"><a class="header" href="#animation-lives-in-the-computed-style">Animation lives in the computed style</a></h2>
+<p>Transitions write interpolated values into the computed style, which everything else already reads. Layout
+properties animate with no layout-side code, and hit-testing and anchoring follow. <strong>Cost:</strong> animating layout
+properties relayouts the moving part of the tree every frame. <strong>Revisit:</strong> if a common animation is too expensive;
+paint-only fast paths could skip layout for paint properties (they already don’t mark layout dirty).</p>
+<h2 id="an-application-supplied-clock"><a class="header" href="#an-application-supplied-clock">An application-supplied clock</a></h2>
+<p>The context never reads the system clock; <code>rd_ctx_set_time</code> drives timers, animations and wheel gesture ends. Tests
+are deterministic, and applications control time (pausing, replaying). <strong>Cost:</strong> forgetting to set time stops
+everything; <code>rd_update</code> does it for raylib apps.</p>
+<h2 id="extras-use-only-public-api"><a class="header" href="#extras-use-only-public-api">Extras use only public API</a></h2>
+<p>Components are built like an application would build them. This keeps the core honest: every capability a
+component needed became public. <strong>Cost:</strong> some features are slightly more general than one component needed.</p>
+<h2 id="component-state-outside-userdata"><a class="header" href="#component-state-outside-userdata">Component state outside userdata</a></h2>
+<p>Userdata is the application’s. Components keep state in listener data plus a registry. <strong>Cost:</strong> a lookup per getter.
+The alternative broke the showcase, which reads userdata on hovered nodes as its own type.</p>
+<h2 id="fixed-height-virtualization"><a class="header" href="#fixed-height-virtualization">Fixed-height virtualization</a></h2>
+<p>Lists and tables require one row height so any row’s position is arithmetic and work is O(visible). <strong>Cost:</strong> no
+variable-height rows. <strong>Revisit:</strong> with an estimated-height scheme that measures rows as they appear.</p>
+<h2 id="blocking-native-file-dialogs"><a class="header" href="#blocking-native-file-dialogs">Blocking native file dialogs</a></h2>
+<p><code>rdx_dialog_*</code> block until the dialog closes. Native dialogs are modal anyway, macOS requires them on the main
+thread, and blocking keeps the API one call. <strong>Cost:</strong> the window doesn’t redraw while a dialog is open.</p>
+<h2 id="vendored-code-stays-unmodified"><a class="header" href="#vendored-code-stays-unmodified">Vendored code stays unmodified</a></h2>
+<p>stb, nanosvg and nativefiledialog are copied verbatim, with static linkage or <code>#define</code> renames to avoid symbol
+clashes. Updating is copying; fixes go upstream (the nanosvg fractional-gradient bug, for example). <strong>Cost:</strong> known
+upstream bugs stay until fixed there.</p>
+<h2 id="byte-offsets-in-public-apis"><a class="header" href="#byte-offsets-in-public-apis">Byte offsets in public APIs</a></h2>
+<p>Selections, highlights and carets use byte offsets into UTF-8, because applications index their strings in bytes.
+Codepoints are internal. <strong>Cost:</strong> callers must not split a multi-byte character; the core clamps to character
+boundaries where it can.</p>
+<h2 id="documentation-samples-are-tests-and-docs-are-per-tag"><a class="header" href="#documentation-samples-are-tests-and-docs-are-per-tag">Documentation samples are tests, and docs are per tag</a></h2>
+<p>Every sample in the user book is compiled, and most run, in the test suite, and each release tag publishes its own
+copy of the book. Docs can’t silently drift from the code, and old versions stay accurate. <strong>Cost:</strong> writing a
+sample means writing a small test program.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="known-limits-and-debt"><a class="header" href="#known-limits-and-debt">Known limits and debt</a></h1>
+<h2 id="missing-features"><a class="header" href="#missing-features">Missing features</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Area</th><th>Limit</th></tr>
+</thead>
+<tbody>
+<tr><td>Text</td><td>No shaping, bidirectional text, IME composition, hyphenation, or double-click word selection</td></tr>
+<tr><td>Accessibility</td><td>Roles are recorded but no platform backend reads them (AccessKit is the plan)</td></tr>
+<tr><td>Layout</td><td>No transforms, z-index, <code>position: fixed</code>/<code>sticky</code>, aspect ratio, grid named lines or areas, dense packing; auto repeats can’t have fixed tracks around them</td></tr>
+<tr><td>Animation</td><td>No springs or keyframes; <code>width: auto</code>, unit changes and <code>display</code> don’t animate; closing popups don’t fade</td></tr>
+<tr><td>Images</td><td>GIFs show the first frame; SVG lacks text, filters, masks, clip paths and patterns</td></tr>
+<tr><td>Input</td><td>No touch or gestures beyond raylib’s mouse</td></tr>
+<tr><td>Views</td><td>Fixed row heights; no column resizing; tree items are added up front</td></tr>
+<tr><td>Threads</td><td>A context is single-threaded</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="debt"><a class="header" href="#debt">Debt</a></h2>
+<ul>
+<li><strong><code>paint_dirty</code> is written but never read.</strong> It’s the hook for skipping display list rebuilds on unchanged
+frames.</li>
+<li><strong>Track lists are never freed.</strong> They’re interned by content, so recreating the same lists is free, but code that
+creates ever-new distinct lists (track sizes computed from a live value) grows the pool until the context is
+destroyed. Auto-repeated tracks cover the common case (columns that follow the width); freeing would need styles to
+hold counted references.</li>
+<li><strong>Class changes scan every node.</strong> <code>invalidate_class</code> is O(nodes). Fine at startup; a per-class node list would
+fix it if classes start changing at runtime.</li>
+<li><strong>Linear registries.</strong> <code>rdx__lookup</code> and the popup and toast lists are linear scans. Fine for the numbers of
+components a UI has; controls already use an O(1) index.</li>
+<li><strong>Glyph atlas resets when full.</strong> A UI showing many sizes of many glyphs at once could thrash it. Multiple atlas
+pages would fix it.</li>
+<li><strong>No CI for tests.</strong> Only docs publishing runs in GitHub Actions.</li>
+<li><strong><code>rd_ctx</code> padding.</strong> clang-tidy’s opt-in padding check flags 33 bytes; reorder fields when convenient.</li>
+<li><strong>nanosvg gradients</strong> with unitless fractional coordinates render as a flat color (upstream bug; use
+percentages).</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="adding-a-style-property"><a class="header" href="#adding-a-style-property">Adding a style property</a></h1>
+<p>Example: a <code>letter_spacing</code> length, inherited, affecting layout.</p>
+<ol>
+<li>
+<p><strong>Declare it.</strong> Add a line to <code>RD_STYLE_PROPS</code> in <code>include/raydom/style.h</code>:</p>
+<pre><code class="language-c">X(letter_spacing, rd_val, VAL, 1, 1)  \
+</code></pre>
+<p>Pick the kind (<code>VAL</code>, <code>COLOR</code>, <code>EDGES</code>, <code>CORNERS</code>, <code>SHADOW</code>, <code>ENUM</code>, …), whether it’s inherited, and whether it
+affects layout. Position in the list is the struct layout; append near related properties.</p>
+</li>
+<li>
+<p><strong>Default it.</strong> Add it to <code>default_style</code> in <code>src/style.c</code>. A debug build asserts at context creation that every
+property has a default.</p>
+</li>
+<li>
+<p><strong>Use it.</strong> Read <code>ctx-&gt;styles[i].computed.letter_spacing</code> where it matters (here, <code>text.c</code> tokenizing and the
+renderer’s glyph placement). Changes already mark layout dirty because of the <code>affects_layout</code> flag.</p>
+</li>
+<li>
+<p><strong>Animate it, if it should.</strong> For kinds <code>VAL</code>, <code>COLOR</code>, <code>EDGES</code>, <code>CORNERS</code>, <code>SHADOW</code>, add it to <code>GROUP[]</code> in
+<code>src/anim.c</code> under the right <code>RD_TRANSITION_*</code> group. Without a group it changes at once.</p>
+</li>
+<li>
+<p><strong>Document it.</strong> Add a one-line description to <code>DESCRIPTIONS</code> and the name to a section of <code>GROUPS</code> in
+<code>docs/tools/preprocess.py</code>. The docs build fails until you do.</p>
+</li>
+<li>
+<p><strong>Test it.</strong> Cover inheritance and the default in <code>tests/test_style.c</code>, and the behavior in the subsystem’s test.</p>
+</li>
+</ol>
+<p>The C++ setter (<code>rd::Style::letter_spacing</code>) and the property reference page generate themselves.</p>
+<p>A property with a new <strong>enum</strong> type also needs the <code>typedef enum ... : uint8_t</code> with <code>_UNSET = 0</code> first. A new
+<strong>kind</strong> of value needs a <code>MERGE_</code>, <code>EQ_</code>, <code>SET_</code> and <code>RD_HH_SETTER_</code> case, a kind in <code>anim.c</code>, and a default
+formatter in <code>preprocess.py</code>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="adding-an-event-type"><a class="header" href="#adding-an-event-type">Adding an event type</a></h1>
+<ol>
+<li>Add the type to <code>rd_event_type</code> in <code>include/raydom/events.h</code>, <strong>before</strong> <code>RD_EVENT_TYPE_COUNT</code>, with a comment
+saying where it’s fired and whether it bubbles. Appending keeps existing values stable.</li>
+<li>Add any fields it needs to <code>rd_event</code>, and accessors to <code>rd::Event</code> in <code>raydom.hh</code>.</li>
+<li>Fire it with <code>fire(ctx, type, target, button, bubbles)</code> from the subsystem that owns the moment, or with
+<code>rd_node_dispatch</code> if it’s a component-level event. If it has a default action, run it after dispatch and only
+when <code>fire</code> reports it wasn’t prevented.</li>
+<li>Document it in the event table of the user book’s Events chapter.</li>
+<li>Test the target, the propagation and the default action in <code>tests/test_events.c</code>.</li>
+</ol>
+<p>Most component-level needs are covered by <code>CHANGE</code> and <code>INPUT</code> with <code>rd_node_dispatch</code>; prefer those over a new type.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="adding-an-extras-component"><a class="header" href="#adding-an-extras-component">Adding an extras component</a></h1>
+<p>Follow the patterns in <a href="#patterns-every-component-follows">Extras</a>. A checklist:</p>
+<ol>
+<li><strong>API</strong> in a header under <code>extras/include/raydom/extras/</code>: <code>rdx_&lt;thing&gt;_create</code> returning the root node, getters
+and setters, and a desc struct if there are options. Setters fire nothing.</li>
+<li><strong>State</strong> in a struct owned by one listener’s data, freed by that listener’s destroy callback. Register it with
+<code>rdx__track</code> so getters can find it; never use userdata.</li>
+<li><strong>Classes</strong> in <code>rdx_classes</code> (<code>theme.h</code>) with defaults in <code>theme.c</code>. Parts use <code>rdx__part</code> to share states.
+Interactive parts get <code>quick()</code> for color transitions.</li>
+<li><strong>Role</strong> on the root (add one to <code>role.h</code> if AccessKit has it and raydom doesn’t), and focusability through the
+role or <code>focusable</code>.</li>
+<li><strong>Keyboard</strong> behavior matching the native control.</li>
+<li><strong>Events</strong>: <code>RD_EVENT_CHANGE</code> on the root via <code>rd_node_dispatch</code> when the user changes it; <code>INPUT</code> for continuous
+changes.</li>
+<li><strong>Popups</strong> register with the manager in <code>popups.c</code> so dismissal, Escape and focus return work.</li>
+<li><strong>C++</strong> wrapper in the matching <code>.hh</code>, owning callables with <code>new (std::nothrow)</code>.</li>
+<li><strong>Tests</strong> in <code>tests/</code>, driving it through <code>rd_ctx_pointer</code>, <code>rd_ctx_key</code> and <code>rd_ctx_set_time</code>. Include a check
+that its internal nodes leave userdata null.</li>
+<li><strong>Docs</strong>: a section in the extras chapters with a <code>docs/examples/</code> program, the theme classes in its restyling
+table, and the header in the installation page’s table.</li>
+<li><strong>Showcase</strong>: a demo in the tour.</li>
+</ol>
+<p>If it needs something the core can’t do through public API, add the public core feature first, documented and
+tested on its own.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="writing-tests"><a class="header" href="#writing-tests">Writing tests</a></h1>
+<h2 id="shape"><a class="header" href="#shape">Shape</a></h2>
+<p>Each subsystem has a test program in <code>tests/</code> (<code>test_layout.c</code>, <code>test_popups.c</code>, …), listed in the <code>foreach</code> in
+the top-level <code>CMakeLists.txt</code>. A test is a <code>main</code> calling functions that use <code>CHECK(cond)</code> from <code>tests/check.h</code>, which
+prints the failing expression and line and counts failures; <code>TEST_RESULT()</code> returns non-zero if any failed. C++
+tests (<code>*_cpp.cc</code>) exercise the C++ layer.</p>
+<p>Tests link the core and extras and can include private headers from <code>src/</code> to check internals (<code>rd__display_list</code>,
+<code>rd__scrollbar</code>, <code>ctx-&gt;sb_hot</code>). Prefer public API; reach inside only to check something the API doesn’t expose.</p>
+<h2 id="headless-by-default"><a class="header" href="#headless-by-default">Headless by default</a></h2>
+<p>Nothing but <code>render.c</code> touches raylib, so tests don’t open windows:</p>
+<ul>
+<li>Fonts: <code>rd_font_load_file(ctx, RAYDOM_TEST_FONT)</code>, a font from raylib’s examples.</li>
+<li>Layout: <code>rd_ctx_layout(ctx, w, h)</code>, then <code>rd_node_rect</code> and <code>rd_node_bounds</code>.</li>
+<li>Input: <code>rd_ctx_pointer</code>, <code>rd_ctx_key</code>, <code>rd_ctx_text</code>; layout first so hit-testing has geometry.</li>
+<li>Time: <code>rd_ctx_set_time(ctx, t)</code> then <code>rd_ctx_layout</code> to advance timers and animations deterministically.</li>
+<li>Drawing: <code>rd__display_list</code> and check commands (<code>tests/test_render.c</code>, <code>tests/test_image.c</code>).</li>
+<li>Pixels: rasterize SVG with <code>rd__image_rasterize</code> and read <code>pixels</code>.</li>
+</ul>
+<h2 id="what-to-cover"><a class="header" href="#what-to-cover">What to cover</a></h2>
+<ul>
+<li>The behavior and its edges (empty, one, many; clamped values; stale handles).</li>
+<li>Every default action and that <code>prevent_default</code> stops it.</li>
+<li>Destruction during dispatch, for anything with listeners.</li>
+<li>For components: keyboard paths, setters firing nothing, userdata left alone.</li>
+</ul>
+<h2 id="floats"><a class="header" href="#floats">Floats</a></h2>
+<p>Compare with a tolerance (<code>near(a, b)</code>, usually 0.01, or 0.6 for laid-out pixels after animation).</p>
+<h2 id="documentation-examples"><a class="header" href="#documentation-examples">Documentation examples</a></h2>
+<p>Programs in <code>docs/examples/</code> are tests too (<code>doc_&lt;name&gt;_&lt;ext&gt;</code>). They <code>assert</code> what the book claims; keep them
+passing when changing behavior, and update the prose with them.</p>
+<h2 id="sanitizers"><a class="header" href="#sanitizers">Sanitizers</a></h2>
+<p>Run the suite under <code>just test</code>, which builds with ASan and UBSan. A test passing without sanitizers but failing
+with them is a bug, not flakiness.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+
+        <script>
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+
+
+    </div>
+    </body>
+</html>
