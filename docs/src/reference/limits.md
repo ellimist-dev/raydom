@@ -18,7 +18,7 @@ What raydom doesn't do in this version. Behavior outside these limits is unspeci
 - No shaping: no ligatures, no contextual forms, no bidirectional text. Pair kerning from the font is applied. Latin, Cyrillic,
   Greek and CJK display; Arabic and Indic scripts don't shape correctly.
 - No hyphenation. Words longer than the line overflow.
-- No double- or triple-click word or line selection.
+- No double- or triple-click word or line selection in text (`ev->clicks` reports double clicks to listeners).
 
 ## Input
 

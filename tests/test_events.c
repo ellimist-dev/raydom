@@ -351,8 +351,55 @@ static void test_handler_drives_layout(void) {
   rd_ctx_destroy(ctx);
 }
 
+static void record_clicks(rd_ctx* ctx, rd_event* ev, void* data) {
+  (void)ctx;
+  *(uint8_t*)data = ev->clicks;
+}
+
+static void test_click_count(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_node a   = add(ctx, rd_ctx_root(ctx), (rd_style){.height = rd_px(50), .focusable = RD_FOCUSABLE_TAB});
+  rd_node b   = add(ctx, rd_ctx_root(ctx), (rd_style){.height = rd_px(50)});
+  uint8_t ca = 0, cb = 0;
+  rd_node_on(ctx, a, RD_EVENT_CLICK, record_clicks, &ca, NULL, 0);
+  rd_node_on(ctx, b, RD_EVENT_CLICK, record_clicks, &cb, NULL, 0);
+  rd_ctx_layout(ctx, 400, 300);
+
+  rd_ctx_set_time(ctx, 1);
+  click(ctx, 10, 10);
+  CHECK(ca == 1);
+  rd_ctx_set_time(ctx, 1.3);
+  click(ctx, 12, 11);  // soon and close: a double click
+  CHECK(ca == 2);
+  rd_ctx_set_time(ctx, 1.6);
+  click(ctx, 12, 11);
+  CHECK(ca == 3);
+  rd_ctx_set_time(ctx, 2.5);  // too late
+  click(ctx, 12, 11);
+  CHECK(ca == 1);
+  rd_ctx_set_time(ctx, 2.6);
+  click(ctx, 30, 11);  // too far
+  CHECK(ca == 1);
+  rd_ctx_set_time(ctx, 2.7);
+  click(ctx, 30, 70);  // another node starts over
+  CHECK(cb == 1);
+  rd_ctx_set_time(ctx, 2.8);
+  click(ctx, 30, 11);
+  CHECK(ca == 1);
+
+  // Keyboard activation is a single click, and ends the run.
+  rd_node_focus(ctx, a);
+  rd_ctx_key(ctx, RD_KEY_ENTER, true, false, 0);
+  CHECK(ca == 1);
+  rd_ctx_set_time(ctx, 2.9);
+  click(ctx, 30, 11);
+  CHECK(ca == 1);
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   test_propagation_order();
+  test_click_count();
   test_stop();
   test_click_targets();
   test_local_coordinates_and_move();

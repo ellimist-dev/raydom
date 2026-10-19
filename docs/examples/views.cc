@@ -1,4 +1,5 @@
 // Runs headless as a test for the "Tabs, splitters, lists, tables and trees" chapter.
+#include <raydom/extras/popups.hh>
 #include <raydom/extras/views.hh>
 #include <raydom/raydom.hh>
 
@@ -50,6 +51,21 @@ int main() {
   // ANCHOR_END: table
   content.append(table.style(rd::Style().flex(1)));
 
+  // ANCHOR: rows
+  // One listener for every row: rows are reused as the table scrolls, so ask which row a node is in.
+  rd::Node rows   = rdx::table_list(table);
+  int      opened = -1;
+  rows.on(RD_EVENT_CLICK, [&](rd::Event& e) {
+    if (e.clicks() == 2) opened = rdx::list_index_of(rows, e.target());  // double click: open the file
+  });
+  rows.on(RD_EVENT_POINTER_DOWN, [&](rd::Event& e) {
+    int row = rdx::list_index_of(rows, e.target());
+    if (e.button() != RD_BUTTON_SECONDARY || row < 0) return;
+    rdx::menu(ctx, {{"Open"}, {"Rename"}, {}, {"Delete"}}, {.x = e.x(), .y = e.y()},
+              [row](int item) { (void)row, (void)item; /* act on row */ });
+  });
+  // ANCHOR_END: rows
+
   // ANCHOR: tree
   rd::Node tree = rdx::tree(ctx);
   int      src  = rdx::tree_add(tree, -1, "src");
@@ -64,5 +80,15 @@ int main() {
   ctx.press(RD_KEY_END);
   ctx.layout(1000, 1200);
   assert(rdx::list_selected(contacts) == 49999 && rdx::selected_tab(tabs) == 0);
+
+  rd_rect r = rows.bounds();  // a double click on the third row
+  float   y = r.y + 28 * 2 + 10;
+  ctx.set_time(1);
+  ctx.pointer(r.x + 20, y, RD_BUTTON_PRIMARY);
+  ctx.pointer(r.x + 20, y, 0);
+  ctx.set_time(1.2);
+  ctx.pointer(r.x + 20, y, RD_BUTTON_PRIMARY);
+  ctx.pointer(r.x + 20, y, 0);
+  assert(opened == 2);
   return 0;
 }

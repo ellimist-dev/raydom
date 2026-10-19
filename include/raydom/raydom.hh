@@ -209,6 +209,7 @@ public:
   float          local_y() const { return ev_->local_y; }
   float          wheel_x() const { return ev_->wheel_x; }
   float          wheel_y() const { return ev_->wheel_y; }
+  std::uint8_t   clicks() const { return ev_->clicks; }
   std::uint8_t   button() const { return ev_->button; }
   std::uint8_t   buttons() const { return ev_->buttons; }
   rd_key         key() const { return ev_->key; }

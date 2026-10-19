@@ -12,8 +12,8 @@
 namespace rdx {
 
 struct MenuItem {
-  std::string label;  // empty for a separator
-  std::string shortcut;
+  std::string label{};  // empty for a separator
+  std::string shortcut{};
   bool        disabled = false;
 };
 

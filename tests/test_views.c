@@ -202,6 +202,19 @@ static void tables(void) {
 
   click(ctx, rd_node_last_child(ctx, header));
   CHECK(header_col == 2);
+
+  // Any node inside a row maps to its index, also after the row is reused for another index.
+  rd_node cell = rd_node_last_child(ctx, row);
+  CHECK(rdx_list_index_of(ctx, body, cell) == 0 && rdx_list_index_of(ctx, body, row) == 0);
+  CHECK(rdx_list_index_of(ctx, body, rd_node_first_child(ctx, body)) == -1);  // the spacer isn't a row
+  CHECK(rdx_list_index_of(ctx, body, header) == -1 && rdx_list_index_of(ctx, t, cell) == -1);
+  rd_node_set_scroll(ctx, body, 0, 24 * 500);
+  rd_ctx_layout(ctx, 800, 600);
+  int shown = rdx_list_index_of(ctx, body, row);
+  CHECK(shown >= 497 && shown <= 520);
+  char want[16];
+  snprintf(want, sizeof want, "%d:2", shown);
+  CHECK(strcmp(rd_node_text(ctx, rd_node_last_child(ctx, row), NULL), want) == 0);
   rd_ctx_destroy(ctx);
 }
 
@@ -249,6 +262,9 @@ static void trees(void) {
   rd_ctx_layout(ctx, 800, 600);
   rd_node row_src = rd_node_next_sibling(ctx, rd_node_first_child(ctx, tree));
   rd_node toggle  = rd_node_first_child(ctx, row_src);
+  CHECK(rdx_tree_item_of(ctx, tree, toggle) == src && rdx_list_index_of(ctx, tree, toggle) == 0);
+  rd_node row_main = rd_node_next_sibling(ctx, row_src);
+  CHECK(rdx_tree_item_of(ctx, tree, rd_node_last_child(ctx, row_main)) == main_c);  // the label
   click(ctx, toggle);
   CHECK(!rdx_tree_expanded(ctx, tree, src));
   rd_ctx_destroy(ctx);

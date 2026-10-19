@@ -14,6 +14,7 @@ typedef enum rd_event_type : uint8_t {
   RD_EVENT_POINTER_ENTER,  // Doesn't bubble.
   RD_EVENT_POINTER_LEAVE,  // Doesn't bubble.
   RD_EVENT_CLICK,          // Primary button; nearest common ancestor of the press and release targets.
+                           // ev->clicks counts rapid clicks on the same node: 2 is a double click.
   RD_EVENT_WHEEL,          // Default action: scroll the nearest scrollable ancestor.
   RD_EVENT_KEY_DOWN,       // To the focused node or the root. Default actions: Tab focus, Enter/Space click, editing.
   RD_EVENT_KEY_UP,
@@ -119,6 +120,7 @@ typedef struct rd_event {
   float          local_x, local_y;  // relative to current's border box
   float          wheel_x, wheel_y;  // notches
   uint8_t        button;            // the button that changed, for down/up/click
+  uint8_t        clicks;            // CLICK: 1, or 2 for a double click, 3 for a triple...
   uint8_t        buttons;           // held buttons
   rd_key         key;
   uint8_t        mods;

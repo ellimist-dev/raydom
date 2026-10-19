@@ -44,6 +44,8 @@ inline int  list_selected(rd::Node list) { return rdx_list_selected(list.ctx(), 
 inline bool list_select(rd::Node list, int i) { return rdx_list_select(list.ctx(), list.handle(), i); }
 inline bool list_set_count(rd::Node list, int n) { return rdx_list_set_count(list.ctx(), list.handle(), n); }
 inline void list_refresh(rd::Node list) { rdx_list_refresh(list.ctx(), list.handle()); }
+// The row node is in, or -1; for tables pass table_list(table).
+inline int  list_index_of(rd::Node list, rd::Node node) { return rdx_list_index_of(list.ctx(), list.handle(), node.handle()); }
 
 struct Column {
   std::string title;
@@ -83,6 +85,7 @@ inline int  tree_add(rd::Node tree, int parent, const std::string& label) {
   return rdx_tree_add(tree.ctx(), tree.handle(), parent, label.c_str());
 }
 inline int  tree_selected(rd::Node tree) { return rdx_tree_selected(tree.ctx(), tree.handle()); }
+inline int  tree_item_of(rd::Node tree, rd::Node node) { return rdx_tree_item_of(tree.ctx(), tree.handle(), node.handle()); }
 inline bool tree_expand(rd::Node tree, int item, bool on = true) { return rdx_tree_expand(tree.ctx(), tree.handle(), item, on); }
 inline std::string tree_label(rd::Node tree, int item) {
   const char* s = rdx_tree_label(tree.ctx(), tree.handle(), item);

@@ -52,6 +52,19 @@ Widths are px or fr. `cell` fills each cell; `header` runs when a column header 
 goes: reorder your data, then `rdx_list_refresh(rdx_table_list(table))`. Selection and `CHANGE` are on the body,
 `rdx_table_list`.
 
+### One listener for every row
+
+Rows are reused as the list scrolls, and only their contents are rebuilt, so per-row listeners would follow the
+row node, not the data. Put one listener on the list and ask which row an event came from:
+
+```cpp
+{{#include ../../examples/views.cc:rows}}
+```
+
+`rdx_list_index_of(ctx, list, node)` returns the row index for the row or anything inside it, or -1. For a table,
+pass `rdx_table_list(table)`; for a tree, `rdx_tree_item_of` returns the item id instead of the visible row.
+`ev->clicks` counts rapid clicks on the same node, so `clicks == 2` is a double click.
+
 ## Tree view
 
 ```cpp

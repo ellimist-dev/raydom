@@ -9,6 +9,9 @@
 static const float NOTCH_STEP = 48, PRECISE_STEP = 10;
 // A wheel gesture stays on one container until it pauses this long or the pointer moves.
 static const double LATCH_SECONDS = 0.3;
+// Clicks this close in time and space count as a double (or triple) click.
+static const double MULTI_CLICK_SECONDS = 0.5;
+static const float  MULTI_CLICK_SLOP    = 4;
 static const float  LATCH_SLOP    = 8;
 
 bool rd__chain_push(rd__chain* c, rd_node n) {
@@ -152,6 +155,7 @@ static rd_event make_event(const rd_ctx* ctx, rd_event_type type, rd_node target
       .x       = ctx->pointer_x,
       .y       = ctx->pointer_y,
       .button  = button,
+      .clicks  = type == RD_EVENT_CLICK ? ctx->click_count : 0,
       .buttons = ctx->pointer_buttons,
       .mods    = ctx->mods,
   };
@@ -384,6 +388,8 @@ void rd_ctx_key(rd_ctx* ctx, rd_key key, bool down, bool repeat, uint8_t mods) {
     rd_ctx_focus_next(ctx, mods & RD_MOD_SHIFT);
   } else if ((key == RD_KEY_ENTER || key == RD_KEY_SPACE) && !repeat && !rd_node_is_null(focused) &&
              !rd_node_is_input(ctx, focused)) {
+    ctx->click_count = 1;  // keyboard activation is a single click and ends any run
+    ctx->last_click  = (rd_node){0};
     fire(ctx, RD_EVENT_CLICK, focused, RD_BUTTON_PRIMARY, true);
   }
 }
@@ -579,7 +585,17 @@ void rd_ctx_pointer(rd_ctx* ctx, float x, float y, uint8_t buttons, float wheel_
       if (b == RD_BUTTON_PRIMARY) {
         ctx->selecting = false;
         rd_node c      = common_ancestor(ctx, ctx->press_target, t);
-        if (!rd_node_is_null(c) && !disabled(ctx, c)) fire(ctx, RD_EVENT_CLICK, c, b, true);
+        if (!rd_node_is_null(c) && !disabled(ctx, c)) {
+          // Another click on the same node, soon and close by, extends the count: a double click.
+          bool again = rd_node_eq(c, ctx->last_click) && ctx->now - ctx->last_click_time <= MULTI_CLICK_SECONDS &&
+                       fabsf(x - ctx->last_click_x) <= MULTI_CLICK_SLOP && fabsf(y - ctx->last_click_y) <= MULTI_CLICK_SLOP;
+          ctx->click_count     = again && ctx->click_count < UINT8_MAX ? (uint8_t)(ctx->click_count + 1) : 1;
+          ctx->last_click      = c;
+          ctx->last_click_time = ctx->now;
+          ctx->last_click_x    = x;
+          ctx->last_click_y    = y;
+          fire(ctx, RD_EVENT_CLICK, c, b, true);
+        }
         set_active(ctx, (rd_node){0}, false);
         ctx->press_target = (rd_node){0};
       }

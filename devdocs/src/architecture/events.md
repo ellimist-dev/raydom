@@ -27,7 +27,8 @@ them. `rd_node_dispatch` is `fire` made public, for components announcing `INPUT
 3. **Move.** `POINTER_MOVE`, then input drag-selection or document drag-selection.
 4. **Buttons.** Per changed button: `POINTER_DOWN` (with `RD_STATE_ACTIVE` on the chain, and unless prevented,
    pointer focus and starting a selection), `POINTER_UP`, and `CLICK` on the common ancestor of the press and
-   release targets for the primary button.
+   release targets for the primary button. `ev->clicks` counts clicks on the same node within
+   `MULTI_CLICK_SECONDS` and `MULTI_CLICK_SLOP`; keyboard activation resets it to 1.
 5. **Wheel.** A gesture latches to the scroll container chosen at its start (`wheel_latch`) until the wheel pauses
    (`LATCH_SECONDS`) or the pointer moves, so a horizontal scroll inside a vertical list doesn't get stolen halfway.
 

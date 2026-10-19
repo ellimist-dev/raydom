@@ -175,6 +175,11 @@ struct rd_ctx {
   uint32_t          default_font;
 
   bool paint_dirty;
+  // The last click, to count double and triple clicks.
+  rd_node last_click;
+  double  last_click_time;
+  float   last_click_x, last_click_y;
+  uint8_t click_count;
   // Scrollbar under the pointer, and the one being dragged or held after a track press.
   struct {
     rd_node node;

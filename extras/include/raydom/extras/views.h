@@ -53,6 +53,10 @@ int     rdx_list_selected(const rd_ctx* ctx, rd_node list);  // -1 for none
 // Selects and scrolls the row into view; -1 clears.
 bool    rdx_list_select(rd_ctx* ctx, rd_node list, int index);
 void    rdx_list_scroll_to(rd_ctx* ctx, rd_node list, int index);
+// The row index that node is in (the row itself or anything inside it), or -1. Rows are reused as the
+// list scrolls, so use this in one listener on the list rather than a listener per row or cell: a
+// context menu, or a double click (ev->clicks == 2) to open or edit. For tables, pass rdx_table_list.
+int     rdx_list_index_of(const rd_ctx* ctx, rd_node list, rd_node node);
 
 // Table: a header row over a virtualized list whose rows share the header's columns. Column widths are
 // px or fr. cell fills one cell; header, if set, runs when a column header is clicked, for sorting.
@@ -91,6 +95,9 @@ int         rdx_tree_selected(const rd_ctx* ctx, rd_node tree);  // item id, or 
 bool        rdx_tree_select(rd_ctx* ctx, rd_node tree, int item);  // expands its ancestors
 const char* rdx_tree_label(const rd_ctx* ctx, rd_node tree, int item);
 int         rdx_tree_parent(const rd_ctx* ctx, rd_node tree, int item);
+// The item that node is in, or -1: rdx_list_index_of for trees, which returns the stable item id
+// rather than a visible row index that shifts as items expand and collapse.
+int         rdx_tree_item_of(const rd_ctx* ctx, rd_node tree, rd_node node);
 
 #ifdef __cplusplus
 }

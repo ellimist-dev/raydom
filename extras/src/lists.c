@@ -572,3 +572,21 @@ static void bind(rd_ctx* ctx, vlist* l, int k, int index) {
   l->index[k] = index;
   if (l->fill) l->fill(ctx, row, index, l->data);
 }
+
+int rdx_list_index_of(const rd_ctx* ctx, rd_node list, rd_node node) {
+  vlist* l = find(ctx, list);
+  if (!l) return -1;
+  // Climb to the list's direct child: a row, or the spacer, which isn't one.
+  for (rd_node n = node; !rd_node_is_null(n); n = rd_node_parent(ctx, n)) {
+    rd_node p = rd_node_parent(ctx, n);
+    if (rd_node_eq(p, l->node)) return row_index(l, n);
+  }
+  return -1;
+}
+
+int rdx_tree_item_of(const rd_ctx* ctx, rd_node node_tree, rd_node node) {
+  tree* t = tree_find(ctx, node_tree);
+  if (!t) return -1;
+  int row = rdx_list_index_of(ctx, node_tree, node);
+  return row >= 0 && row < t->visible_count ? t->visible[row] : -1;
+}
