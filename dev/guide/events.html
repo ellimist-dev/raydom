@@ -36,7 +36,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-2bf57da4.js";
+            window.path_to_searchindex_js = "../searchindex-3a3e7567.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-c393df87.js"></script>
@@ -237,9 +237,11 @@ list.append(row);
 </table>
 </div>
 <p>Event fields: <code>x</code>, <code>y</code> in root coordinates; <code>local_x</code>, <code>local_y</code> relative to <code>current</code>’s border box; <code>wheel_x</code>,
-<code>wheel_y</code> in notches; <code>button</code> (the button that changed) and <code>buttons</code> (held mask); <code>key</code>, <code>mods</code>, <code>repeat</code>;
+<code>wheel_y</code> in notches; <code>button</code> (the button that changed) and <code>buttons</code> (held mask); <code>clicks</code> for <code>CLICK</code>; <code>key</code>, <code>mods</code>, <code>repeat</code>;
 <code>codepoint</code> for text; <code>related</code> for focus events.</p>
-<p><code>CLICK</code> fires for the primary button only.</p>
+<p><code>CLICK</code> fires for the primary button only. <code>ev-&gt;clicks</code> counts rapid clicks on the same node: 1, then 2 for a double
+click and 3 for a triple, when each follows the last within half a second and four pixels. Keyboard activation
+(Enter or Space) is always 1.</p>
 <h2 id="pointer-capture"><a class="header" href="#pointer-capture">Pointer capture</a></h2>
 <pre><code class="language-cpp">rd::Node handle = ctx.create(rd::Style().width(20_px).height(20_px));
 float    dragged = 0;

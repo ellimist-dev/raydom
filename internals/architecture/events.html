@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-86bc52c8.js";
+            window.path_to_searchindex_js = "../searchindex-0d8881a8.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-0c2227d3.js"></script>
@@ -200,7 +200,8 @@ gaining it, and <code>RD_STATE_HOVER</code> on the chain.</li>
 <li><strong>Move.</strong> <code>POINTER_MOVE</code>, then input drag-selection or document drag-selection.</li>
 <li><strong>Buttons.</strong> Per changed button: <code>POINTER_DOWN</code> (with <code>RD_STATE_ACTIVE</code> on the chain, and unless prevented,
 pointer focus and starting a selection), <code>POINTER_UP</code>, and <code>CLICK</code> on the common ancestor of the press and
-release targets for the primary button.</li>
+release targets for the primary button. <code>ev-&gt;clicks</code> counts clicks on the same node within
+<code>MULTI_CLICK_SECONDS</code> and <code>MULTI_CLICK_SLOP</code>; keyboard activation resets it to 1.</li>
 <li><strong>Wheel.</strong> A gesture latches to the scroll container chosen at its start (<code>wheel_latch</code>) until the wheel pauses
 (<code>LATCH_SECONDS</code>) or the pointer moves, so a horizontal scroll inside a vertical list doesn’t get stolen halfway.</li>
 </ol>
