@@ -36,7 +36,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-3a3e7567.js";
+            window.path_to_searchindex_js = "../searchindex-303fe6e0.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-c393df87.js"></script>
@@ -212,9 +212,12 @@ std::string shown;
 volume.on(RD_EVENT_INPUT, [&amp;] { shown = std::to_string(static_cast&lt;int&gt;(rdx::slider_value(volume))); });  // while moving
 volume.on(RD_EVENT_CHANGE, [&amp;] { /* save it */ });  // drag released or key pressed
 </code></pre>
+<p><code>rdx_slider_set_range</code> changes the range later, for a timeline whose end moves, without recreating the slider; the
+value is clamped into the new range and no event fires.</p>
 <p>Dragging or pressing anywhere on the track moves it; the drag continues outside the slider. Arrow keys move one step
 (1% of the range when <code>step</code> is 0), Page Up and Page Down a tenth of the range, Home and End to the ends. A zero
-<code>rdx_slider_desc</code> is 0 to 100, continuous. The default width is 200px; set <code>width</code> on the slider to change it.</p>
+<code>rdx_slider_desc</code> is 0 to 100, continuous. With a step, values are <code>min + n * step</code>, as for an HTML range input; when
+the range isn’t a whole number of steps, the largest value is the last step below <code>max</code>. The default width is 200px; set <code>width</code> on the slider to change it.</p>
 <h2 id="toasts"><a class="header" href="#toasts">Toasts</a></h2>
 <pre><code class="language-cpp">rd::Node t = rdx::toast(ctx, {.title    = "Exported",
                               .text     = "report.csv is in your Downloads folder.",

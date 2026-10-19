@@ -27,7 +27,7 @@ Each page below is Markdown. `llms-full.txt` is the whole book in one file. Read
 - [Roles](guide/roles.md): Semantic roles and the button/text/input constructors; how roles affect focus.
 - [Animation](guide/animation.md): Transitions on style changes, layout properties and auto height included; explicit rd_node_animate.
 - [Overlay and anchoring](guide/overlay.md): The overlay layer for popups, and anchoring nodes to other nodes or points with flip and shift.
-- [Canvases](guide/canvas.md): Custom raylib drawing inside a node with paint callbacks.
+- [Canvases](guide/canvas.md): Custom raylib drawing inside a node with paint callbacks, and the pixel ratio for sharp rendering on the web.
 
 ## C++
 
