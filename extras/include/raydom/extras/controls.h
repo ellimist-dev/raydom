@@ -41,6 +41,9 @@ typedef struct rdx_slider_desc {
 rd_node rdx_slider_create(rd_ctx* ctx, const rdx_slider_desc* desc);
 float   rdx_slider_value(const rd_ctx* ctx, rd_node slider);
 bool    rdx_slider_set_value(rd_ctx* ctx, rd_node slider, float value);
+// Changes the range, keeping the step; the value is clamped (and snapped) into it without firing an
+// event. False, and nothing changes, unless max > min.
+bool    rdx_slider_set_range(rd_ctx* ctx, rd_node slider, float min, float max);
 
 #ifdef __cplusplus
 }

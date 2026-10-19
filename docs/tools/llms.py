@@ -39,7 +39,7 @@ DESCRIPTIONS = {
     "guide/roles.md": "Semantic roles and the button/text/input constructors; how roles affect focus.",
     "guide/animation.md": "Transitions on style changes, layout properties and auto height included; explicit rd_node_animate.",
     "guide/overlay.md": "The overlay layer for popups, and anchoring nodes to other nodes or points with flip and shift.",
-    "guide/canvas.md": "Custom raylib drawing inside a node with paint callbacks.",
+    "guide/canvas.md": "Custom raylib drawing inside a node with paint callbacks, and the pixel ratio for sharp rendering on the web.",
     "cpp/overview.md": "The rd:: C++ wrapper: ownership, Style builder, literals, callable listeners.",
     "extras/controls.md": "Checkbox, switch, radio group, slider and toast components; their events, keys and theme classes.",
     "extras/popups.md": "Menus, context menus, selects, modal dialogs and tooltips; dismissal and focus rules.",

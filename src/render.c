@@ -499,9 +499,18 @@ static void draw_image(gpu* g, rd_ctx* ctx, const rd__cmd* c, float dpi) {
   rlDrawRenderBatchActive();
 }
 
-static void scissor(rd_rect r) {
-  int x0 = (int)floorf(r.x), y0 = (int)floorf(r.y);
-  int x1 = (int)ceilf(r.x + r.width), y1 = (int)ceilf(r.y + r.height);
+float rd_pixel_ratio(const rd_ctx* ctx) { return ctx && ctx->pixel_ratio > 0 ? ctx->pixel_ratio : 1; }
+
+void rd_set_pixel_ratio(rd_ctx* ctx, float ratio) {
+  if (!ctx || !(ratio > 0) || ratio == rd_pixel_ratio(ctx)) return;
+  ctx->pixel_ratio = ratio;
+  rd__mark_layout_dirty(ctx, ctx->root);
+}
+
+// Logical rectangles to raylib screen pixels, which raylib scales by its own DPI.
+static void scissor(rd_rect r, float ratio) {
+  int x0 = (int)floorf(r.x * ratio), y0 = (int)floorf(r.y * ratio);
+  int x1 = (int)ceilf((r.x + r.width) * ratio), y1 = (int)ceilf((r.y + r.height) * ratio);
   BeginScissorMode(x0, y0, x1 > x0 ? x1 - x0 : 0, y1 > y0 ? y1 - y0 : 0);
 }
 
@@ -509,16 +518,39 @@ void rd_paint_scissor(const rd_paint_info* info) {
   rd_rect c = info->content, k = info->clip;
   float   x0 = fmaxf(c.x, k.x), y0 = fmaxf(c.y, k.y);
   float   x1 = fminf(c.x + c.width, k.x + k.width), y1 = fminf(c.y + c.height, k.y + k.height);
-  scissor((rd_rect){x0, y0, fmaxf(0, x1 - x0), fmaxf(0, y1 - y0)});
+  scissor((rd_rect){x0, y0, fmaxf(0, x1 - x0), fmaxf(0, y1 - y0)}, info->ratio > 0 ? info->ratio : 1);
+}
+
+// The modelview rd_draw draws with: raylib's, scaled by the pixel ratio. Like raylib's own state,
+// one per process; set for the duration of rd_draw.
+static Matrix draw_matrix;
+
+void rd_paint_restore(const rd_paint_info* info) {
+  if (!info || info->ratio == 1) return;
+  rlDrawRenderBatchActive();
+  rlSetMatrixModelview(draw_matrix);
 }
 
 void rd_draw(rd_ctx* ctx) {
   if (!ctx) return;
   gpu* g = gpu_get(ctx);
   if (!g) return;
+#ifdef __EMSCRIPTEN__
+  float dpi = 1;  // raylib renders the web at CSS resolution, and its render size isn't kept up to date there
+#else
   int   sw  = GetScreenWidth();
   float dpi = sw > 0 ? (float)GetRenderWidth() / (float)sw : 1;
   if (dpi <= 0) dpi = 1;
+#endif
+  float  ratio = rd_pixel_ratio(ctx);
+  Matrix base  = rlGetMatrixModelview();
+  dpi *= ratio;
+  if (ratio != 1) {
+    rlDrawRenderBatchActive();
+    rlMatrixMode(RL_MODELVIEW);
+    rlScalef(ratio, ratio, 1);
+  }
+  draw_matrix = rlGetMatrixModelview();
 
   uint32_t       n;
   const rd__cmd* cmds    = rd__display_list(ctx, &n);
@@ -551,7 +583,7 @@ void rd_draw(rd_ctx* ctx) {
         break;
       }
       case RD_CMD_CLIP:
-        scissor(c->rect);
+        scissor(c->rect, ratio);
         clip    = c->rect;
         clipped = true;
         break;
@@ -561,11 +593,12 @@ void rd_draw(rd_ctx* ctx) {
         shader_mode(g, false);
         rlDrawRenderBatchActive();
         if (clipped) EndScissorMode();
-        rd_paint_info info = {rd__handle(ctx, c->node), c->rect, c->clip, dpi};
+        rd_paint_info info = {rd__handle(ctx, c->node), c->rect, c->clip, dpi, ratio};
         L->paint_fn(ctx, &info, L->paint_data);
         rlDrawRenderBatchActive();
         EndScissorMode();
-        if (clipped) scissor(clip);
+        rlSetMatrixModelview(draw_matrix);  // in case the callback reset it
+        if (clipped) scissor(clip, ratio);
         break;
       }
       default:
@@ -574,6 +607,10 @@ void rd_draw(rd_ctx* ctx) {
   }
   shader_mode(g, false);
   if (clipped) EndScissorMode();
+  if (ratio != 1) {
+    rlDrawRenderBatchActive();
+    rlSetMatrixModelview(base);
+  }
   ctx->paint_dirty = false;
 }
 
@@ -653,12 +690,13 @@ void rd_update(rd_ctx* ctx) {
   if (!ctx) return;
   rd_ctx_set_time(ctx, GetTime());
   feed_keyboard(ctx);
+  float   ratio = rd_pixel_ratio(ctx);
   Vector2 m = GetMousePosition(), w = GetMouseWheelMoveV();
   uint8_t buttons = (IsMouseButtonDown(MOUSE_BUTTON_LEFT) ? RD_BUTTON_PRIMARY : 0) |
                     (IsMouseButtonDown(MOUSE_BUTTON_RIGHT) ? RD_BUTTON_SECONDARY : 0) |
                     (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE) ? RD_BUTTON_MIDDLE : 0);
-  rd_ctx_pointer(ctx, m.x, m.y, buttons, w.x, w.y);
-  rd_ctx_layout(ctx, (float)GetScreenWidth(), (float)GetScreenHeight());
+  rd_ctx_pointer(ctx, m.x / ratio, m.y / ratio, buttons, w.x, w.y);
+  rd_ctx_layout(ctx, (float)GetScreenWidth() / ratio, (float)GetScreenHeight() / ratio);
   apply_cursor(ctx);
   if (ctx->event_waiting) {
     bool wait = rd_ctx_timer_wait(ctx) == INFINITY && !rd_ctx_animating(ctx);

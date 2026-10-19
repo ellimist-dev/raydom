@@ -664,6 +664,9 @@ public:
   // raylib: input and layout at the screen size, then drawing inside BeginDrawing/EndDrawing.
   void update() const { rd_update(ctx_); }
   void draw() const { rd_draw(ctx_); }
+  // See rd_set_pixel_ratio.
+  void  set_pixel_ratio(float ratio) const { rd_set_pixel_ratio(ctx_, ratio); }
+  float pixel_ratio() const { return rd_pixel_ratio(ctx_); }
 
 private:
   template <class F>

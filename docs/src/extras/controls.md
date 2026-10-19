@@ -40,9 +40,13 @@ options, as in browsers.
 {{#include ../../examples/controls.cc:slider}}
 ```
 
+`rdx_slider_set_range` changes the range later, for a timeline whose end moves, without recreating the slider; the
+value is clamped into the new range and no event fires.
+
 Dragging or pressing anywhere on the track moves it; the drag continues outside the slider. Arrow keys move one step
 (1% of the range when `step` is 0), Page Up and Page Down a tenth of the range, Home and End to the ends. A zero
-`rdx_slider_desc` is 0 to 100, continuous. The default width is 200px; set `width` on the slider to change it.
+`rdx_slider_desc` is 0 to 100, continuous. With a step, values are `min + n * step`, as for an HTML range input; when
+the range isn't a whole number of steps, the largest value is the last step below `max`. The default width is 200px; set `width` on the slider to change it.
 
 ## Toasts
 

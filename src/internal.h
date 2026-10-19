@@ -150,6 +150,7 @@ struct rd_ctx {
   rd__timer*      timers;
   uint32_t        timer_count, timer_cap, timer_epoch;
   bool            event_waiting, waiting_now;  // rd_set_event_waiting, and whether raylib is waiting now
+  float           pixel_ratio;                 // rd_set_pixel_ratio; 0 means 1
   rd__image*      images;
   uint32_t        image_count, image_cap;
   rd_node         overlay;

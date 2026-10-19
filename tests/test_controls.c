@@ -141,6 +141,17 @@ static void sliders(void) {
   rd_node rail = rd_node_first_child(ctx, slider), fill = rd_node_first_child(ctx, rail);
   CHECK(near(rd_node_rect(ctx, fill).width, 60) && near(rd_node_rect(ctx, rd_node_last_child(ctx, rail)).x, 60 - 8));
 
+  // A new range clamps and re-snaps the value, moves the thumb, and fires nothing.
+  int before = changes + inputs;
+  CHECK(rdx_slider_set_range(ctx, slider, 0, 2) && near(rdx_slider_value(ctx, slider), 2));  // 3 clamped to 2
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_rect(ctx, fill).width, 200) && changes + inputs == before);
+  CHECK(rdx_slider_set_range(ctx, slider, 0.5f, 20) && near(rdx_slider_value(ctx, slider), 2.5f));  // steps from 0.5
+  CHECK(!rdx_slider_set_range(ctx, slider, 5, 5) && !rdx_slider_set_range(ctx, slider, 5, 1));
+  CHECK(near(rdx_slider_value(ctx, slider), 2.5f) && !rdx_slider_set_range(ctx, rd_ctx_root(ctx), 0, 1));
+  press(ctx, RD_KEY_END);
+  CHECK(near(rdx_slider_value(ctx, slider), 19.5f));  // the last step within the range
+
   rd_node plain = rdx_slider_create(ctx, NULL);  // 0 to 100, continuous
   CHECK(near(rdx_slider_value(ctx, plain), 0) && rdx_slider_set_value(ctx, plain, 33.3f) &&
         near(rdx_slider_value(ctx, plain), 33.3f));

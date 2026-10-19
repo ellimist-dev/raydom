@@ -35,6 +35,7 @@ inline rd::Node slider(const rd::Context& ctx, const rdx_slider_desc& desc = {})
 }
 inline float slider_value(rd::Node n) { return rdx_slider_value(n.ctx(), n.handle()); }
 inline bool  set_slider_value(rd::Node n, float v) { return rdx_slider_set_value(n.ctx(), n.handle(), v); }
+inline bool  set_slider_range(rd::Node n, float min, float max) { return rdx_slider_set_range(n.ctx(), n.handle(), min, max); }
 
 // rdx_toast_desc with strings; the C layer copies them.
 struct ToastOptions {

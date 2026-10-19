@@ -276,9 +276,13 @@ bool rdx_radio_select(rd_ctx* ctx, rd_node group, int index) {
 
 // Slider.
 
+// Values are min + n * step, as for an HTML range input: when the range isn't a whole number of steps,
+// the largest value is the last step below max, not max.
 static float snap(const control* c, float v) {
-  if (c->step > 0) v = c->min + roundf((v - c->min) / c->step) * c->step;
-  return fminf(c->max, fmaxf(c->min, v));
+  v = fminf(c->max, fmaxf(c->min, v));
+  if (c->step <= 0) return v;
+  float last = c->min + floorf((c->max - c->min) / c->step + 1e-4f) * c->step;
+  return fminf(last, c->min + roundf((v - c->min) / c->step) * c->step);
 }
 
 static void show_value(rd_ctx* ctx, control* c) {
@@ -380,6 +384,16 @@ bool rdx_slider_set_value(rd_ctx* ctx, rd_node slider, float value) {
   control* c = find(ctx, slider, SLIDER);
   if (!c) return false;
   c->value = snap(c, value);
+  show_value(ctx, c);
+  return true;
+}
+
+bool rdx_slider_set_range(rd_ctx* ctx, rd_node slider, float min, float max) {
+  control* c = find(ctx, slider, SLIDER);
+  if (!c || !(max > min)) return false;
+  c->min   = min;
+  c->max   = max;
+  c->value = snap(c, c->value);
   show_value(ctx, c);
   return true;
 }

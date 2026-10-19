@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(raydom VERSION 0.2.2 LANGUAGES C CXX)
+project(raydom VERSION 0.2.3 LANGUAGES C CXX)
 
 option(RAYDOM_FETCH_RAYLIB "Download raylib when find_package can't find it" ON)
 option(RAYDOM_BUILD_EXTRAS "Build raydom::extras" ON)

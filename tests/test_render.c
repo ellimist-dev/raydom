@@ -182,7 +182,22 @@ static void test_paint_commands(void) {
   rd_ctx_destroy(ctx);
 }
 
+static void test_pixel_ratio(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  CHECK(rd_pixel_ratio(ctx) == 1);
+  rd_set_pixel_ratio(ctx, 2);
+  CHECK(rd_pixel_ratio(ctx) == 2);
+  rd_set_pixel_ratio(ctx, 0);  // ignored, as are negatives and NaN
+  rd_set_pixel_ratio(ctx, -1);
+  rd_set_pixel_ratio(ctx, NAN);
+  CHECK(rd_pixel_ratio(ctx) == 2);
+  CHECK(rd_pixel_ratio(NULL) == 1);
+  rd_paint_restore(&(rd_paint_info){.ratio = 1});  // no-op without a ratio
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
+  test_pixel_ratio();
   test_display_list();
   test_clip_and_cull();
   test_hit_and_pointer();

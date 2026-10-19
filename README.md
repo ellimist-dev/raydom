@@ -17,6 +17,15 @@ statically linked binary.
   splitter, virtualized list, table and tree view components; an interactive network view (3D
   spheres, edges, labels, pan and zoom); native open, save and folder dialogs
 
+## Built with raydom
+
+[black-hole-sim](https://github.com/ellimist-dev/black-hole-sim) simulates a particle accretion disc around a
+spinning black hole, with gravitational lensing and Doppler beaming, and an Earth to drop in and watch torn apart.
+It's a separate project that depends on raydom the way yours would, through FetchContent, and runs on the desktop
+and in the browser. It's a reference for a complete app: a canvas drawing through render textures, `raydom::extras`
+controls restyled to its own theme, a layout that moves its controls below the canvas on narrow windows, and a
+WebAssembly build that renders at the display's pixel density.
+
 ## Status
 
 raydom follows [semantic versioning](https://semver.org/). Before 1.0, minor versions may contain breaking changes;
@@ -36,7 +45,7 @@ patch versions don't.
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.2)
+    GIT_TAG        v0.2.3)
 FetchContent_MakeAvailable(raydom)
 
 target_link_libraries(your_app PRIVATE raydom::raydom)   # or raydom::extras
