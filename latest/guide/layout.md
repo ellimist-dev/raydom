@@ -60,6 +60,33 @@ implicit tracks sized by `grid_auto_rows` and `grid_auto_columns`.
 The algorithm follows [CSS Grid §11](https://www.w3.org/TR/css-grid-1/#layout-algorithm). Named lines, named areas
 and `dense` packing are not implemented.
 
+### Auto-repeated tracks
+
+```c
+// Responsive cards: as many columns of at least 260px as fit, sharing the rest.
+rd_track card  = rd_track_minmax(rd_px(260), rd_fr(1));
+rd_node  cards = add(ctx, root,
+                     (rd_style){.display               = RD_DISPLAY_GRID,
+                                .grid_template_columns = rd_tracks_create_auto(ctx, RD_REPEAT_AUTO_FILL, &card, 1),
+                                .column_gap            = rd_px(20),
+                                .row_gap               = rd_px(20)});
+for (int i = 0; i < 5; i++) add(ctx, cards, (rd_style){.height = rd_px(120)});
+```
+
+`rd_tracks_create_auto` is CSS's `repeat(auto-fill, ...)` and `repeat(auto-fit, ...)`: the list repeats as many times
+as fits the grid's content width, so the column count follows the window. Each track counts at its max size when
+that's a length, else its min size, which is why `minmax(260px, 1fr)` means "at least 260px". Without a definite
+width, the grid's max width decides, then its min width; otherwise the list appears once.
+
+- `RD_REPEAT_AUTO_FILL` keeps empty repetitions: three cards in a four-column row leave a gap.
+- `RD_REPEAT_AUTO_FIT` drops repetitions no item occupies, so the cards stretch to fill the row.
+
+The whole list repeats; fixed tracks before or after a repeat aren't supported. C++:
+`ctx.tracks(rd::repeat(rd::auto_fill, {rd::minmax(260_px, 1_fr)}))`.
+
+Track lists are interned: creating a list identical to an existing one returns the same handle, so code that
+rebuilds lists doesn't grow memory.
+
 ## Running layout and reading geometry
 
 ```c
@@ -120,16 +147,24 @@ Leave room with `padding` if content shouldn't sit under the bar.
 
 ## Layout hooks
 
-`rd_ctx_on_layout(ctx, fn, data, destroy)` runs `fn` after every layout, with that layout's geometry and scroll
-offsets. It's for content that depends on its own geometry: a virtualized list binding the rows that scrolled into
-view, a chat log staying scrolled to its end. If hooks change the tree, layout runs once more before
-`rd_ctx_layout` returns, so the change shows in the same frame; hooks don't run for that second pass.
+Layout hooks run after every layout, with that layout's geometry and scroll offsets. They're for content that
+depends on its own geometry: a virtualized list binding the rows that scrolled into view, a chat log staying
+scrolled to its end. If hooks change the tree, layout runs once more before `rd_ctx_layout` returns, so the change
+shows in the same frame; hooks don't run for that second pass.
+
+`rd_node_on_layout(ctx, node, fn, data, destroy)` ties a hook to a node: destroying the node removes the hook and
+runs `destroy(data)`, and the hook is skipped while the node is detached. That's the right lifetime for a hook that
+belongs to a view, and it can't leak. C++: `node.on_layout([&] { ... })`. `rd_ctx_on_layout` adds a hook for the
+context's whole lifetime.
 
 ```c
 static void stick_to_bottom(rd_ctx* ctx, void* data) {
   rd_node log = *(rd_node*)data;
   rd_node_set_scroll(ctx, log, 0, 1e9f);  // clamped to the content just laid out
 }
+
+static rd_node log_node;  // the hook's data must live as long as the hook
+rd_node_on_layout(ctx, log_node, stick_to_bottom, &log_node, NULL);  // removed with the log
 ```
 
 ## Custom measurement

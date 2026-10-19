@@ -61,7 +61,8 @@ rd::Node t = rdx::toast(ctx, {.title    = "Exported",
                               .text     = "report.csv is in your Downloads folder.",
                               .position = RDX_TOAST_TOP_RIGHT,
                               .kind     = RDX_TOAST_SUCCESS});
-rdx::toast(ctx, {.text = "Connection lost", .kind = RDX_TOAST_ERROR, .seconds = -1});  // stays until closed
+std::string host = "db.internal";
+rdx::toast(ctx, {.text = "Lost connection to " + host, .kind = RDX_TOAST_ERROR, .seconds = -1});  // until closed
 ```
 
 | Field      | Meaning                                                                    |
@@ -71,6 +72,8 @@ rdx::toast(ctx, {.text = "Connection lost", .kind = RDX_TOAST_ERROR, .seconds = 
 | `position` | `BOTTOM_RIGHT` (zero), `BOTTOM_LEFT`, `TOP_RIGHT`, `TOP_LEFT`, `TOP_CENTER`, `BOTTOM_CENTER` |
 | `kind`     | `INFO` (zero), `SUCCESS`, `WARNING`, `ERROR`: the color of the bar on the left |
 | `seconds`  | How long it stays; 0 means 4, negative until closed                        |
+
+In C++, `rdx::toast` takes `rdx::ToastOptions`, the same fields with `std::string` for the title and text.
 
 Toasts live in the [overlay](../guide/overlay.md), one stack per position, 16px from the window's edges, newest
 nearest the edge. A stack keeps the newest five. Hovering a toast pauses its countdown, which restarts when the

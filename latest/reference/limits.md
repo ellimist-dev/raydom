@@ -5,7 +5,7 @@ What raydom doesn't do in this version. Behavior outside these limits is unspeci
 ## Layout
 
 - No `display: block` or `inline`; every container is flex or grid. Text nodes are leaves.
-- Grid: no named lines, no named areas, no `dense` auto-flow, no `repeat(auto-fill)`.
+- Grid: no named lines, no named areas, no `dense` auto-flow; an auto repeat must be the whole track list.
 - No `position: fixed` or `sticky`, and no `z-index`. Children draw in tree order, later siblings on top; content
   that must sit above everything goes in the [overlay](../guide/overlay.md).
 - No `aspect_ratio`, no `transform`. Animate `inset` to move a node without reflowing its neighbors.

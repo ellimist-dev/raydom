@@ -13,6 +13,9 @@ are reported the same way as in C: null handles and `false`.
 
 `get()` and `handle()` return the C values, so C and C++ calls can be mixed freely on one context.
 
+`rd::Node` and `rd::Class` are handles, so their setters are `const`, as with `std::span`: they change the node in
+the context, not the handle. A node captured by value in a lambda, or a `const rd::Node`, can be changed directly.
+
 ## Styles
 
 `rd::Style` has one chainable setter per property, named as in the [reference](../reference/properties.md), plus

@@ -36,7 +36,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-a8891df0.js";
+            window.path_to_searchindex_js = "../searchindex-2bf57da4.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-c393df87.js"></script>
@@ -196,6 +196,8 @@ are reported the same way as in C: null handles and <code>false</code>.</p>
 </table>
 </div>
 <p><code>get()</code> and <code>handle()</code> return the C values, so C and C++ calls can be mixed freely on one context.</p>
+<p><code>rd::Node</code> and <code>rd::Class</code> are handles, so their setters are <code>const</code>, as with <code>std::span</code>: they change the node in
+the context, not the handle. A node captured by value in a lambda, or a <code>const rd::Node</code>, can be changed directly.</p>
 <h2 id="styles"><a class="header" href="#styles">Styles</a></h2>
 <p><code>rd::Style</code> has one chainable setter per property, named as in the <a href="../reference/properties.html">reference</a>, plus
 overloads for common shapes:</p>

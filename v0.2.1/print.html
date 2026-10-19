@@ -1,0 +1,2340 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>raydom</title>
+        <meta name="robots" content="noindex">
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="A retained-mode UI tree for raylib, in C with a C++ layer.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="favicon-8114d1fc.png">
+        <link rel="stylesheet" href="css/variables-8adf115d.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
+        <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="theme/version-switcher-ed80a069.css">
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "searchindex-2bf57da4.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="toc-c393df87.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">raydom</h1>
+
+                    <div class="right-buttons">
+                        <a href="print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/ellimist-dev/raydom" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
+<p>raydom is a retained-mode UI tree for <a href="https://www.raylib.com/">raylib</a>. An application builds a tree of nodes,
+assigns CSS-like styles, and attaches event listeners. raydom computes layout with flexbox and grid, shapes and wraps
+text, routes pointer and keyboard input, and draws the result with raylib. The core is C23; a header-only C++20 layer
+wraps it. Applications link it statically and ship as one binary.</p>
+<p>This book documents the version shown in the version menu. Each release tag has its own copy of the book, so the
+pages you read match the headers you compile against.</p>
+<h2 id="model"><a class="header" href="#model">Model</a></h2>
+<ul>
+<li><strong>Context.</strong> <code>rd_ctx</code> owns every node, style, class, font and listener. Destroying it frees all of them.</li>
+<li><strong>Nodes.</strong> <code>rd_node</code> is a small value handle. A handle to a destroyed node is stale; every call on it is a no-op.</li>
+<li><strong>Styles.</strong> A node’s computed style merges defaults, inherited properties, classes, state variants, and the inline
+style, in that order.</li>
+<li><strong>Frame loop.</strong> Each frame, <code>rd_update</code> feeds raylib’s input and lays the tree out at the window size, and <code>rd_draw</code>
+draws it.</li>
+</ul>
+<h2 id="how-to-read-this-book"><a class="header" href="#how-to-read-this-book">How to read this book</a></h2>
+<p><a href="#installation">Getting started</a> covers installation and a first window. The
+<a href="#nodes-and-the-tree">guide</a> has one chapter per subsystem. The <a href="#style-properties">reference</a> lists every
+style property with its type, default and inheritance.</p>
+<p>Every code sample in this book is a fragment of a program under <code>docs/examples/</code> in the repository. Those programs
+are compiled by the test suite, and the ones that don’t open a window run as tests, so the samples compile and
+behave as described for this version.</p>
+<p>Agents and tools can read the book as plain Markdown; see <a href="#for-ai-agents">For AI agents</a>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="installation"><a class="header" href="#installation">Installation</a></h1>
+<h2 id="requirements"><a class="header" href="#requirements">Requirements</a></h2>
+<ul>
+<li>CMake 3.25 or newer.</li>
+<li>A C23 compiler for C code that includes raydom (clang 18+, GCC 13+). A C++20 compiler for the C++ layer.</li>
+<li>raylib 6.0. raydom downloads it when the project doesn’t provide one.</li>
+</ul>
+<h2 id="fetchcontent"><a class="header" href="#fetchcontent">FetchContent</a></h2>
+<pre><code class="language-cmake">include(FetchContent)
+FetchContent_Declare(raydom
+    GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
+    GIT_TAG        v0.2.1)
+FetchContent_MakeAvailable(raydom)
+
+target_link_libraries(your_app PRIVATE raydom::raydom)
+</code></pre>
+<p>Link <code>raydom::extras</code> instead to get the <a href="#network-view">network view</a> and <a href="#file-dialogs">file dialogs</a>;
+it links <code>raydom::raydom</code> for you.</p>
+<p>raylib is resolved in this order: an existing <code>raylib</code> target in the project, an installed raylib found with
+<code>find_package</code>, then a download. Set <code>RAYDOM_FETCH_RAYLIB=OFF</code> to require one of the first two.</p>
+<h2 id="installed-package"><a class="header" href="#installed-package">Installed package</a></h2>
+<pre><code class="language-sh">cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DRAYDOM_INSTALL=ON
+cmake --build build
+cmake --install build --prefix /your/prefix
+</code></pre>
+<pre><code class="language-cmake">find_package(raydom 0.2 CONFIG REQUIRED)
+target_link_libraries(your_app PRIVATE raydom::raydom)
+</code></pre>
+<p>The package’s version check accepts any patch release of the requested minor version while raydom is below 1.0.
+After 1.0 it accepts any later release with the same major version.</p>
+<h2 id="options"><a class="header" href="#options">Options</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Option</th><th>Default</th><th>Effect</th></tr>
+</thead>
+<tbody>
+<tr><td><code>RAYDOM_BUILD_EXTRAS</code></td><td><code>ON</code></td><td>Build <code>raydom::extras</code></td></tr>
+<tr><td><code>RAYDOM_FILE_DIALOG</code></td><td><code>ON</code></td><td>Native <a href="#file-dialogs">file dialogs</a> in extras; needs libdbus on Linux</td></tr>
+<tr><td><code>RAYDOM_FETCH_RAYLIB</code></td><td><code>ON</code></td><td>Download raylib when it can’t be found</td></tr>
+<tr><td><code>RAYDOM_INSTALL</code></td><td>top-level only</td><td>Generate install rules and the CMake package</td></tr>
+<tr><td><code>RAYDOM_BUILD_TESTS</code></td><td>top-level only</td><td>Build the test suite</td></tr>
+<tr><td><code>RAYDOM_BUILD_EXAMPLES</code></td><td>top-level only</td><td>Build the examples</td></tr>
+<tr><td><code>RAYDOM_SANITIZE</code></td><td><code>OFF</code></td><td>Build with AddressSanitizer and UBSan</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="headers"><a class="header" href="#headers">Headers</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Header</th><th>Contents</th></tr>
+</thead>
+<tbody>
+<tr><td><code>&lt;raydom/raydom.h&gt;</code></td><td>The whole C API</td></tr>
+<tr><td><code>&lt;raydom/raydom.hh&gt;</code></td><td>The C++ layer; includes the C API</td></tr>
+<tr><td><code>&lt;raydom/extras/graph.h&gt;</code></td><td>Network view, C</td></tr>
+<tr><td><code>&lt;raydom/extras/graph.hh&gt;</code></td><td>Network view, C++</td></tr>
+<tr><td><code>&lt;raydom/extras/controls.h&gt;</code></td><td>Checkbox, switch, radio, slider, C</td></tr>
+<tr><td><code>&lt;raydom/extras/toast.h&gt;</code></td><td>Toasts, C</td></tr>
+<tr><td><code>&lt;raydom/extras/popups.h&gt;</code></td><td>Menus, selects, modals, tooltips, C</td></tr>
+<tr><td><code>&lt;raydom/extras/popups.hh&gt;</code></td><td>Menus, selects, modals, tooltips, C++</td></tr>
+<tr><td><code>&lt;raydom/extras/views.h&gt;</code></td><td>Tabs, splitter, list, table, tree, C</td></tr>
+<tr><td><code>&lt;raydom/extras/views.hh&gt;</code></td><td>Tabs, splitter, list, table, tree, C++</td></tr>
+<tr><td><code>&lt;raydom/extras/theme.h&gt;</code></td><td>Classes behind the controls and toasts</td></tr>
+<tr><td><code>&lt;raydom/extras/controls.hh&gt;</code></td><td>Controls and toasts, C++</td></tr>
+<tr><td><code>&lt;raydom/extras/dialog.h&gt;</code></td><td>File dialogs, C</td></tr>
+<tr><td><code>&lt;raydom/extras/dialog.hh&gt;</code></td><td>File dialogs, C++</td></tr>
+<tr><td><code>&lt;raydom/image.h&gt;</code></td><td>Images and image nodes</td></tr>
+<tr><td><code>&lt;raydom/overlay.h&gt;</code></td><td>The overlay layer and anchored positioning</td></tr>
+<tr><td><code>&lt;raydom/animate.h&gt;</code></td><td>Explicit animations; transitions are style properties</td></tr>
+<tr><td><code>&lt;raydom/timer.h&gt;</code></td><td>Timers</td></tr>
+<tr><td><code>&lt;raydom/role.h&gt;</code></td><td>Roles and the button, text and input constructors</td></tr>
+<tr><td><code>&lt;raydom/version.h&gt;</code></td><td><code>RD_VERSION_MAJOR</code>, <code>_MINOR</code>, <code>_PATCH</code></td></tr>
+</tbody>
+</table>
+</div>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="quickstart"><a class="header" href="#quickstart">Quickstart</a></h1>
+<p>raydom has no built-in font. Load a TrueType or OpenType file before creating text; the first font loaded becomes
+the default for every node.</p>
+<h2 id="c"><a class="header" href="#c">C</a></h2>
+<pre><code class="language-c">#include &lt;raydom/raydom.h&gt;
+#include &lt;raylib.h&gt;
+
+int main(void) {
+  SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
+  InitWindow(800, 600, "hello");
+  rd_ctx* ctx = rd_ctx_create();
+  rd_font_load_file(ctx, FONT_PATH);  // any .ttf or .otf file
+
+  rd_node card = rd_node_create_text(ctx, "Hello from raydom", RD_TEXT_NUL);
+  rd_node_set_style(ctx, card,
+                    &amp;(rd_style){
+                        .padding       = rd_edges_all(rd_px(16)),
+                        .border_radius = rd_corners_all(rd_px(8)),
+                        .background    = rd_hex(0x1a1f2b),
+                        .color         = rd_hex(0xe4e7ee),
+                    });
+  rd_node_append(ctx, rd_ctx_root(ctx), card);
+
+  while (!WindowShouldClose()) {
+    rd_update(ctx);  // input, then layout at the window size
+    BeginDrawing();
+    ClearBackground(BLACK);
+    rd_draw(ctx);
+    EndDrawing();
+  }
+  rd_ctx_destroy(ctx);  // before CloseWindow, so GPU resources are released
+  CloseWindow();
+}
+</code></pre>
+<h2 id="c-1"><a class="header" href="#c-1">C++</a></h2>
+<pre><code class="language-cpp">#include &lt;raydom/raydom.hh&gt;
+#include &lt;raylib.h&gt;
+
+#include &lt;string&gt;
+
+using namespace rd::literals;
+
+int main() {
+  SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
+  InitWindow(800, 600, "hello");
+  {
+    rd::Context ctx;
+    ctx.load_font_file(FONT_PATH);  // any .ttf or .otf file
+
+    rd::Class button_style = ctx.create_class(rd::Style()
+                                                  .padding(8_px, 16_px)
+                                                  .border_radius(8_px)
+                                                  .background(rd::hex(0x5b8cff))
+                                                  .color(rd::hex(0xffffff)));
+    button_style.on(RD_STATE_HOVER, rd::Style().background(rd::hex(0x7aa2ff)));
+
+    int      clicks = 0;
+    rd::Node label  = ctx.create_text("Clicked 0 times", rd::Style().color(rd::hex(0xe4e7ee)));
+    rd::Node button = ctx.create_button("Click me").add_class(button_style);  // Tab focuses it; Enter and Space click it
+    button.on_click([&amp;] { label.text("Clicked " + std::to_string(++clicks) + " times"); });
+
+    ctx.root()
+        .style(rd::Style().padding(24_px).row_gap(12_px).align_items(RD_ALIGN_START))
+        .append(button)
+        .append(label);
+
+    while (!WindowShouldClose()) {
+      ctx.update();
+      BeginDrawing();
+      ClearBackground(BLACK);
+      ctx.draw();
+      EndDrawing();
+    }
+  }  // the context is destroyed here, before CloseWindow
+  CloseWindow();
+}
+</code></pre>
+<p>The C++ context is an RAII owner. It is scoped inside a block so it is destroyed before <code>CloseWindow</code>; raydom owns
+GPU textures and a shader that must be released while the window still exists.</p>
+<h2 id="build"><a class="header" href="#build">Build</a></h2>
+<pre><code class="language-cmake">cmake_minimum_required(VERSION 3.25)
+project(hello LANGUAGES C CXX)
+
+include(FetchContent)
+FetchContent_Declare(raydom
+    GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
+    GIT_TAG        v0.2.1)
+FetchContent_MakeAvailable(raydom)
+
+add_executable(hello main.cc)
+target_link_libraries(hello PRIVATE raydom::raydom)
+target_compile_definitions(hello PRIVATE FONT_PATH="${CMAKE_SOURCE_DIR}/font.ttf")
+</code></pre>
+<p>For a single binary with no files next to it, embed the font and use <code>rd_font_load(ctx, data, size, false)</code>. With
+C23 <code>#embed</code>:</p>
+<pre><code class="language-c">static const unsigned char font_data[] = {
+#embed "font.ttf"
+};
+rd_font_load(ctx, font_data, sizeof font_data, false);  // false: the data outlives the context
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="the-frame-loop"><a class="header" href="#the-frame-loop">The frame loop</a></h1>
+<pre><code class="language-c">while (!WindowShouldClose()) {
+  rd_update(ctx);
+  BeginDrawing();
+  ClearBackground(BLACK);
+  rd_draw(ctx);
+  EndDrawing();
+}
+</code></pre>
+<p><code>rd_update</code> does these things, in order:</p>
+<ol>
+<li>Sets the context clock from <code>GetTime()</code> (<code>rd_ctx_set_time</code>), which fires due timers.</li>
+<li>Feeds raylib’s keyboard and text input (<code>rd_ctx_key</code>, <code>rd_ctx_text</code>).</li>
+<li>Feeds the mouse position, buttons and wheel (<code>rd_ctx_pointer</code>). Listeners run here.</li>
+<li>Lays the tree out at the screen size (<code>rd_ctx_layout</code>): advances animations, computes styles, lays out, and places
+anchored nodes.</li>
+<li>Applies the mouse cursor, and, with <code>rd_set_event_waiting</code>, raylib’s event waiting.</li>
+</ol>
+<p><code>rd_draw</code> builds a display list from the laid-out tree and executes it with raylib. It must be called between
+<code>BeginDrawing</code> and <code>EndDrawing</code>. Anything drawn with raylib after <code>rd_draw</code> appears on top of the UI.</p>
+<h2 id="mutating-the-tree"><a class="header" href="#mutating-the-tree">Mutating the tree</a></h2>
+<p>Tree and style changes are allowed at any time: in listeners, between frames, or from application logic. They are
+recorded as dirty flags; nothing is recomputed until the next layout. Several changes in one frame cost one layout.</p>
+<p>Geometry queries such as <code>rd_node_rect</code> return the result of the most recent layout. After changing the tree outside
+the frame loop, call <code>rd_ctx_layout</code> before reading geometry.</p>
+<h2 id="without-raylib-input"><a class="header" href="#without-raylib-input">Without raylib input</a></h2>
+<p><code>rd_update</code> is a convenience. Applications with their own input handling, and tests, call the lower-level functions
+directly:</p>
+<pre><code class="language-c">rd_ctx_set_time(ctx, seconds);
+rd_ctx_pointer(ctx, x, y, RD_BUTTON_PRIMARY, 0, 0);  // position, held buttons, wheel
+rd_ctx_key(ctx, RD_KEY_TAB, true, false, 0);          // key, down, repeat, modifiers
+rd_ctx_text(ctx, 'a');                                // one codepoint
+rd_ctx_layout(ctx, width, height);
+</code></pre>
+<p>Nothing except <code>rd_update</code>, <code>rd_draw</code>, and paint callbacks touches raylib, so a context can be built, laid out and
+driven with input without a window. The headless examples behind the guide chapters run this way.</p>
+<h2 id="timers"><a class="header" href="#timers">Timers</a></h2>
+<p>Timers run on the context’s clock. <code>rd_update</code> sets the clock from raylib each frame, before input, and every due
+timer fires then, on the main thread, so callbacks may change the tree like any listener.</p>
+<pre><code class="language-c">static void hide_toast(rd_ctx* ctx, void* data) {
+  toast* t = data;
+  rd_node_merge_style(ctx, t-&gt;node, &amp;(rd_style){.display = RD_DISPLAY_NONE});
+}
+
+static void show_toast(rd_ctx* ctx, toast* t) {
+  rd_node_merge_style(ctx, t-&gt;node, &amp;(rd_style){.display = RD_DISPLAY_FLEX});
+  rd_ctx_clear_timer(ctx, t-&gt;hide);  // showing again restarts the countdown
+  t-&gt;hide = rd_ctx_set_timer(ctx, 2.0, 0, hide_toast, t, NULL);
+}
+</code></pre>
+<pre><code class="language-c">int      seconds = 0;
+rd_timer clock   = rd_ctx_set_timer(ctx, 1.0, RD_TIMER_REPEAT, tick, &amp;seconds, NULL);
+// ... later
+rd_ctx_clear_timer(ctx, clock);
+</code></pre>
+<p>A one-shot timer is destroyed after it fires; clearing it afterwards is a harmless no-op, so “clear, then set” is
+the restart idiom. A repeating timer that falls behind (the window was minimized, say) fires once and skips the rest.
+A timer set from a timer callback doesn’t fire until the next clock update, so callbacks can’t loop forever within
+one frame. <code>destroy(data)</code> runs when a timer is cleared, a one-shot has fired, or the context is destroyed.</p>
+<p>C++: <code>ctx.set_timeout(2.0, [&amp;] { ... })</code> and <code>ctx.set_interval(1.0, [&amp;] { ... })</code> return an <code>rd_timer</code> for
+<code>ctx.clear_timer</code>.</p>
+<h3 id="event-waiting"><a class="header" href="#event-waiting">Event waiting</a></h3>
+<p>raylib’s <code>EnableEventWaiting</code> makes idle frames block until input arrives, which saves power but would also stall
+timers. Let raydom manage it instead:</p>
+<pre><code class="language-c">rd_set_event_waiting(ctx, true);  // instead of EnableEventWaiting()
+</code></pre>
+<p><code>rd_update</code> then turns raylib’s event waiting off while any timer is pending or anything animates, and back on when
+neither is true, so a
+tooltip delay or toast fires on time and an idle UI still costs nothing. A repeating timer keeps frames running for as
+long as it exists.</p>
+<h2 id="lifetime"><a class="header" href="#lifetime">Lifetime</a></h2>
+<p>Destroy the context before <code>CloseWindow</code>. <code>rd_ctx_destroy</code> frees every node and runs every destroy callback
+registered for userdata, listeners, measure and paint functions.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="nodes-and-the-tree"><a class="header" href="#nodes-and-the-tree">Nodes and the tree</a></h1>
+<p>A context starts with one node, the root, which is sized to the layout viewport. Every other node is created
+detached and becomes visible when it is attached under the root.</p>
+<pre><code class="language-c">rd_ctx* ctx  = rd_ctx_create();
+rd_node root = rd_ctx_root(ctx);
+
+rd_node list = rd_node_create(ctx);
+rd_node a = rd_node_create(ctx), b = rd_node_create(ctx), c = rd_node_create(ctx);
+rd_node_append(ctx, root, list);
+rd_node_append(ctx, list, a);
+rd_node_append(ctx, list, c);
+rd_node_insert_before(ctx, list, b, c);  // list: a, b, c
+</code></pre>
+<h2 id="handles"><a class="header" href="#handles">Handles</a></h2>
+<p><code>rd_node</code> is <code>{index, gen}</code>. The context stores nodes in a slot array; <code>index</code> names a slot and <code>gen</code> counts how
+many times that slot has been reused. Destroying a node bumps its slot’s generation, so old handles stop matching.</p>
+<p>Consequences:</p>
+<ul>
+<li>Handles are plain values. Copy them, store them in structs, compare them with <code>rd_node_eq</code>.</li>
+<li>A stale handle is safe. Every function checks it and returns <code>false</code>, a null node, or does nothing.</li>
+<li><code>rd_node_is_null</code> tests for the zero handle, which functions return on failure. It doesn’t test liveness; use
+<code>rd_node_alive</code> for that.</li>
+</ul>
+<h2 id="walking"><a class="header" href="#walking">Walking</a></h2>
+<pre><code class="language-c">for (rd_node n = rd_node_first_child(ctx, list); !rd_node_is_null(n); n = rd_node_next_sibling(ctx, n)) {
+  // visit n
+}
+</code></pre>
+<p>C++ offers <code>for (rd::Node child : node.children())</code>. Neither form is stable if the loop body adds or removes siblings
+of the node being visited; collect the nodes first in that case.</p>
+<h2 id="moving-and-detaching"><a class="header" href="#moving-and-detaching">Moving and detaching</a></h2>
+<pre><code class="language-c">rd_node_append(ctx, root, b);  // moving: b leaves list and becomes root's last child
+rd_node_detach(ctx, c);        // c stays alive, owned by the context, outside the tree
+rd_node_append(ctx, list, c);  // and can be attached again later
+</code></pre>
+<p><code>rd_node_append</code> and <code>rd_node_insert_before</code> move a node that already has a parent. They fail, returning <code>false</code>,
+when the move would create a cycle, or when either handle is stale. A detached node keeps its subtree, styles and
+listeners. It isn’t laid out, drawn or hit-tested.</p>
+<h2 id="userdata"><a class="header" href="#userdata">Userdata</a></h2>
+<p>Each node carries one <code>void*</code> and an optional destroy callback that runs when the node is destroyed or the userdata
+is replaced.</p>
+<pre><code class="language-c">typedef struct item {
+  int id;
+} item;
+
+static void free_item(void* data) { free(data); }
+</code></pre>
+<pre><code class="language-c">item* data = malloc(sizeof *data);
+data-&gt;id   = 7;
+rd_node_set_userdata(ctx, a, data, free_item);
+item* back = rd_node_userdata(ctx, a);
+</code></pre>
+<p>C++: <code>node.emplace_userdata&lt;T&gt;(args...)</code> allocates a <code>T</code> owned by the node, and <code>node.userdata&lt;T&gt;()</code> returns it.</p>
+<h2 id="extension-storage"><a class="header" href="#extension-storage">Extension storage</a></h2>
+<p>Libraries built on raydom can keep per-context data without a global map:</p>
+<pre><code class="language-c">static const char key;  // any address the library owns
+rd_ctx_set_extension(ctx, &amp;key, data, free_data);  // destroyed with the context
+my_state* s = rd_ctx_extension(ctx, &amp;key);
+</code></pre>
+<p>The extras controls keep their classes and state this way, which leaves every node’s userdata to the application.</p>
+<h2 id="destroying"><a class="header" href="#destroying">Destroying</a></h2>
+<pre><code class="language-c">rd_node_destroy(ctx, list);         // destroys list, a and c; a's userdata is freed
+bool alive = rd_node_alive(ctx, a);  // false: the handle is stale, and every call on it is a no-op
+</code></pre>
+<p><code>rd_node_destroy</code> destroys the subtree, depth first, and runs its destroy callbacks. The root can’t be destroyed.
+Destroying a node from inside one of its own listeners is allowed; see <a href="#mutating-during-dispatch">Events</a>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="styles-and-classes"><a class="header" href="#styles-and-classes">Styles and classes</a></h1>
+<p><code>rd_style</code> is a struct with one field per property. Every field type reserves zero for “unset”, so a
+compound literal names only the properties it sets. The <a href="#style-properties">property reference</a> lists them
+all.</p>
+<h2 id="inline-styles"><a class="header" href="#inline-styles">Inline styles</a></h2>
+<pre><code class="language-c">rd_node_set_style(ctx, node,
+                  &amp;(rd_style){
+                      .width         = rd_px(240),
+                      .padding       = rd_edges_vh(rd_px(8), rd_px(12)),  // vertical, horizontal
+                      .border_width  = rd_edges_all(rd_px(1)),
+                      .border_color  = rd_hex(0x272d3a),
+                      .border_radius = rd_corners_all(rd_px(6)),
+                      .background    = rd_hex(0x1a1f2b),
+                  });
+rd_node_merge_style(ctx, node, &amp;(rd_style){.padding.left = rd_px(20)});  // only the left side changes
+</code></pre>
+<p><code>rd_node_set_style</code> replaces the inline style. <code>rd_node_merge_style</code> copies the set fields over it and leaves the
+rest. Passing <code>NULL</code> to <code>rd_node_set_style</code> clears it.</p>
+<p>Value constructors: <code>rd_px</code>, <code>rd_pct</code>, <code>rd_num</code>, <code>rd_fr</code>, <code>rd_auto()</code>, <code>rd_min_content()</code>, <code>rd_max_content()</code>.
+Colors: <code>rd_hex(0xRRGGBB)</code>, <code>rd_rgb</code>, <code>rd_rgba</code>. Box sides: <code>rd_edges_all</code>, <code>rd_edges_vh</code>, or designated
+<code>.padding.left</code>. See <a href="#values-and-units">Values and units</a>.</p>
+<h2 id="classes"><a class="header" href="#classes">Classes</a></h2>
+<p>A class is a reusable style with optional variants per state. Classes live until the context is destroyed;
+<code>rd_class_set</code> replaces a class’s base style and restyles every node that uses it.</p>
+<pre><code class="language-c">rd_class button_style = rd_class_create(ctx, &amp;(rd_style){.padding    = rd_edges_vh(rd_px(6), rd_px(14)),
+                                                        .background = rd_hex(0x1d2230)});
+rd_class primary      = rd_class_create(ctx, &amp;(rd_style){.background = rd_hex(0x5b8cff)});
+rd_class_set_state(ctx, button_style, RD_STATE_HOVER, &amp;(rd_style){.background = rd_hex(0x252c3d)});
+rd_class_set_state(ctx, button_style, RD_STATE_DISABLED, &amp;(rd_style){.opacity = rd_num(0.4f)});
+
+rd_node ok = rd_node_create(ctx);
+rd_node_append(ctx, root, ok);
+rd_node_add_class(ctx, ok, button_style);
+rd_node_add_class(ctx, ok, primary);  // later classes win: the background is primary's
+</code></pre>
+<pre><code class="language-c">const rd_style* s = rd_node_computed_style(ctx, ok);
+// background from primary (the later class), padding from button_style (primary doesn't set it)
+</code></pre>
+<h2 id="precedence"><a class="header" href="#precedence">Precedence</a></h2>
+<p>For each property, the last of these that sets it wins:</p>
+<ol>
+<li>Defaults (the reference’s Default column).</li>
+<li>The parent’s computed value, for inherited properties.</li>
+<li>Class base styles, in the order the classes were added.</li>
+<li>Class state variants for the node’s current states, ordered by state: <code>hover</code>, <code>checked</code>, <code>focus_within</code>,
+<code>focus</code>, <code>focus_visible</code>, <code>active</code>, <code>disabled</code>. Within one state, later classes win.</li>
+<li>The inline style.</li>
+</ol>
+<p>Inline styles beat every class and every state variant. Put anything that should change on hover in a class, not
+inline.</p>
+<h2 id="states"><a class="header" href="#states">States</a></h2>
+<p>raydom sets <code>hover</code>, <code>active</code>, <code>focus</code>, <code>focus_visible</code> and <code>focus_within</code> from input. <code>checked</code> and <code>disabled</code> are
+set by the application, or by a control such as an extras checkbox.</p>
+<pre><code class="language-c">rd_node_set_states(ctx, ok, RD_STATE_HOVER, true);
+// the hover variant of button_style now beats primary's base background
+</code></pre>
+<p>A disabled node and its descendants receive no pointer down, up or click events and can’t be focused. Hover and
+pointer move still apply.</p>
+<p><code>focus_visible</code> is set when focus came from the keyboard, or when the focused node is a text input. Use it, not
+<code>focus</code>, for focus rings.</p>
+<h2 id="shared-states"><a class="header" href="#shared-states">Shared states</a></h2>
+<p>A control is usually several nodes: a checkbox is a row holding a box and a label. Its box should look hovered while
+the pointer is anywhere on the row, like CSS’s <code>.row:hover .box</code>. <code>rd_node_set_share_states</code> does that: the node’s
+class variants also apply for its parent’s states, and the sharing chains through parents that share too.</p>
+<pre><code class="language-c">rd_node_set_share_states(ctx, box, true);   // box variants see the row's hover, checked, focus...
+rd_node_set_share_states(ctx, mark, true);  // and the mark inside the box, through it
+rd_node_set_states(ctx, row, RD_STATE_CHECKED, true);
+</code></pre>
+<p>Only class variants see shared states; <code>rd_node_states</code> still returns the node’s own.</p>
+<h2 id="inheritance"><a class="header" href="#inheritance">Inheritance</a></h2>
+<pre><code class="language-c">rd_node child = rd_node_create(ctx);
+rd_node_append(ctx, node, child);
+rd_node_merge_style(ctx, node, &amp;(rd_style){.color = rd_hex(0xe4e7ee), .font_size = rd_px(18)});
+// child's computed color and font_size come from node; its background doesn't
+</code></pre>
+<p>Inherited properties: <code>color</code>, <code>font</code>, <code>font_size</code>, <code>line_height</code>, <code>white_space</code>, <code>user_select</code>, <code>pointer_events</code>,
+<code>caret_color</code>, <code>selection_color</code>, <code>text_align</code>. The rest start from the default on every node.</p>
+<h2 id="computed-styles"><a class="header" href="#computed-styles">Computed styles</a></h2>
+<p><code>rd_node_computed_style</code> returns the fully resolved style, with every field set. It computes styles if they are
+dirty. The pointer is valid until the next node is created.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="layout"><a class="header" href="#layout">Layout</a></h1>
+<p>Every node is a flex container by default, with <code>flex_direction: column</code>, <code>align_items: stretch</code>, and
+<code>flex_shrink: 0</code>. Children stack vertically and fill the width. Set <code>display</code> to <code>RD_DISPLAY_GRID</code> for grid, or
+<code>RD_DISPLAY_NONE</code> to remove a node from layout, drawing and hit-testing.</p>
+<p>Sizes are border-box: <code>width</code> includes padding and border.</p>
+<h2 id="flexbox"><a class="header" href="#flexbox">Flexbox</a></h2>
+<pre><code class="language-c">// A toolbar: fixed-width side items and a flexible middle.
+rd_node bar = add(ctx, root,
+                  (rd_style){.flex_direction = RD_FLEX_ROW,
+                             .align_items    = RD_ALIGN_CENTER,
+                             .column_gap     = rd_px(8),
+                             .padding        = rd_edges_all(rd_px(8)),
+                             .height         = rd_px(48)});
+rd_node left   = add(ctx, bar, (rd_style){.width = rd_px(80), .height = rd_px(32)});
+rd_node middle = add(ctx, bar, (rd_style){.flex_grow = rd_num(1), .flex_basis = rd_px(0), .height = rd_px(32)});
+rd_node right  = add(ctx, bar, (rd_style){.width = rd_px(80), .height = rd_px(32)});
+</code></pre>
+<p>The algorithm follows <a href="https://www.w3.org/TR/css-flexbox-1/#layout-algorithm">CSS Flexible Box Layout §9</a>, with
+these differences:</p>
+<ul>
+<li><code>flex_shrink</code> defaults to 0. Items keep their size and overflow unless they opt in to shrinking.</li>
+<li><code>flex_direction</code> defaults to column.</li>
+<li><code>min_width</code> and <code>min_height</code> <code>auto</code> resolve to 0, not to the content size. An item is never smaller than its
+padding plus border.</li>
+</ul>
+<p><code>flex_basis: 0</code> with <code>flex_grow: 1</code> splits free space without regard to content, which is the common “fill the rest”
+pattern.</p>
+<h2 id="grid"><a class="header" href="#grid">Grid</a></h2>
+<pre><code class="language-c">rd_track  cols[3] = {rd_track_of(rd_px(200)), rd_track_of(rd_fr(1)), rd_track_of(rd_fr(2))};
+rd_node   grid    = add(ctx, root,
+                        (rd_style){.display               = RD_DISPLAY_GRID,
+                                   .grid_template_columns = rd_tracks_create(ctx, cols, 3),
+                                   .grid_auto_rows        = rd_track_of(rd_px(40)),
+                                   .column_gap            = rd_px(10),
+                                   .row_gap               = rd_px(10)});
+rd_node header = add(ctx, grid, (rd_style){.grid_column_start = rd_line(1), .grid_column_end = rd_line(-1)});
+for (int i = 0; i &lt; 6; i++) add(ctx, grid, (rd_style){0});  // auto-placed, row by row
+</code></pre>
+<p>Track lists are interned: <code>rd_tracks_create</code> copies the array into the context and returns a handle that styles
+refer to. The list lives until the context is destroyed. C++ builds them with
+<code>ctx.tracks({200_px, 1_fr, 2_fr})</code> and <code>rd::repeat(3, {1_fr})</code>.</p>
+<p>A track is <code>{min, max}</code>. <code>rd_track_of(v)</code> uses <code>v</code> for both, except <code>fr</code>, which becomes <code>minmax(auto, fr)</code> as in
+CSS. <code>rd_track_minmax</code> builds any other pair.</p>
+<p>Placement uses <code>grid_{column,row}_{start,end}</code>: <code>rd_line(n)</code> is a 1-based line, negative from the end of the
+explicit grid; <code>rd_span(n)</code> spans tracks. Items without placement are auto-placed in <code>grid_auto_flow</code> order into
+implicit tracks sized by <code>grid_auto_rows</code> and <code>grid_auto_columns</code>.</p>
+<p>The algorithm follows <a href="https://www.w3.org/TR/css-grid-1/#layout-algorithm">CSS Grid §11</a>. Named lines, named areas
+and <code>dense</code> packing are not implemented.</p>
+<h3 id="auto-repeated-tracks"><a class="header" href="#auto-repeated-tracks">Auto-repeated tracks</a></h3>
+<pre><code class="language-c">// Responsive cards: as many columns of at least 260px as fit, sharing the rest.
+rd_track card  = rd_track_minmax(rd_px(260), rd_fr(1));
+rd_node  cards = add(ctx, root,
+                     (rd_style){.display               = RD_DISPLAY_GRID,
+                                .grid_template_columns = rd_tracks_create_auto(ctx, RD_REPEAT_AUTO_FILL, &amp;card, 1),
+                                .column_gap            = rd_px(20),
+                                .row_gap               = rd_px(20)});
+for (int i = 0; i &lt; 5; i++) add(ctx, cards, (rd_style){.height = rd_px(120)});
+</code></pre>
+<p><code>rd_tracks_create_auto</code> is CSS’s <code>repeat(auto-fill, ...)</code> and <code>repeat(auto-fit, ...)</code>: the list repeats as many times
+as fits the grid’s content width, so the column count follows the window. Each track counts at its max size when
+that’s a length, else its min size, which is why <code>minmax(260px, 1fr)</code> means “at least 260px”. Without a definite
+width, the grid’s max width decides, then its min width; otherwise the list appears once.</p>
+<ul>
+<li><code>RD_REPEAT_AUTO_FILL</code> keeps empty repetitions: three cards in a four-column row leave a gap.</li>
+<li><code>RD_REPEAT_AUTO_FIT</code> drops repetitions no item occupies, so the cards stretch to fill the row.</li>
+</ul>
+<p>The whole list repeats; fixed tracks before or after a repeat aren’t supported. C++:
+<code>ctx.tracks(rd::repeat(rd::auto_fill, {rd::minmax(260_px, 1_fr)}))</code>.</p>
+<p>Track lists are interned: creating a list identical to an existing one returns the same handle, so code that
+rebuilds lists doesn’t grow memory.</p>
+<h2 id="running-layout-and-reading-geometry"><a class="header" href="#running-layout-and-reading-geometry">Running layout and reading geometry</a></h2>
+<pre><code class="language-c">rd_ctx_layout(ctx, 800, 600);  // rd_update does this for you in a raylib app
+rd_rect m = rd_node_rect(ctx, middle);    // relative to the parent's border box
+rd_rect h = rd_node_bounds(ctx, header);  // relative to the root, after scrolling
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Function</th><th>Returns</th></tr>
+</thead>
+<tbody>
+<tr><td><code>rd_node_rect</code></td><td>Border box relative to the parent’s border box, before scroll</td></tr>
+<tr><td><code>rd_node_bounds</code></td><td>Border box in root coordinates, after scroll offsets</td></tr>
+<tr><td><code>rd_node_box</code></td><td>Resolved margin, border and padding insets</td></tr>
+<tr><td><code>rd_node_content_size</code></td><td>Extent of the padding box and children’s margin boxes</td></tr>
+<tr><td><code>rd_node_baseline</code></td><td>First baseline from the top of the border box, or NaN</td></tr>
+</tbody>
+</table>
+</div>
+<p>Layout results are cached per node and reused when neither the node nor its inputs changed.</p>
+<h2 id="absolute-positioning"><a class="header" href="#absolute-positioning">Absolute positioning</a></h2>
+<pre><code class="language-c">rd_node badge = add(ctx, bar,
+                    (rd_style){.position = RD_POSITION_ABSOLUTE,
+                               .inset    = {.top = rd_px(-6), .right = rd_px(-6)},
+                               .width    = rd_px(12),
+                               .height   = rd_px(12)});
+</code></pre>
+<p>An absolute node is positioned against its parent’s padding box using <code>inset</code>. With both insets on an axis and
+no size, it stretches between them. It takes no space in the parent’s
+flex or grid layout.</p>
+<h2 id="scrolling"><a class="header" href="#scrolling">Scrolling</a></h2>
+<pre><code class="language-c">rd_node list = add(ctx, root, (rd_style){.height = rd_px(200), .overflow_y = RD_OVERFLOW_SCROLL});
+for (int i = 0; i &lt; 50; i++) add(ctx, list, (rd_style){.height = rd_px(24)});
+rd_ctx_layout(ctx, 800, 600);
+rd_node_set_scroll(ctx, list, 0, 300);  // clamped to the content: at most 50 * 24 - 200
+</code></pre>
+<p><code>overflow_x</code> and <code>overflow_y</code> set to <code>RD_OVERFLOW_HIDDEN</code> clip children; <code>RD_OVERFLOW_SCROLL</code> also makes the node
+scroll with the wheel. The wheel scrolls the nearest scroll container under the pointer that can move in the gesture’s
+direction; once a gesture starts, it stays with that container until the wheel pauses.</p>
+<p>A <code>SCROLL</code> axis whose content overflows shows a scrollbar. Bars draw over the content’s edge, inside the padding
+box, and take no layout space, so content doesn’t reflow when one appears. Dragging the thumb scrolls; pressing the
+track pages toward the pointer. Presses on a bar never reach the content under it.</p>
+<pre><code class="language-c">rd_node_merge_style(ctx, list, &amp;(rd_style){
+    .scrollbar_width = rd_px(6),                     // 0px hides the bars; scrolling still works
+    .scrollbar_color = rd_rgba(255, 255, 255, 60),   // inherited, so set it once on the root for a theme
+});
+</code></pre>
+<p>Leave room with <code>padding</code> if content shouldn’t sit under the bar.</p>
+<h2 id="layout-hooks"><a class="header" href="#layout-hooks">Layout hooks</a></h2>
+<p>Layout hooks run after every layout, with that layout’s geometry and scroll offsets. They’re for content that
+depends on its own geometry: a virtualized list binding the rows that scrolled into view, a chat log staying
+scrolled to its end. If hooks change the tree, layout runs once more before <code>rd_ctx_layout</code> returns, so the change
+shows in the same frame; hooks don’t run for that second pass.</p>
+<p><code>rd_node_on_layout(ctx, node, fn, data, destroy)</code> ties a hook to a node: destroying the node removes the hook and
+runs <code>destroy(data)</code>, and the hook is skipped while the node is detached. That’s the right lifetime for a hook that
+belongs to a view, and it can’t leak. C++: <code>node.on_layout([&amp;] { ... })</code>. <code>rd_ctx_on_layout</code> adds a hook for the
+context’s whole lifetime.</p>
+<pre><code class="language-c">static void stick_to_bottom(rd_ctx* ctx, void* data) {
+  rd_node log = *(rd_node*)data;
+  rd_node_set_scroll(ctx, log, 0, 1e9f);  // clamped to the content just laid out
+}
+
+static rd_node log_node;  // the hook's data must live as long as the hook
+rd_node_on_layout(ctx, log_node, stick_to_bottom, &amp;log_node, NULL);  // removed with the log
+</code></pre>
+<h2 id="custom-measurement"><a class="header" href="#custom-measurement">Custom measurement</a></h2>
+<p>A leaf node can report its own size with <code>rd_node_set_measure</code>. The callback receives a width and height, each with
+a mode:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Mode</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>RD_MEASURE_EXACTLY</code></td><td>The size is fixed; return it</td></tr>
+<tr><td><code>RD_MEASURE_AT_MOST</code></td><td>Return any size up to the value</td></tr>
+<tr><td><code>RD_MEASURE_UNDEFINED</code></td><td>Size freely (max-content); the value is NaN</td></tr>
+<tr><td><code>RD_MEASURE_MIN_CONTENT</code></td><td>Return the smallest size without overflow; NaN</td></tr>
+</tbody>
+</table>
+</div>
+<p>Sizes are content-box. The callback must not change the tree. When the content it measures changes, call
+<code>rd_node_mark_layout_dirty</code>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="text-and-fonts"><a class="header" href="#text-and-fonts">Text and fonts</a></h1>
+<h2 id="fonts"><a class="header" href="#fonts">Fonts</a></h2>
+<pre><code class="language-c">rd_font body = rd_font_load_file(ctx, FONT_PATH);  // the first font loaded is the default
+rd_font mono = rd_font_load_file(ctx, FONT_PATH);  // stands in for a second font file
+if (body.id == 0) return 1;                        // a null handle means the file couldn't be loaded
+
+rd_node code = rd_node_create(ctx);
+rd_node_set_style(ctx, code, &amp;(rd_style){.font = mono, .font_size = rd_px(13)});  // inherited by the text inside
+rd_node_append(ctx, root, code);
+</code></pre>
+<p><code>rd_font_load</code> takes TrueType or OpenType data in memory. With <code>copy = false</code> the data must outlive the context;
+with <code>true</code> raydom copies it. <code>rd_font_load_file</code> reads and copies a file. Both return a null handle (<code>id == 0</code>) on
+failure. The first font loaded becomes the default; <code>rd_ctx_set_default_font</code> changes it. In a style,
+<code>(rd_font){0, true}</code> means “the default font”.</p>
+<p><code>font</code> and <code>font_size</code> are inherited, so setting them on a container applies them to all the text inside it.
+Glyphs are rasterized on demand into an atlas per font size and display scale.</p>
+<h2 id="text-nodes"><a class="header" href="#text-nodes">Text nodes</a></h2>
+<pre><code class="language-c">rd_node para = add_text(ctx, root, (rd_style){.color = rd_hex(0xe4e7ee), .line_height = rd_num(1.4f)},
+                        "Text wraps on spaces to the width its container gives it.");
+rd_node_set_text(ctx, para, "New text; the next layout re-measures it.", RD_TEXT_NUL);
+size_t      len;
+const char* now = rd_node_text(ctx, para, &amp;len);
+</code></pre>
+<p><code>rd_node_set_text</code> makes the node a text leaf and copies the UTF-8 string. Pass a length, or <code>RD_TEXT_NUL</code> for a
+NUL-terminated string. A text node’s size comes from its text; it lays out no children. <code>rd_node_text</code> returns the
+stored text, or <code>NULL</code> for a node that isn’t a text leaf.</p>
+<p><code>line_height</code> accepts <code>rd_num</code> (a multiple of <code>font_size</code>), <code>rd_px</code>, or <code>rd_pct</code> (of <code>font_size</code>).</p>
+<h2 id="wrapping-and-overflow"><a class="header" href="#wrapping-and-overflow">Wrapping and overflow</a></h2>
+<pre><code class="language-c">rd_node log_line = add_text(ctx, root,
+                            (rd_style){.white_space   = RD_WHITE_SPACE_NOWRAP,
+                                       .text_overflow = RD_TEXT_OVERFLOW_ELLIPSIS},
+                            "a single long line that is cut with an ellipsis when it doesn't fit");
+rd_node summary  = add_text(ctx, root,
+                            (rd_style){.line_clamp    = rd_num(3),
+                                       .text_overflow = RD_TEXT_OVERFLOW_ELLIPSIS},
+                            "A paragraph that shows at most three lines and ends the third with an ellipsis.");
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th><code>white_space</code></th><th>Spaces and newlines</th><th>Wraps</th></tr>
+</thead>
+<tbody>
+<tr><td><code>NORMAL</code></td><td>Collapsed</td><td>Yes</td></tr>
+<tr><td><code>NOWRAP</code></td><td>Collapsed</td><td>No</td></tr>
+<tr><td><code>PRE</code></td><td>Preserved</td><td>No</td></tr>
+<tr><td><code>PRE_WRAP</code></td><td>Preserved</td><td>Yes</td></tr>
+</tbody>
+</table>
+</div>
+<p>Lines break at spaces, and between CJK characters. A word longer than the line isn’t broken; it overflows, and
+<code>text_overflow: ellipsis</code> cuts it. <code>text_overflow: ellipsis</code> replaces
+the end of a line that doesn’t fit with “…”. With <code>line_clamp: n</code>, at most <code>n</code> lines are shown, and with ellipsis
+the last shown line ends with “…” when text was cut.</p>
+<p><code>text_align</code> aligns each line within the node’s content box: <code>START</code>, <code>CENTER</code> or <code>END</code>.</p>
+<h2 id="highlights"><a class="header" href="#highlights">Highlights</a></h2>
+<pre><code class="language-c">rd_highlight marks[] = {
+    {.start = 0, .end = 3, .background = rd_hex(0xffd84d), .color = rd_hex(0x15171c)},  // "New"
+};
+rd_node_set_highlights(ctx, para, marks, 1);
+</code></pre>
+<p>Highlights are byte ranges with a background and an optional text color (alpha 0 keeps the node’s color). They are
+copied, kept across <code>rd_node_set_text</code>, and clamped to the text when drawn. Passing <code>NULL, 0</code> clears them. Use them
+for search results or syntax marks; the user’s selection is separate.</p>
+<h2 id="measuring"><a class="header" href="#measuring">Measuring</a></h2>
+<pre><code class="language-c">float           w = rd_font_measure(ctx, (rd_font){0, true}, 16, "Hello", RD_TEXT_NUL);  // default font
+rd_font_metrics m = rd_font_get_metrics(ctx, body, 16);
+</code></pre>
+<p><code>rd_font_measure</code> returns the advance width of one unwrapped line. <code>rd_font_get_metrics</code> returns ascent, descent
+(positive, below the baseline) and line gap in pixels. Both work without layout.</p>
+<h2 id="selection"><a class="header" href="#selection">Selection</a></h2>
+<p>Dragging over text whose <code>user_select</code> is <code>auto</code> (the default) selects it across text nodes, in tree order. The
+selection is also settable from code:</p>
+<pre><code class="language-c">rd_ctx_select(ctx, para, 0, para, 8);
+char   buf[64];
+size_t n = rd_ctx_selection_text(ctx, buf, sizeof buf);  // "New text"
+</code></pre>
+<p>Offsets are bytes. <code>rd_ctx_selection_text</code> writes the selected text, one line per text node, and returns its full
+length, so a first call with <code>buf = NULL</code> sizes the buffer. <code>RD_EVENT_SELECTION_CHANGE</code> fires on the root when the
+selection changes. Set <code>user_select: none</code> on buttons and labels that shouldn’t start a selection.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="images"><a class="header" href="#images">Images</a></h1>
+<h2 id="loading"><a class="header" href="#loading">Loading</a></h2>
+<pre><code class="language-c">rd_image logo = rd_image_load_file(ctx, "logo.png");  // or rd_image_load(ctx, bytes, size) for #embed data
+if (logo.id == 0) {
+  // missing or unreadable file: fall back to generated pixels
+}
+</code></pre>
+<p>raydom decodes PNG, JPEG, BMP, GIF (the first frame), TGA and PSD with a vendored copy of stb_image, so the formats
+don’t depend on how raylib was built. SVG is covered <a href="#svg">below</a>. Decoding happens at load; the texture is created on the first draw. Loading
+and layout therefore work before <code>InitWindow</code> and in headless tests.</p>
+<p>For a single binary, embed the file and load it from memory:</p>
+<pre><code class="language-c">static const unsigned char logo_png[] = {
+#embed "logo.png"
+};
+rd_image logo = rd_image_load(ctx, logo_png, sizeof logo_png);
+</code></pre>
+<p>Pixels generated by the program work the same way:</p>
+<pre><code class="language-c">int            w = 64, h = 32;
+unsigned char* rgba = calloc((size_t)w * (size_t)h, 4);
+for (int i = 0; i &lt; w * h; i++) rgba[i * 4 + 0] = rgba[i * 4 + 3] = 255;  // opaque red
+rd_image swatch = rd_image_from_pixels(ctx, rgba, w, h);                 // copied; rgba can be freed
+free(rgba);
+</code></pre>
+<h2 id="svg"><a class="header" href="#svg">SVG</a></h2>
+<p><code>rd_image_load</code> and <code>rd_image_load_file</code> recognize SVG documents by their content and parse them with a vendored
+copy of nanosvg. An SVG’s natural size comes from its <code>width</code> and <code>height</code>, or its <code>viewBox</code>. It is rasterized when
+drawn, at the size it’s drawn at times the display scale, so it stays sharp at any size; when drawn larger later,
+it’s rasterized again. Smaller uses sample the larger raster.</p>
+<pre><code class="language-c">rd_image icon = rd_image_load(ctx, icon_svg, sizeof icon_svg - 1);
+rd_node  n    = rd_node_create(ctx);
+rd_node_set_image(ctx, n, icon);
+rd_node_set_style(ctx, n, &amp;(rd_style){.height = rd_px(20), .color = rd_hex(0x5b8cff)});  // 20px, blue
+</code></pre>
+<p>An SVG that uses <code>currentColor</code> is drawn tinted by the node’s <code>color</code>, which is inherited, so icons match the text
+around them. The tint applies to the whole icon: in an SVG that mixes <code>currentColor</code> with other colors, the other
+colors are tinted too. Monochrome icon sets (Lucide, Heroicons, Feather) work as intended.</p>
+<p>nanosvg covers paths, basic shapes, strokes, fills, opacity and gradients. It doesn’t support text, filters, masks,
+clip paths, patterns or embedded images. See <a href="#limits">Limits</a>.</p>
+<h2 id="image-nodes"><a class="header" href="#image-nodes">Image nodes</a></h2>
+<pre><code class="language-c">rd_node banner = rd_node_create(ctx);
+rd_node_set_image(ctx, banner, swatch);
+rd_node_set_style(ctx, banner, &amp;(rd_style){.width = rd_px(200)});  // height follows: 100
+rd_node_append(ctx, root, banner);
+
+rd_node avatar = rd_node_create(ctx);
+rd_node_set_image(ctx, avatar, swatch);
+rd_node_set_style(ctx, avatar, &amp;(rd_style){.width          = rd_px(48),
+                                           .height         = rd_px(48),
+                                           .object_fit     = RD_OBJECT_FIT_COVER,
+                                           .border_radius  = rd_corners_all(rd_px(24))});  // a circle
+rd_node_append(ctx, root, avatar);
+</code></pre>
+<p><code>rd_node_set_image</code> makes the node an image leaf. It is sized like an HTML <code>&lt;img&gt;</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Style sets</th><th>Size</th></tr>
+</thead>
+<tbody>
+<tr><td>Nothing</td><td>The image’s size in pixels, as logical pixels</td></tr>
+<tr><td><code>width</code> only</td><td>That width; height from the aspect ratio</td></tr>
+<tr><td><code>height</code> only</td><td>That height; width from the aspect ratio</td></tr>
+<tr><td>Both</td><td>Both; <code>object_fit</code> decides how the image fills</td></tr>
+</tbody>
+</table>
+</div>
+<p>A stretched item in a column (the default <code>align_items</code>) has a definite width, so it fills the column and takes its
+height from the ratio.</p>
+<p><code>object_fit</code> places the image in the content box. The image is centered, and cropped where it overflows:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th><code>object_fit</code></th><th>Result</th></tr>
+</thead>
+<tbody>
+<tr><td><code>FILL</code></td><td>Stretched to the box (the default)</td></tr>
+<tr><td><code>CONTAIN</code></td><td>As large as fits, aspect ratio kept, letterboxed</td></tr>
+<tr><td><code>COVER</code></td><td>Covers the box, aspect ratio kept, edges cropped</td></tr>
+<tr><td><code>NONE</code></td><td>Natural size</td></tr>
+<tr><td><code>SCALE_DOWN</code></td><td><code>NONE</code> or <code>CONTAIN</code>, whichever is smaller</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>border_radius</code> clips the image, less the node’s border and padding, so a square node with <code>COVER</code> and a radius of
+half its size is a round avatar. <code>opacity</code> fades it. Background and border draw behind it as on any node.</p>
+<p>C++: <code>ctx.create_image(img, style)</code> creates an image node with the image <a href="#roles">role</a>.</p>
+<h2 id="changing-and-freeing"><a class="header" href="#changing-and-freeing">Changing and freeing</a></h2>
+<pre><code class="language-c">unsigned char frame[16 * 16 * 4] = {0};
+rd_image_update(ctx, swatch, frame, 16, 16);  // a new size: nodes showing it relayout
+rd_image_unload(ctx, logo);                   // safe on a null image
+</code></pre>
+<p><code>rd_image_update</code> replaces the pixels, for video frames, emulator screens or anything drawn on the CPU. The texture is
+updated in place when the size is unchanged. <code>rd_image_unload</code> frees the pixels and texture; nodes showing the image
+collapse and draw nothing. Image handles aren’t reused, so a stale handle stays null. Everything is freed with the
+context.</p>
+<p>Textures get mipmaps and trilinear filtering, so images stay smooth when drawn smaller than their size.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="events"><a class="header" href="#events">Events</a></h1>
+<h2 id="listeners"><a class="header" href="#listeners">Listeners</a></h2>
+<pre><code class="language-cpp">item.on_click([&amp;] { log.push_back("item"); });                                  // bubble phase, target
+list.on(RD_EVENT_CLICK, [&amp;](rd::Event&amp;) { log.push_back("list bubble"); });     // after the target
+list.on(RD_EVENT_CLICK, [&amp;](rd::Event&amp;) { log.push_back("list capture"); }, true);  // before the target
+</code></pre>
+<p>The C form is:</p>
+<pre><code class="language-c">rd_listener l = rd_node_on(ctx, node, RD_EVENT_CLICK, on_click, data, free_data, 0);  // or RD_LISTEN_CAPTURE
+rd_node_off(ctx, l);                                                                   // runs free_data
+</code></pre>
+<p><code>fn(ctx, ev, data)</code> receives the event. <code>destroy(data)</code> runs when the listener is removed, or when its node is
+destroyed. C++ listeners take <code>rd::Event&amp;</code> or nothing; the callable is owned by the listener.</p>
+<h2 id="propagation"><a class="header" href="#propagation">Propagation</a></h2>
+<p>Dispatch follows the DOM. The path from the root to the target is fixed when dispatch starts. Capture listeners run
+from the root down to the target’s parent, then the target’s listeners run (its capture listeners
+first), then bubble listeners run from the parent up to the root. <code>ev-&gt;phase</code> says which phase is running; <code>ev-&gt;current</code> is the node whose listener is running
+and <code>ev-&gt;target</code> is the node the event is for.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Call</th><th>Effect</th></tr>
+</thead>
+<tbody>
+<tr><td><code>rd_event_stop_propagation</code></td><td>Finish the current node’s listeners, then stop</td></tr>
+<tr><td><code>rd_event_stop_immediate_propagation</code></td><td>Stop now; later listeners on the same node don’t run</td></tr>
+<tr><td><code>rd_event_prevent_default</code></td><td>Skip raydom’s default action (scroll, focus, editing, click)</td></tr>
+</tbody>
+</table>
+</div>
+<pre><code class="language-cpp">rd::Node row = ctx.create(rd::Style().height(30_px));
+row.on_click([](rd::Event&amp; e) {
+  e.stop_propagation();       // no bubble listeners run; capture listeners already have
+  e.current().destroy();      // safe during dispatch: freed when dispatch ends
+});
+list.append(row);
+</code></pre>
+<p>Stopping at the target doesn’t undo capture listeners that already ran on ancestors.</p>
+<h2 id="event-types"><a class="header" href="#event-types">Event types</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Type</th><th>Target</th><th>Bubbles</th><th>Default action</th></tr>
+</thead>
+<tbody>
+<tr><td><code>POINTER_DOWN</code>, <code>_UP</code>, <code>_MOVE</code></td><td>Node under the pointer, or the capturing node</td><td>Yes</td><td>Down: focus, start selection</td></tr>
+<tr><td><code>POINTER_ENTER</code>, <code>_LEAVE</code></td><td>Each node entered or left</td><td>No</td><td></td></tr>
+<tr><td><code>CLICK</code></td><td>Common ancestor of the press and release targets</td><td>Yes</td><td></td></tr>
+<tr><td><code>WHEEL</code></td><td>Node under the pointer</td><td>Yes</td><td>Scroll the nearest scroll container</td></tr>
+<tr><td><code>KEY_DOWN</code>, <code>KEY_UP</code></td><td>Focused node, or the root</td><td>Yes</td><td>Down: Tab focus, Enter/Space click, editing</td></tr>
+<tr><td><code>TEXT</code></td><td>Focused node, or the root</td><td>Yes</td><td>Insert into a focused input</td></tr>
+<tr><td><code>FOCUS</code>, <code>BLUR</code></td><td>The node gaining or losing focus</td><td>No</td><td></td></tr>
+<tr><td><code>FOCUS_IN</code>, <code>FOCUS_OUT</code></td><td>Same</td><td>Yes</td><td></td></tr>
+<tr><td><code>INPUT</code></td><td>The input</td><td>Yes</td><td></td></tr>
+<tr><td><code>CHANGE</code></td><td>The input</td><td>Yes</td><td></td></tr>
+<tr><td><code>SELECTION_CHANGE</code></td><td>The root</td><td>No</td><td></td></tr>
+</tbody>
+</table>
+</div>
+<p>Event fields: <code>x</code>, <code>y</code> in root coordinates; <code>local_x</code>, <code>local_y</code> relative to <code>current</code>’s border box; <code>wheel_x</code>,
+<code>wheel_y</code> in notches; <code>button</code> (the button that changed) and <code>buttons</code> (held mask); <code>key</code>, <code>mods</code>, <code>repeat</code>;
+<code>codepoint</code> for text; <code>related</code> for focus events.</p>
+<p><code>CLICK</code> fires for the primary button only.</p>
+<h2 id="pointer-capture"><a class="header" href="#pointer-capture">Pointer capture</a></h2>
+<pre><code class="language-cpp">rd::Node handle = ctx.create(rd::Style().width(20_px).height(20_px));
+float    dragged = 0;
+handle.on(RD_EVENT_POINTER_DOWN, [](rd::Event&amp; e) { e.current().capture_pointer(); });
+handle.on(RD_EVENT_POINTER_MOVE, [&amp;](rd::Event&amp; e) {
+  if (e.buttons() &amp; RD_BUTTON_PRIMARY) dragged = e.local_x();  // keeps arriving outside the handle
+});
+</code></pre>
+<p>While a node holds the capture, every pointer event goes to it, wherever the pointer is, until all buttons are
+released or <code>rd_node_release_pointer_capture</code> is called. Use it for drags, sliders and splitters.</p>
+<h2 id="overriding-defaults"><a class="header" href="#overriding-defaults">Overriding defaults</a></h2>
+<pre><code class="language-cpp">rd::Node canvas = ctx.create(rd::Style().height(100_px).overflow_y(RD_OVERFLOW_SCROLL));
+canvas.on(RD_EVENT_WHEEL, [](rd::Event&amp; e) { e.prevent_default(); });  // handle the wheel yourself, no scrolling
+</code></pre>
+<h2 id="firing-events"><a class="header" href="#firing-events">Firing events</a></h2>
+<p><code>rd_node_dispatch(ctx, node, type)</code> fires an event through capture, target and bubble like any other, with the
+current pointer position and modifiers. Components use it to announce their own <code>INPUT</code> and <code>CHANGE</code>, so
+applications listen to them the same way as to built-in inputs. It returns false if a listener called
+<code>rd_event_prevent_default</code>.</p>
+<h2 id="hit-testing"><a class="header" href="#hit-testing">Hit-testing</a></h2>
+<p><code>rd_node_at(ctx, x, y)</code> returns the topmost node under a point after layout. Nodes with <code>pointer_events: none</code> are
+skipped, and children inherit it unless they set <code>auto</code>. Use <code>none</code> for overlays and decorative layers that
+shouldn’t take the pointer.</p>
+<h2 id="cursors"><a class="header" href="#cursors">Cursors</a></h2>
+<p>The <code>cursor</code> style property sets the mouse cursor over a node. It’s inherited, so setting it on a card applies to
+everything inside. <code>rd_update</code> shows the cursor of the hovered node, or of the node holding the pointer capture.</p>
+<pre><code class="language-cpp">rd::Class grip = ctx.create_class(rd::Style().cursor(RD_CURSOR_EW_RESIZE));
+grip.on(RD_STATE_ACTIVE, rd::Style().cursor(RD_CURSOR_MOVE));  // while pressed, for the whole drag
+</code></pre>
+<p><code>RD_CURSOR_AUTO</code>, the default, shows:</p>
+<ul>
+<li>text over inputs, and over text whose <code>user_select</code> is <code>auto</code>;</li>
+<li>pointer over nodes with the link role;</li>
+<li>default over everything else, including text inside a button or other interactive role.</li>
+</ul>
+<p>While the user drags a text selection, the cursor stays text even over other nodes. <code>RD_CURSOR_NONE</code> hides it.
+<code>rd_ctx_cursor</code> returns the resolved cursor, for applications that drive input themselves. Don’t call raylib’s
+<code>SetMouseCursor</code> alongside <code>rd_update</code>; set the style instead.</p>
+<h2 id="mutating-during-dispatch"><a class="header" href="#mutating-during-dispatch">Mutating during dispatch</a></h2>
+<p>Listeners may create, move and destroy nodes, including the target and the current node. A node destroyed during
+dispatch is detached at once and freed when dispatch ends, so <code>ev-&gt;current</code> stays valid until the listener returns.
+A listener added to a node while that node’s listeners are running doesn’t run for the current event.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="focus-keyboard-and-text-input"><a class="header" href="#focus-keyboard-and-text-input">Focus, keyboard and text input</a></h1>
+<h2 id="focus"><a class="header" href="#focus">Focus</a></h2>
+<p>A node can take focus when its <code>focusable</code> is <code>TAB</code> (pointer, code and Tab) or <code>POINTER</code> (pointer and code). Inputs
+and nodes with an interactive <a href="#roles">role</a>, such as buttons from <code>rd_node_create_button</code>, are focusable without
+the style. Pressing the primary button focuses the target or its nearest focusable ancestor, and clears focus if there is
+none. A listener that calls <code>rd_event_prevent_default</code> on <code>POINTER_DOWN</code> keeps focus where it was.</p>
+<pre><code class="language-cpp">rd::Class button_style = ctx.create_class(rd::Style().padding(6_px, 12_px));
+button_style.on(RD_STATE_FOCUS_VISIBLE, rd::Style().box_shadow(0, 0, 0, rd::rgba(91, 140, 255, 200), 2));
+rd::Node save  = ctx.create_button("Save").add_class(button_style);  // focusable by role
+rd::Node badge = ctx.create(rd::Style().focusable(RD_FOCUSABLE_TAB));  // any node, by style
+int      saves = 0;
+save.on_click([&amp;] { ++saves; });  // also fires on Enter or Space while focused
+</code></pre>
+<p>Tab and Shift+Tab move through <code>TAB</code> nodes in tree order, wrapping, skipping hidden and disabled subtrees.
+<code>rd_node_focus(ctx, node)</code> focuses from code; a null node clears focus. <code>rd_ctx_focus_next</code> steps like Tab. A focus
+change fires <code>BLUR</code>, <code>FOCUS_OUT</code>, <code>FOCUS</code>, <code>FOCUS_IN</code>, in that order.</p>
+<p><code>rd_ctx_set_focus_scope(ctx, node)</code> keeps Tab and Shift+Tab inside a subtree, as a modal dialog needs; null
+restores the whole tree, and so does destroying the scope node. Pointer and programmatic focus aren’t restricted.</p>
+<p>Enter and Space on a focused node that isn’t an input fire <code>CLICK</code>, so keyboard users can activate buttons without
+extra code.</p>
+<h2 id="keyboard"><a class="header" href="#keyboard">Keyboard</a></h2>
+<pre><code class="language-cpp">ctx.root().on(RD_EVENT_KEY_DOWN, [&amp;](rd::Event&amp; e) {
+  if (e.key() == RD_KEY_ESCAPE) ctx.blur();
+});
+</code></pre>
+<p>Keys go to the focused node, or the root when nothing has focus, and bubble. <code>ev-&gt;mods</code> is a mask of
+<code>RD_MOD_SHIFT</code>, <code>RD_MOD_CTRL</code>, <code>RD_MOD_ALT</code>, <code>RD_MOD_SUPER</code>. Calling <code>rd_event_prevent_default</code> in a <code>KEY_DOWN</code>
+listener suppresses Tab navigation, activation, and editing for that key.</p>
+<h2 id="text-inputs"><a class="header" href="#text-inputs">Text inputs</a></h2>
+<pre><code class="language-cpp">rd::Node name  = ctx.create_input(false, rd::Style().width(240_px)).placeholder("Your name");
+rd::Node notes = ctx.create_input(/*multiline=*/true, rd::Style().min_height(80_px));
+
+std::string value;
+name.on(RD_EVENT_INPUT, [&amp;](rd::Event&amp; e) { value = std::string(e.target().text()); });  // every edit
+name.on(RD_EVENT_CHANGE, [&amp;] { /* Enter, or leaving the field after editing */ });
+</code></pre>
+<p><code>rd_node_create_input</code> creates an input, and <code>rd_node_make_input</code> turns an existing node into one: an editable text
+leaf. A single-line input scrolls horizontally; a multi-line
+input (<code>RD_INPUT_MULTILINE</code>) wraps and grows. <code>rd_node_text</code> reads the value and <code>rd_node_set_text</code> replaces it.
+<code>rd_input_select</code> and <code>rd_input_selection</code> set and read the selection as byte offsets; the caret is the moving end.</p>
+<p><code>INPUT</code> fires after every edit. <code>CHANGE</code> fires when edits are committed: Enter in a single-line input, or blur after
+an edit.</p>
+<p>Editing keys, with Shortcut meaning Cmd on macOS and Ctrl elsewhere, and Word meaning Option on macOS and Ctrl
+elsewhere:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Keys</th><th>Action</th></tr>
+</thead>
+<tbody>
+<tr><td>Arrows, Home, End</td><td>Move; Shift extends the selection</td></tr>
+<tr><td>Word + Left/Right</td><td>Move by word</td></tr>
+<tr><td>Shortcut + Home/End</td><td>Start or end of the value</td></tr>
+<tr><td>Backspace, Delete</td><td>Delete; Word deletes a word; on macOS, Cmd deletes to the line edge</td></tr>
+<tr><td>Shortcut + A</td><td>Select all</td></tr>
+<tr><td>Shortcut + C, X, V</td><td>Copy, cut, paste</td></tr>
+<tr><td>Shortcut + Z</td><td>Undo; with Shift, redo</td></tr>
+<tr><td>Shortcut + Y</td><td>Redo</td></tr>
+<tr><td>Enter</td><td>Newline in multi-line; <code>CHANGE</code> in single-line</td></tr>
+</tbody>
+</table>
+</div>
+<p>Consecutive typed characters form one undo step.</p>
+<h2 id="clipboard"><a class="header" href="#clipboard">Clipboard</a></h2>
+<p>Inputs use an in-memory clipboard by default. <code>rd_update</code> installs raylib’s system clipboard. Without raylib, provide
+one:</p>
+<pre><code class="language-c">rd_ctx_set_clipboard(ctx, get_text, set_text, data);
+</code></pre>
+<h2 id="driving-input-in-tests"><a class="header" href="#driving-input-in-tests">Driving input in tests</a></h2>
+<p>The C++ context has <code>press(key)</code> and <code>type(utf8)</code> helpers over <code>rd_ctx_key</code> and <code>rd_ctx_text</code>:</p>
+<pre><code class="language-cpp">ctx.press(RD_KEY_TAB);  // focus moves to the first focusable node: name
+ctx.type("Ada");        // text events, one per codepoint
+ctx.press(RD_KEY_TAB);  // notes
+ctx.press(RD_KEY_TAB);  // save
+ctx.press(RD_KEY_ENTER);
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="roles"><a class="header" href="#roles">Roles</a></h1>
+<p>A role says what a node is: a button, a heading, a text input. raydom doesn’t draw or behave differently by role,
+with one exception below. Roles exist so a future accessibility backend can describe the tree to screen readers
+without every application revisiting its controls. Set them now and that work becomes a backend change only.</p>
+<h2 id="constructors"><a class="header" href="#constructors">Constructors</a></h2>
+<p>The direct way to get a role is to create the node with one:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>C</th><th>C++</th><th>Role</th></tr>
+</thead>
+<tbody>
+<tr><td><code>rd_node_create_text(ctx, s, n)</code></td><td><code>ctx.create_text(s, style)</code></td><td>text</td></tr>
+<tr><td><code>rd_node_create_button(ctx, s, n)</code></td><td><code>ctx.create_button(s, style)</code></td><td>button, with a text label</td></tr>
+<tr><td><code>rd_node_create_button(ctx, NULL, 0)</code></td><td><code>ctx.create_button(style)</code></td><td>button, empty, for icon or composite content</td></tr>
+<tr><td><code>rd_node_create_input(ctx, flags)</code></td><td><code>ctx.create_input(multiline, style)</code></td><td>text input or multi-line text input</td></tr>
+</tbody>
+</table>
+</div>
+<pre><code class="language-cpp">#include &lt;raydom/raydom.hh&gt;
+#include &lt;raylib.h&gt;
+
+#include &lt;string&gt;
+
+using namespace rd::literals;
+
+int main() {
+  SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
+  InitWindow(800, 600, "hello");
+  {
+    rd::Context ctx;
+    ctx.load_font_file(FONT_PATH);  // any .ttf or .otf file
+
+    rd::Class button_style = ctx.create_class(rd::Style()
+                                                  .padding(8_px, 16_px)
+                                                  .border_radius(8_px)
+                                                  .background(rd::hex(0x5b8cff))
+                                                  .color(rd::hex(0xffffff)));
+    button_style.on(RD_STATE_HOVER, rd::Style().background(rd::hex(0x7aa2ff)));
+
+    int      clicks = 0;
+    rd::Node label  = ctx.create_text("Clicked 0 times", rd::Style().color(rd::hex(0xe4e7ee)));
+    rd::Node button = ctx.create_button("Click me").add_class(button_style);  // Tab focuses it; Enter and Space click it
+    button.on_click([&amp;] { label.text("Clicked " + std::to_string(++clicks) + " times"); });
+
+    ctx.root()
+        .style(rd::Style().padding(24_px).row_gap(12_px).align_items(RD_ALIGN_START))
+        .append(button)
+        .append(label);
+
+    while (!WindowShouldClose()) {
+      ctx.update();
+      BeginDrawing();
+      ClearBackground(BLACK);
+      ctx.draw();
+      EndDrawing();
+    }
+  }  // the context is destroyed here, before CloseWindow
+  CloseWindow();
+}
+</code></pre>
+<p>Each returns a detached node, or a null node on allocation failure.</p>
+<h2 id="setting-a-role"><a class="header" href="#setting-a-role">Setting a role</a></h2>
+<pre><code class="language-c">rd_node_set_role(ctx, title, RD_ROLE_HEADING);
+rd_node_set_role(ctx, menu, RD_ROLE_LIST);
+rd_role r = rd_node_role(ctx, node);
+</code></pre>
+<p><code>RD_ROLE_AUTO</code>, the default, derives the role from the node: multi-line or single-line text input for inputs, text
+for other text leaves, canvas for nodes with a paint callback, and generic otherwise. <code>rd_node_role</code> returns the
+resolved role. Setting <code>RD_ROLE_AUTO</code> returns a node to its derived role.</p>
+<p>The roles are a subset of <a href="https://accesskit.dev/">AccessKit</a>’s: generic, group, button, link, checkbox, radio
+button, radio group, switch, slider, text, label, heading, text input, multi-line text input, list, list item, image,
+canvas, menu, menu item, combo box, dialog, tooltip. More can be added
+in a minor release.</p>
+<h2 id="focus-1"><a class="header" href="#focus-1">Focus</a></h2>
+<p>Interactive roles (button, link, checkbox, radio button, switch, slider, menu item, combo box) take focus without a <code>focusable</code> style, as inputs do:</p>
+<ul>
+<li>Tab reaches them, unless their <code>focusable</code> is <code>POINTER</code>, which keeps pointer focus and skips Tab.</li>
+<li>Enter and Space on a focused one fire <code>CLICK</code>, as for any focused node that isn’t an input.</li>
+<li>To take one out of focus and pointer input, set <code>RD_STATE_DISABLED</code> on it.</li>
+</ul>
+<p>Roles carry no other behavior. A checkbox doesn’t toggle itself; the application tracks its state and styles it.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="animation"><a class="header" href="#animation">Animation</a></h1>
+<h2 id="transitions"><a class="header" href="#transitions">Transitions</a></h2>
+<p>A node with a <code>transition_duration</code> animates its own style changes: a class added or removed, a state variant
+applying, an inline style set. Each changed property moves from the value it shows to its new value.</p>
+<pre><code class="language-c">rd_class card = rd_class_create(ctx, &amp;(rd_style){.width               = rd_px(200),
+                                                 .background          = rd_hex(0x1a1f2b),
+                                                 .transition_duration = rd_ms(200),
+                                                 .transition_easing   = RD_EASING_EASE_OUT});
+rd_class_set_state(ctx, card, RD_STATE_HOVER,
+                   &amp;(rd_style){.width = rd_px(240), .background = rd_hex(0x252c3d)});  // both animate
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>transition_duration</code></td><td>Seconds: <code>rd_ms(150)</code>, <code>rd_s(0.2)</code>; C++ <code>150_ms</code>. 0, the default, changes at once</td></tr>
+<tr><td><code>transition_delay</code></td><td>Seconds before the change starts animating</td></tr>
+<tr><td><code>transition_easing</code></td><td><code>LINEAR</code>, <code>EASE</code> (default), <code>EASE_IN</code>, <code>EASE_OUT</code>, <code>EASE_IN_OUT</code>: the CSS curves</td></tr>
+<tr><td><code>transition_properties</code></td><td>A mask of groups: <code>COLOR</code>, <code>OPACITY</code>, <code>SHADOW</code>, <code>RADIUS</code>, <code>SIZE</code>, <code>SPACING</code>, <code>INSET</code>, <code>TEXT</code>; all by default</td></tr>
+</tbody>
+</table>
+</div>
+<p>Put the transition properties on the base style of a class, so they apply in every state. A variant that sets a
+different duration applies it to changes made while the variant is active.</p>
+<h3 id="what-animates"><a class="header" href="#what-animates">What animates</a></h3>
+<ul>
+<li><strong>Lengths</strong> (sizes, spacing, insets, gaps, radii, font size, line height, flex factors) when both values have the
+same unit. px to px animates; px to percent, or anything to <code>auto</code>, changes at once.</li>
+<li><strong>Height to and from <code>auto</code>.</strong> Collapsing from <code>auto</code> starts at the laid-out height. Expanding to <code>auto</code> animates
+to the content’s height, measured every frame, and ends as <code>auto</code>, so the node keeps following its content.</li>
+<li><strong>Colors</strong>, in premultiplied alpha, so fading to or from transparent doesn’t pass through black.</li>
+<li><strong>Edges, corners and shadows</strong>, side by side.</li>
+</ul>
+<p>Everything else (<code>display</code>, <code>flex_direction</code>, fonts, enumerations) changes at once. A node’s first style never
+animates, nor does a change while the node has <code>display: none</code>.</p>
+<h3 id="layout-1"><a class="header" href="#layout-1">Layout</a></h3>
+<p>Layout properties animate through layout: every frame of a width or margin transition lays the tree out again, so
+siblings and parents move with it, and hit-testing, anchoring and scrolling all follow. Layout is cached per node,
+so only the animating node’s ancestors and the siblings it moves are recomputed.</p>
+<p>To move something without moving its neighbors, animate <code>inset</code> on a node with the default <code>position: relative</code>:
+it’s offset from where it was laid out, and nothing else reflows.</p>
+<h3 id="accordions"><a class="header" href="#accordions">Accordions</a></h3>
+<pre><code class="language-c">rd_node panel = rd_node_create(ctx);
+rd_node_set_style(ctx, panel, &amp;(rd_style){.height              = rd_px(0),  // closed
+                                          .overflow_y          = RD_OVERFLOW_HIDDEN,
+                                          .transition_duration = rd_ms(250)});
+// open: animates to the content's height, then stays auto as the content changes
+rd_node_merge_style(ctx, panel, &amp;(rd_style){.height = rd_auto()});
+</code></pre>
+<h3 id="retargeting"><a class="header" href="#retargeting">Retargeting</a></h3>
+<p>Changing a property mid-transition starts a new transition from where it is, so hovering in and out quickly never
+jumps.</p>
+<h2 id="explicit-animations"><a class="header" href="#explicit-animations">Explicit animations</a></h2>
+<pre><code class="language-c">static rd_node toast;
+toast = rd_node_create(ctx);
+rd_node_append(ctx, rd_ctx_root(ctx), toast);
+// In: from transparent and 24px lower, to its place.
+rd_node_animate(ctx, toast, &amp;(rd_style){.opacity = rd_num(0), .margin.top = rd_px(24)},
+                &amp;(rd_style){.opacity = rd_num(1), .margin.top = rd_px(0)}, 0.2, RD_EASING_EASE_OUT, NULL, NULL);
+// ... later, out: fade, then remove it when the animation ends.
+rd_node_animate(ctx, toast, NULL, &amp;(rd_style){.opacity = rd_num(0)}, 0.15, RD_EASING_EASE_IN, remove_node, &amp;toast);
+</code></pre>
+<p><code>rd_node_animate</code> merges <code>to</code> into the node’s inline style and animates the properties it sets, from what the node
+shows, over the given seconds and easing, whatever the node’s transition properties say. <code>from</code> sets starting values
+for some properties, which is how a node that was just created animates in. <code>done</code> runs once the time is up; it’s a
+<a href="#timers">timer</a>, so it may destroy the node.</p>
+<p>C++: <code>node.animate(to, 0.2)</code>, <code>node.animate(from, to, 0.2)</code>, and <code>node.animate(to, 0.15, RD_EASING_EASE_IN, [&amp;] { ... })</code>.</p>
+<h2 id="clock-and-frames"><a class="header" href="#clock-and-frames">Clock and frames</a></h2>
+<p>Animations advance in <code>rd_ctx_layout</code>, on the context’s clock (<code>rd_ctx_set_time</code>, which <code>rd_update</code> sets from
+raylib). <code>rd_ctx_animating</code> is true while anything moves. With
+<a href="#event-waiting"><code>rd_set_event_waiting</code></a>, frames keep running while anything
+animates and wait for input once everything is still.</p>
+<p>Animating layout costs one layout pass per frame for the animating parts of the tree, which is the same cost as
+resizing the window.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="overlay-and-anchoring"><a class="header" href="#overlay-and-anchoring">Overlay and anchoring</a></h1>
+<p>Menus, popovers, tooltips and modals have to draw above everything else and must not be clipped by the scroll
+container their trigger sits in. raydom provides two primitives for them: the overlay layer, and anchored
+positioning.</p>
+<h2 id="the-overlay"><a class="header" href="#the-overlay">The overlay</a></h2>
+<pre><code class="language-c">rd_node menu = rd_node_create(ctx);
+rd_node_set_style(ctx, menu, &amp;(rd_style){.position = RD_POSITION_ABSOLUTE, .width = rd_px(160), .height = rd_px(90)});
+rd_node_append(ctx, rd_ctx_overlay(ctx), menu);
+rd_node_set_anchor(ctx, menu, &amp;(rd_anchor){.node = button, .offset = 4});  // below the button
+</code></pre>
+<p><code>rd_ctx_overlay</code> returns the overlay node, creating it on first use. It is a child of the root with special rules:</p>
+<ul>
+<li><strong>Always last.</strong> It stays the root’s last child: appending to the root inserts before it. So it draws after,
+and is hit-tested before, everything else.</li>
+<li><strong>Never clipped.</strong> It always covers the root, and no other node is its ancestor, so overflow containers don’t
+clip what’s inside it. Its position, inset, margin and size can’t be changed by styles; padding, background and
+layout properties can.</li>
+<li><strong>Transparent to input.</strong> The overlay node itself is never a hit target, so it doesn’t block the page under it.
+Only its children take input.</li>
+</ul>
+<p>Overlay children are ordinary nodes. Give them <code>position: absolute</code>, or they stack in the overlay’s flex layout.
+Events from them bubble through the overlay to the root, and they’re in Tab order after the page.</p>
+<h2 id="anchoring"><a class="header" href="#anchoring">Anchoring</a></h2>
+<p><code>rd_node_set_anchor</code> positions a node against another node, or a point, after every layout:</p>
+<pre><code class="language-c">rd_node_set_anchor(ctx, menu, &amp;(rd_anchor){.node = button, .side = RD_SIDE_RIGHT, .align = RD_ALIGN_CENTER});
+rd_node_set_anchor(ctx, menu, &amp;(rd_anchor){.x = 300, .y = 200});  // at a point: a context menu
+rd_node_set_anchor(ctx, menu, &amp;(rd_anchor){.node = button, .match_width = true});  // a dropdown
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>node</code></td><td>The anchor node; null to use <code>x</code>, <code>y</code> in root coordinates</td></tr>
+<tr><td><code>side</code></td><td><code>BOTTOM</code> (zero), <code>TOP</code>, <code>RIGHT</code> or <code>LEFT</code> of the anchor</td></tr>
+<tr><td><code>align</code></td><td><code>START</code> (zero), <code>CENTER</code> or <code>END</code> along that side</td></tr>
+<tr><td><code>offset</code></td><td>Gap between the anchor and the node</td></tr>
+<tr><td><code>no_flip</code></td><td>Keep <code>side</code> even when the node only fits on the opposite side</td></tr>
+<tr><td><code>no_shift</code></td><td>Don’t slide the node to keep it inside the root</td></tr>
+<tr><td><code>match_width</code></td><td>Lay the node out at the anchor’s width</td></tr>
+</tbody>
+</table>
+</div>
+<p>A zero-initialized <code>rd_anchor</code> places the node below its anchor, start-aligned, flipping to the other side when it
+doesn’t fit and shifting to stay inside the window:</p>
+<pre><code class="language-c">rd_node_merge_style(ctx, button, &amp;(rd_style){.margin.top = rd_px(560)});
+rd_ctx_layout(ctx, 800, 600);
+rd_side side = rd_node_anchor_side(ctx, menu);  // RD_SIDE_TOP: no room below, so it flipped
+</code></pre>
+<p><code>rd_node_anchor_side</code> reports the side actually used, for drawing an arrow that points at the anchor.</p>
+<p>The anchor is followed every layout, including when it scrolls. Anchored nodes are placed in the order they were
+anchored, so a submenu anchored to an item of an anchored menu lands next to the item’s final position. If the
+anchor is destroyed or detached, the node stays where it was last placed.</p>
+<h2 id="opening-and-closing"><a class="header" href="#opening-and-closing">Opening and closing</a></h2>
+<p>The overlay has no notion of open or closed. Show and hide popups with <code>display</code>, or create and destroy them:</p>
+<pre><code class="language-c">rd_node_set_style(ctx, menu, &amp;(rd_style){.position = RD_POSITION_ABSOLUTE, .display = RD_DISPLAY_NONE});  // close
+rd_node_destroy(ctx, menu);                                                                           // or remove
+</code></pre>
+<p>Light dismiss, closing when the user presses outside, is a capture listener on the root:</p>
+<pre><code class="language-cpp">ctx.root().on(RD_EVENT_POINTER_DOWN, [&amp;](rd::Event&amp; e) {
+  if (!popover.contains(e.target()) &amp;&amp; !toggle.contains(e.target())) hide(popover);
+}, /*capture=*/true);
+</code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="canvases"><a class="header" href="#canvases">Canvases</a></h1>
+<p>A paint callback lets a node draw with raylib directly. The node is laid out and styled as usual; the callback draws
+inside its content box.</p>
+<pre><code class="language-c">typedef struct chart {
+  float values[5];
+} chart;
+
+static void paint_chart(rd_ctx* ctx, const rd_paint_info* info, void* data) {
+  (void)ctx;
+  const chart* c = data;
+  rd_rect      r = info-&gt;content;  // screen coordinates, already scrolled
+  rd_paint_scissor(info);          // clip to the visible part of the node
+  float bar = r.width / 5;
+  for (int i = 0; i &lt; 5; i++) {
+    float h = r.height * c-&gt;values[i];
+    DrawRectangleRec((Rectangle){r.x + bar * (float)i + 4, r.y + r.height - h, bar - 8, h}, SKYBLUE);
+  }
+}
+</code></pre>
+<pre><code class="language-c">static chart data = {{0.2f, 0.5f, 0.9f, 0.4f, 0.7f}};
+rd_node      plot = rd_node_create(ctx);
+rd_node_set_style(ctx, plot, &amp;(rd_style){.height = rd_px(240), .margin = rd_edges_all(rd_px(20))});
+rd_node_set_paint(ctx, plot, paint_chart, &amp;data, NULL);  // NULL: nothing to free when the node goes away
+rd_node_append(ctx, rd_ctx_root(ctx), plot);
+</code></pre>
+<p>The callback runs inside <code>rd_draw</code>, after the node’s background and border and before its children, so children
+draw on top. raydom flushes raylib’s batch before the call, with no scissor or shader active.</p>
+<p><code>rd_paint_info</code> has:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>content</code></td><td>The node’s content box in screen coordinates, after scrolling</td></tr>
+<tr><td><code>clip</code></td><td>The part of the screen left visible by enclosing overflow containers</td></tr>
+<tr><td><code>dpi</code></td><td>Device pixels per logical pixel</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>rd_paint_scissor(info)</code> clips raylib drawing to the content box within <code>clip</code>; raydom ends the scissor after the
+callback. Restore any other raylib state you change. Rendering to a texture with <code>BeginTextureMode</code> inside the
+callback is safe.</p>
+<p>C++: <code>node.paint([](const rd_paint_info&amp; info) { ... })</code>, with the callable owned by the node.</p>
+<p>Pair a canvas with listeners on the same node for interaction: pointer events carry <code>local_x</code> and <code>local_y</code>
+relative to the node’s border box. Use the paint callback for drawing only; it must not change the tree.</p>
+<p>The <a href="#network-view">network view</a> is built on this.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="the-c-layer"><a class="header" href="#the-c-layer">The C++ layer</a></h1>
+<p><code>&lt;raydom/raydom.hh&gt;</code> wraps the C API in namespace <code>rd</code>. It is header-only, needs C++20, and doesn’t throw. Failures
+are reported the same way as in C: null handles and <code>false</code>.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>C++</th><th>C</th><th>Ownership</th></tr>
+</thead>
+<tbody>
+<tr><td><code>rd::Context</code></td><td><code>rd_ctx*</code></td><td>Owns the context; move-only; destroys it</td></tr>
+<tr><td><code>rd::Node</code></td><td><code>rd_ctx*</code> + <code>rd_node</code></td><td>Non-owning value, like the C handle</td></tr>
+<tr><td><code>rd::Class</code></td><td><code>rd_ctx*</code> + <code>rd_class</code></td><td>Non-owning</td></tr>
+<tr><td><code>rd::Style</code></td><td><code>rd_style</code></td><td>Value; builder methods</td></tr>
+<tr><td><code>rd::Event</code></td><td><code>rd_event*</code></td><td>Valid only inside the listener</td></tr>
+</tbody>
+</table>
+</div>
+<p><code>get()</code> and <code>handle()</code> return the C values, so C and C++ calls can be mixed freely on one context.</p>
+<p><code>rd::Node</code> and <code>rd::Class</code> are handles, so their setters are <code>const</code>, as with <code>std::span</code>: they change the node in
+the context, not the handle. A node captured by value in a lambda, or a <code>const rd::Node</code>, can be changed directly.</p>
+<h2 id="styles"><a class="header" href="#styles">Styles</a></h2>
+<p><code>rd::Style</code> has one chainable setter per property, named as in the <a href="#style-properties">reference</a>, plus
+overloads for common shapes:</p>
+<pre><code class="language-cpp">using namespace rd::literals;
+
+rd::Style()
+    .padding(8_px, 16_px)                             // vertical, horizontal; also (all) and (t, r, b, l)
+    .border_radius(6_px)                              // all corners
+    .box_shadow(0, 4, 12, rd::rgba(0, 0, 0, 120))     // x, y, blur, color, spread = 0
+    .grid_auto_rows(40_px)                            // any rd_val becomes a track
+    .gap(8_px)                                        // row_gap and column_gap
+    .flex(1);                                         // grow 1, shrink 1, basis 0
+</code></pre>
+<p>Literals: <code>_px</code>, <code>_pct</code>, <code>_fr</code>. Functions: <code>rd::px</code>, <code>rd::pct</code>, <code>rd::num</code>, <code>rd::fr</code>, <code>rd::hex</code>, <code>rd::rgb</code>,
+<code>rd::rgba</code>, <code>rd::line</code>, <code>rd::span</code>, <code>rd::minmax</code>, <code>rd::repeat</code>. Constants: <code>rd::auto_</code>, <code>rd::min_content</code>,
+<code>rd::max_content</code>. <code>-5_px</code> works for negative offsets.</p>
+<h2 id="callbacks"><a class="header" href="#callbacks">Callbacks</a></h2>
+<p><code>node.on(type, f, capture)</code>, <code>node.on_click(f)</code>, <code>node.paint(f)</code> and <code>node.measure(f)</code> take any callable. The
+callable is moved into a heap allocation owned by raydom and deleted when the listener is removed or the node is
+destroyed. Captured references must outlive the node, or the listener must be removed first.</p>
+<p><code>node.emplace_userdata&lt;T&gt;(args...)</code> constructs a <code>T</code> owned by the node; <code>node.userdata&lt;T&gt;()</code> returns it.</p>
+<h2 id="the-quickstart-annotated"><a class="header" href="#the-quickstart-annotated">The quickstart, annotated</a></h2>
+<pre><code class="language-cpp">#include &lt;raydom/raydom.hh&gt;
+#include &lt;raylib.h&gt;
+
+#include &lt;string&gt;
+
+using namespace rd::literals;
+
+int main() {
+  SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
+  InitWindow(800, 600, "hello");
+  {
+    rd::Context ctx;
+    ctx.load_font_file(FONT_PATH);  // any .ttf or .otf file
+
+    rd::Class button_style = ctx.create_class(rd::Style()
+                                                  .padding(8_px, 16_px)
+                                                  .border_radius(8_px)
+                                                  .background(rd::hex(0x5b8cff))
+                                                  .color(rd::hex(0xffffff)));
+    button_style.on(RD_STATE_HOVER, rd::Style().background(rd::hex(0x7aa2ff)));
+
+    int      clicks = 0;
+    rd::Node label  = ctx.create_text("Clicked 0 times", rd::Style().color(rd::hex(0xe4e7ee)));
+    rd::Node button = ctx.create_button("Click me").add_class(button_style);  // Tab focuses it; Enter and Space click it
+    button.on_click([&amp;] { label.text("Clicked " + std::to_string(++clicks) + " times"); });
+
+    ctx.root()
+        .style(rd::Style().padding(24_px).row_gap(12_px).align_items(RD_ALIGN_START))
+        .append(button)
+        .append(label);
+
+    while (!WindowShouldClose()) {
+      ctx.update();
+      BeginDrawing();
+      ClearBackground(BLACK);
+      ctx.draw();
+      EndDrawing();
+    }
+  }  // the context is destroyed here, before CloseWindow
+  CloseWindow();
+}
+</code></pre>
+<ul>
+<li><code>button_style</code> is an <code>rd::Class</code>: a shared style, not a node. <code>button_style.on(RD_STATE_HOVER, ...)</code> is the C++
+form of <code>rd_class_set_state</code>.</li>
+<li><code>create_text(s, style)</code> creates a text node. <code>create_button(s, style)</code> does the same with the button
+<a href="#roles">role</a>, which makes it focusable and activatable with Enter and Space.</li>
+<li><code>append</code> returns the parent, so a subtree builds in one expression.</li>
+<li>The lambda captures <code>label</code> by reference; both live in the same scope as the context.</li>
+</ul>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="controls-and-toasts"><a class="header" href="#controls-and-toasts">Controls and toasts</a></h1>
+<p><code>raydom::extras</code> has form controls (checkbox, switch, radio group, slider) and toasts. They are ordinary nodes built
+from core primitives, with a role, keyboard support and a default look, so they mix freely with your own nodes.</p>
+<pre><code class="language-cpp">#include &lt;raydom/extras/controls.hh&gt;  // C: controls.h and toast.h
+</code></pre>
+<h2 id="events-1"><a class="header" href="#events-1">Events</a></h2>
+<p>A control fires <code>RD_EVENT_CHANGE</code> when the user changes it, and a slider also fires <code>RD_EVENT_INPUT</code> while it moves.
+Listen with <code>rd_node_on</code> or <code>node.on</code>; read the value with the getter. Setters (<code>rdx_set_checked</code>,
+<code>rdx_radio_select</code>, <code>rdx_slider_set_value</code>) fire nothing, so code that syncs a control from your model doesn’t loop.</p>
+<p>To disable a control, set <code>RD_STATE_DISABLED</code> on it: it stops taking input and focus, and the theme dims it.</p>
+<h2 id="checkbox-and-switch"><a class="header" href="#checkbox-and-switch">Checkbox and switch</a></h2>
+<pre><code class="language-cpp">rd::Node remember = rdx::checkbox(ctx, "Remember me");
+rd::Node sync     = rdx::toggle_switch(ctx, "Sync");
+rdx::set_checked(sync, true);  // setters don't fire CHANGE
+bool remembered = false;
+remember.on(RD_EVENT_CHANGE, [&amp;] { remembered = rdx::checked(remember); });
+</code></pre>
+<p>Each is a row holding the box or track and an optional label. Clicking anywhere on the row, or Space or Enter while
+it has focus, toggles it. The row has <code>RD_STATE_CHECKED</code> while it’s on.</p>
+<h2 id="radio-group"><a class="header" href="#radio-group">Radio group</a></h2>
+<pre><code class="language-cpp">rd::Node size = rdx::radio_group(ctx);
+for (const char* s : {"Small", "Medium", "Large"}) rdx::add_radio(size, s);
+rdx::radio_select(size, 1);
+size.on(RD_EVENT_CHANGE, [&amp;] { /* rdx::radio_selected(size) */ });
+</code></pre>
+<p>At most one option is selected; <code>rdx_radio_selected</code> returns its index, or -1. <code>CHANGE</code> fires on the group. Tab
+reaches the group once, at the selected option, and the arrow keys move the selection, wrapping and skipping disabled
+options, as in browsers.</p>
+<h2 id="slider"><a class="header" href="#slider">Slider</a></h2>
+<pre><code class="language-cpp">rd::Node    volume = rdx::slider(ctx, {.min = 0, .max = 100, .value = 40, .step = 5});
+std::string shown;
+volume.on(RD_EVENT_INPUT, [&amp;] { shown = std::to_string(static_cast&lt;int&gt;(rdx::slider_value(volume))); });  // while moving
+volume.on(RD_EVENT_CHANGE, [&amp;] { /* save it */ });  // drag released or key pressed
+</code></pre>
+<p>Dragging or pressing anywhere on the track moves it; the drag continues outside the slider. Arrow keys move one step
+(1% of the range when <code>step</code> is 0), Page Up and Page Down a tenth of the range, Home and End to the ends. A zero
+<code>rdx_slider_desc</code> is 0 to 100, continuous. The default width is 200px; set <code>width</code> on the slider to change it.</p>
+<h2 id="toasts"><a class="header" href="#toasts">Toasts</a></h2>
+<pre><code class="language-cpp">rd::Node t = rdx::toast(ctx, {.title    = "Exported",
+                              .text     = "report.csv is in your Downloads folder.",
+                              .position = RDX_TOAST_TOP_RIGHT,
+                              .kind     = RDX_TOAST_SUCCESS});
+std::string host = "db.internal";
+rdx::toast(ctx, {.text = "Lost connection to " + host, .kind = RDX_TOAST_ERROR, .seconds = -1});  // until closed
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Field</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>title</code></td><td>Optional first line</td></tr>
+<tr><td><code>text</code></td><td>The message</td></tr>
+<tr><td><code>position</code></td><td><code>BOTTOM_RIGHT</code> (zero), <code>BOTTOM_LEFT</code>, <code>TOP_RIGHT</code>, <code>TOP_LEFT</code>, <code>TOP_CENTER</code>, <code>BOTTOM_CENTER</code></td></tr>
+<tr><td><code>kind</code></td><td><code>INFO</code> (zero), <code>SUCCESS</code>, <code>WARNING</code>, <code>ERROR</code>: the color of the bar on the left</td></tr>
+<tr><td><code>seconds</code></td><td>How long it stays; 0 means 4, negative until closed</td></tr>
+</tbody>
+</table>
+</div>
+<p>In C++, <code>rdx::toast</code> takes <code>rdx::ToastOptions</code>, the same fields with <code>std::string</code> for the title and text.</p>
+<p>Toasts live in the <a href="#overlay-and-anchoring">overlay</a>, one stack per position, 16px from the window’s edges, newest
+nearest the edge. A stack keeps the newest five. Hovering a toast pauses its countdown, which restarts when the
+pointer leaves; the × button closes it, as does <code>rdx_toast_close</code>. <code>rdx_toast_show</code> returns the toast’s node, so
+you can append your own content, such as an Undo button.</p>
+<p>For menus, selects, modals and tooltips, see <a href="#menus-selects-modals-and-tooltips">the next chapter</a>.</p>
+<p>Toast timers need the clock to advance; with raylib’s event waiting, use
+<a href="#event-waiting"><code>rd_set_event_waiting</code></a>.</p>
+<h2 id="restyling"><a class="header" href="#restyling">Restyling</a></h2>
+<p>Every part of every control and toast has a class in <code>rdx_theme(ctx)</code>. They start with a dark look; restyle them
+for the whole context with <code>rd_class_set</code> and <code>rd_class_set_state</code>, or add your own classes to individual nodes:</p>
+<pre><code class="language-cpp">const rdx_classes* theme = rdx_theme(ctx.get());
+rd::Class(ctx.get(), theme-&gt;check_box).on(RD_STATE_CHECKED, rd::Style().background(rd::hex(0x4cc38a)));  // green
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Classes</th><th>Parts</th></tr>
+</thead>
+<tbody>
+<tr><td><code>check_row</code>, <code>check_box</code>, <code>check_mark</code></td><td>Checkbox row, box, checkmark (an SVG)</td></tr>
+<tr><td><code>switch_row</code>, <code>switch_track</code>, <code>switch_thumb</code></td><td>Switch row, track, thumb</td></tr>
+<tr><td><code>radio_group</code>, <code>radio_row</code>, <code>radio_ring</code>, <code>radio_dot</code></td><td>Group, option row, ring, dot</td></tr>
+<tr><td><code>slider</code>, <code>slider_track</code>, <code>slider_fill</code>, <code>slider_thumb</code></td><td>Slider, rail, filled part, thumb</td></tr>
+<tr><td><code>label</code></td><td>Text beside a checkbox, switch or option</td></tr>
+<tr><td><code>toast_stack</code>, <code>toast</code>, <code>toast_bar</code>, <code>toast_title</code>, <code>toast_body</code>, <code>toast_close</code></td><td>Toast parts</td></tr>
+<tr><td><code>toast_info</code>, <code>toast_success</code>, <code>toast_warning</code>, <code>toast_error</code></td><td>The bar’s color per kind</td></tr>
+</tbody>
+</table>
+</div>
+<p>Parts share their control’s states (see <a href="#shared-states">shared states</a>), so a variant on a part
+reacts to the whole control: <code>check_box</code> with <code>RD_STATE_HOVER</code> applies while the pointer is anywhere on the row, and
+<code>RD_STATE_CHECKED</code> while the checkbox is on.</p>
+<p>Controls keep their state outside the node, so <code>rd_node_set_userdata</code> on a control is still yours.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="menus-selects-modals-and-tooltips"><a class="header" href="#menus-selects-modals-and-tooltips">Menus, selects, modals and tooltips</a></h1>
+<p>These popups live in the <a href="#overlay-and-anchoring">overlay</a>, use <a href="#anchoring">anchoring</a> to sit next
+to what opened them, and share one set of dismissal rules:</p>
+<ul>
+<li>A press outside closes the topmost menu or list; a press on the node that opened it doesn’t.</li>
+<li>Escape closes the topmost popup.</li>
+<li>Scrolling outside closes menus and lists.</li>
+<li>Closing returns focus to the node that opened the popup, if focus was inside it.</li>
+</ul>
+<p><code>rdx_popup_close(ctx, node)</code> closes the popup any node belongs to, so a button inside a modal can close it.</p>
+<pre><code class="language-cpp">#include &lt;raydom/extras/popups.hh&gt;  // C: popups.h
+</code></pre>
+<h2 id="menus"><a class="header" href="#menus">Menus</a></h2>
+<pre><code class="language-cpp">file.on_click([&amp;] {
+  rdx::menu(ctx, {{"New", "Ctrl+N"}, {"Open...", "Ctrl+O"}, {}, {"Quit", "Ctrl+Q"}},  // {} is a separator
+            {.node = file.handle(), .offset = 4},                                       // below the button
+            [&amp;](int index) { log = "menu " + std::to_string(index); });
+});
+</code></pre>
+<p>A menu takes a list of items: a label, an optional shortcut hint shown at the right (it doesn’t bind the key), and a
+disabled flag. An item with no label is a separator. The callback gets the index into the list of the chosen item,
+after the menu has closed, so it can open a modal or another menu. Dismissing the menu calls nothing.</p>
+<p>The menu takes focus when it opens. Up and Down move through the enabled items and wrap, Home and End jump, Enter or
+Space chooses, and Tab closes the menu. Hovering an item highlights it.</p>
+<h2 id="context-menus"><a class="header" href="#context-menus">Context menus</a></h2>
+<pre><code class="language-cpp">rdx::context_menu(area, {{"Copy", "Ctrl+C"}, {"Paste", "Ctrl+V", /*disabled=*/true}},
+                  [&amp;](int index) { log = "context " + std::to_string(index); });
+</code></pre>
+<p><code>rdx_context_menu_attach</code> opens the menu at the pointer when the node is pressed with the secondary button. The items
+are copied, and the callback lives as long as the node.</p>
+<h2 id="select"><a class="header" href="#select">Select</a></h2>
+<pre><code class="language-cpp">rd::Node theme = rdx::select(ctx, {"System", "Light", "Dark"}, "Theme");
+theme.on(RD_EVENT_CHANGE, [&amp;] { log = "theme " + std::to_string(rdx::selected(theme)); });
+</code></pre>
+<p>A select shows the chosen option, or the placeholder, with a chevron. Clicking it, or Enter or Space, opens a list
+as wide as the select, with the chosen option checked and focused; clicking the select again closes it. Up and Down
+on the closed select change the choice directly. <code>CHANGE</code> fires on the select when the user chooses;
+<code>rdx::set_selected</code> (<code>rdx_select_set</code>) doesn’t fire it.</p>
+<h2 id="modals"><a class="header" href="#modals">Modals</a></h2>
+<pre><code class="language-cpp">rd::Node body = rdx::modal(ctx, {.title = "Rename", .on_close = [&amp;] { log += ", closed"; }});
+rd::Node name = ctx.create_input().placeholder("New name");
+rd::Node done = ctx.create_button("Rename");
+done.on_click([body] { rdx::close_popup(body); });
+body.append(name).append(done);
+</code></pre>
+<p>A modal dims the window and centers a card with an optional title and × button. <code>rdx::modal</code> returns the card’s
+body, a column for your content and buttons. While it’s open:</p>
+<ul>
+<li>Tab and Shift+Tab stay inside it (it sets the <a href="#focus">focus scope</a>).</li>
+<li>At the next clock update, focus moves to the first focusable node in the body, or the card.</li>
+<li>Escape, the × button and a press on the backdrop close it, unless it’s <code>persistent</code>.</li>
+</ul>
+<p><code>on_close</code> runs whenever it closes, from any of those or from <code>rdx_popup_close</code>. <code>width</code> sets the card’s width
+(default 440px); the card never grows beyond the window and its body scrolls.</p>
+<h2 id="tooltips"><a class="header" href="#tooltips">Tooltips</a></h2>
+<pre><code class="language-cpp">rdx::tooltip(file, "File operations");
+</code></pre>
+<p>The tooltip appears above the node, flipping below near the top edge, after the pointer rests on it for half a
+second, and at once when the node gets keyboard focus. Leaving, pressing, scrolling or blurring hides it. Attaching
+again replaces the text. The tooltip ignores the pointer, so it never covers what it describes.</p>
+<h2 id="restyling-1"><a class="header" href="#restyling-1">Restyling</a></h2>
+<p>The popups’ classes are in <code>rdx_theme(ctx)</code> with the other extras classes:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Classes</th><th>Parts</th></tr>
+</thead>
+<tbody>
+<tr><td><code>menu</code>, <code>menu_item</code>, <code>menu_label</code>, <code>menu_shortcut</code>, <code>menu_separator</code></td><td>Menus and select lists</td></tr>
+<tr><td><code>menu_check</code></td><td>The checkmark column of select lists</td></tr>
+<tr><td><code>select</code>, <code>select_value</code>, <code>select_chevron</code></td><td>The select button</td></tr>
+<tr><td><code>modal_backdrop</code>, <code>modal</code>, <code>modal_header</code>, <code>modal_title</code>, <code>modal_close</code>, <code>modal_body</code></td><td>Modal parts</td></tr>
+<tr><td><code>tooltip</code></td><td>Tooltips</td></tr>
+</tbody>
+</table>
+</div>
+<p>Menu items highlight on <code>RD_STATE_FOCUS</code> as well as hover, so keyboard and pointer show the same highlight.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="tabs-splitters-lists-tables-and-trees"><a class="header" href="#tabs-splitters-lists-tables-and-trees">Tabs, splitters, lists, tables and trees</a></h1>
+<pre><code class="language-cpp">#include &lt;raydom/extras/views.hh&gt;  // C: views.h
+</code></pre>
+<p>Each of these fires <code>CHANGE</code> on its node when the user changes it; the setters fire nothing.</p>
+<h2 id="tabs"><a class="header" href="#tabs">Tabs</a></h2>
+<pre><code class="language-cpp">rd::Node tabs    = rdx::tabs(ctx);
+rd::Node general = rdx::add_tab(tabs, "General");  // panels to fill
+rd::Node network = rdx::add_tab(tabs, "Network");
+general.append(ctx.create_text("General settings"));
+network.append(ctx.create_text("Network settings"));
+tabs.on(RD_EVENT_CHANGE, [&amp;] { /* rdx::selected_tab(tabs) */ });
+</code></pre>
+<p><code>rdx_tabs_add</code> returns the tab’s panel. Only the selected panel is shown. Tab reaches the bar once, at the selected
+tab; Left, Right, Home and End move between tabs.</p>
+<h2 id="splitter"><a class="header" href="#splitter">Splitter</a></h2>
+<pre><code class="language-cpp">rd::Node split = rdx::split(ctx, {.fraction = 0.3f, .min_first = 120, .min_second = 200});
+split.style(rd::Style().height(400_px));
+rd::Node sidebar = rdx::pane(split, 0), content = rdx::pane(split, 1);
+</code></pre>
+<p>Two panes with a handle between them, side by side or (<code>vertical</code>) stacked. Dragging the handle or, with it
+focused, the arrow keys resize the panes, within each pane’s minimum. The first pane’s size is a fraction of the
+splitter, so it follows window resizes; <code>rdx_split_fraction</code> reads it and <code>CHANGE</code> fires when a drag ends.</p>
+<h2 id="virtualized-list"><a class="header" href="#virtualized-list">Virtualized list</a></h2>
+<pre><code class="language-cpp">std::vector&lt;std::string&gt; names;
+for (int i = 0; i &lt; 50000; i++) names.push_back("Contact " + std::to_string(i));
+rd::Node contacts = rdx::list(ctx, static_cast&lt;int&gt;(names.size()), 28, [&amp;](rd::Node row, int i) {
+  row.append(ctx.create_text(names[static_cast&lt;std::size_t&gt;(i)]));  // the row comes empty
+});
+contacts.style(rd::Style().flex(1));
+contacts.on(RD_EVENT_CHANGE, [&amp;] { /* names[rdx::list_selected(contacts)] */ });
+</code></pre>
+<p>The list holds a spacer as tall as every row and positions only the rows in view, plus three on each side, over it.
+A <a href="#layout-hooks">layout hook</a> rebinds rows after each layout, so a scroll shows the right rows
+in the same frame. Rows are reused: <code>fill</code> gets an empty row each time it’s asked for an index, and fills it.</p>
+<ul>
+<li><strong>Fixed height.</strong> Every row has the same height, so the list can place any row without measuring the others.</li>
+<li><strong>Selection.</strong> Clicking a row, or Up, Down, Page Up, Page Down, Home and End while the list has focus, selects
+one row, scrolls it into view, and fires <code>CHANGE</code>. The selected row has <code>RD_STATE_CHECKED</code>.</li>
+<li><strong>Data changes.</strong> <code>rdx_list_set_count</code> changes the number of rows; <code>rdx_list_refresh</code> fills the rows in view
+again.</li>
+</ul>
+<h2 id="table"><a class="header" href="#table">Table</a></h2>
+<pre><code class="language-cpp">rd::Node table = rdx::table(ctx, {{"Name", 1_fr}, {"Size", 80_px}}, 10000, 28,
+                            {.cell = [](rd::Node cell, int row, int col) {
+                               char buf[32];
+                               std::snprintf(buf, sizeof buf, col == 0 ? "file_%05d" : "%d KB", row);
+                               cell.text(buf);
+                             },
+                             .header = [](int column) { (void)column; /* sort by it, then rdx::list_refresh */ }});
+</code></pre>
+<p>A header over a virtualized list whose rows use the header’s grid columns, so cells line up with their headers.
+Widths are px or fr. <code>cell</code> fills each cell; <code>header</code> runs when a column header is clicked, which is where sorting
+goes: reorder your data, then <code>rdx_list_refresh(rdx_table_list(table))</code>. Selection and <code>CHANGE</code> are on the body,
+<code>rdx_table_list</code>.</p>
+<h2 id="tree-view"><a class="header" href="#tree-view">Tree view</a></h2>
+<pre><code class="language-cpp">rd::Node tree = rdx::tree(ctx);
+int      src  = rdx::tree_add(tree, -1, "src");
+rdx::tree_add(tree, src, "main.c");
+rdx::tree_expand(tree, src);
+tree.on(RD_EVENT_CHANGE, [&amp;] { /* rdx::tree_label(tree, rdx::tree_selected(tree)) */ });
+</code></pre>
+<p>Items are added under a parent (-1 for the top level) and get an id. The tree shows the expanded items as an
+indented, virtualized list with disclosure chevrons. Right expands an item, or moves to its first child; Left
+collapses it, or moves to its parent; Enter toggles. Selecting a hidden item with <code>rdx_tree_select</code> expands its
+ancestors, and collapsing an ancestor of the selection moves the selection to the ancestor.</p>
+<h2 id="restyling-2"><a class="header" href="#restyling-2">Restyling</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Classes in <code>rdx_theme(ctx)</code></th><th>Parts</th></tr>
+</thead>
+<tbody>
+<tr><td><code>tabs</code>, <code>tab_bar</code>, <code>tab</code>, <code>tab_panel</code></td><td>Tabs; the selected tab is <code>CHECKED</code></td></tr>
+<tr><td><code>split</code>, <code>split_handle</code></td><td>Splitter</td></tr>
+<tr><td><code>list</code>, <code>list_row</code></td><td>Lists, and the rows of tables and trees</td></tr>
+<tr><td><code>table</code>, <code>table_header</code>, <code>table_header_cell</code>, <code>table_cell</code></td><td>Tables</td></tr>
+<tr><td><code>tree_toggle</code>, <code>tree_label</code></td><td>Tree rows</td></tr>
+</tbody>
+</table>
+</div>
+<p>Rows, cells and items leave node userdata to the application.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="network-view"><a class="header" href="#network-view">Network view</a></h1>
+<p><code>raydom::extras</code> provides <code>rdx_graph</code>, a view of nodes and edges for simulators and tools: lit 3D spheres, straight
+edges with optional arrows and labels, and messages drawn in flight. It is built on a <a href="#canvases">canvas</a>
+and lives in its own library so the core stays free of widgets.</p>
+<pre><code class="language-cmake">target_link_libraries(your_app PRIVATE raydom::extras)
+</code></pre>
+<pre><code class="language-cpp">#include &lt;raydom/extras/graph.hh&gt;  // or graph.h for C
+</code></pre>
+<h2 id="creating-a-view"><a class="header" href="#creating-a-view">Creating a view</a></h2>
+<pre><code class="language-cpp">rd::Node   canvas = ctx.create(rd::Style().flex(1));
+rdx::Graph graph  = rdx::Graph::create(canvas);
+graph.background(rd::hex(0x0b0d12));
+graph.label_class().set(rd::Style().font_size(12_px).color(rd::hex(0xe4e7ee)));
+ctx.root().append(canvas);
+</code></pre>
+<p><code>rdx_graph_create(ctx, host)</code> turns <code>host</code> into the view. The graph lives until the host node is destroyed; there is
+no separate destroy call. Node labels are text nodes under the host, styled with the class returned by
+<code>label_class()</code>.</p>
+<h2 id="nodes-and-edges"><a class="header" href="#nodes-and-edges">Nodes and edges</a></h2>
+<pre><code class="language-cpp">std::vector&lt;rdx_node&gt; nodes;
+for (const char* name : {"A", "B", "C", "D", "E"}) nodes.push_back(graph.add_node({0, 0}, rd::hex(0x6c7385), name));
+graph.layout_circle(nodes, {0, 0}, 160);
+for (std::size_t i = 0; i &lt; nodes.size(); i++)
+  graph.connect(nodes[i], nodes[(i + 1) % nodes.size()], {.color = rd::hex(0x2a3142), .width = 1.5f});
+graph.fit(60);
+</code></pre>
+<p>Positions are world units on a plane, y down. <code>rdx_node</code> and <code>rdx_edge</code> are generational handles, like <code>rd_node</code>.
+Removing a node removes its edges. <code>fit(padding)</code> frames every node; <code>view(center, zoom)</code> sets the camera.</p>
+<p>Defaults: node radius 20 world units, edge width 2 screen pixels, message radius 6 world units.</p>
+<h2 id="interaction"><a class="header" href="#interaction">Interaction</a></h2>
+<p>Dragging the background pans, and the wheel zooms about the pointer, between 0.1x and 10x. With
+<code>RDX_GRAPH_DRAG_NODES</code>, dragging a node moves it. <code>RDX_GRAPH_NO_GRID</code> hides the background grid.</p>
+<pre><code class="language-cpp">graph.on([&amp;](rdx_graph_event ev, rdx_node n) {
+  if (ev == RDX_EVENT_NODE_CLICK) graph.select(n);
+});
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Event</th><th>When</th></tr>
+</thead>
+<tbody>
+<tr><td><code>RDX_EVENT_NODE_ENTER</code></td><td>Pointer moves onto a node</td></tr>
+<tr><td><code>RDX_EVENT_NODE_LEAVE</code></td><td>Pointer leaves a node</td></tr>
+<tr><td><code>RDX_EVENT_NODE_CLICK</code></td><td>Press and release on the same node without dragging</td></tr>
+<tr><td><code>RDX_EVENT_NODE_DRAG</code></td><td>A node moved, with <code>RDX_GRAPH_DRAG_NODES</code></td></tr>
+<tr><td><code>RDX_EVENT_VIEW</code></td><td>The view panned or zoomed</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="messages"><a class="header" href="#messages">Messages</a></h2>
+<p>The graph has no clock. Each frame, pass the messages in flight with their progress from 0 (at <code>from</code>) to 1 (at
+<code>to</code>); the call replaces the previous set.</p>
+<pre><code class="language-cpp">float progress = t - static_cast&lt;float&gt;(static_cast&lt;int&gt;(t));  // your simulation decides this
+graph.messages({{nodes[0], nodes[1], progress, rd::hex(0x5b8cff), 6}});
+</code></pre>
+<p>The showcase’s Network tab is a Paxos simulator built this way (<code>examples/showcase/network.cc</code>).</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="file-dialogs"><a class="header" href="#file-dialogs">File dialogs</a></h1>
+<p><code>raydom::extras</code> wraps the operating system’s file dialogs: Cocoa panels on macOS, the shell dialog on Windows, and
+<a href="https://flatpak.github.io/xdg-desktop-portal/">xdg-desktop-portal</a> on Linux, which shows the desktop’s own dialog
+(GNOME, KDE and others). The backends come from
+<a href="https://github.com/btzy/nativefiledialog-extended">nativefiledialog-extended</a> 1.4.1, vendored and compiled into
+<code>raydom::extras</code>, so applications still link one static library.</p>
+<pre><code class="language-cmake">target_link_libraries(your_app PRIVATE raydom::extras)
+</code></pre>
+<pre><code class="language-cpp">#include &lt;raydom/extras/dialog.hh&gt;  // or dialog.h for C
+</code></pre>
+<h2 id="c-2"><a class="header" href="#c-2">C++</a></h2>
+<pre><code class="language-cpp">rd::Node open = ctx.create_button("Open...");
+open.on_click([&amp;] {
+  rdx::DialogResult r = rdx::open_file({.title = "Open", .filters = {{"Text", "txt,md"}}});
+  if (r) label.text(r.path());
+  else if (r.status == RDX_DIALOG_ERROR) label.text("error: " + r.error);
+});
+
+rd::Node save = ctx.create_button("Save as...");
+save.on_click([&amp;] {
+  if (rdx::DialogResult r = rdx::save_file({.default_name = "notes.txt"})) label.text("saving to " + r.path());
+});
+</code></pre>
+<p><code>rdx::open_file</code>, <code>open_files</code>, <code>save_file</code> and <code>pick_folder</code> take <code>rdx::DialogOptions</code> and return
+<code>rdx::DialogResult</code>. The result is true when the user chose something. <code>status</code> is <code>RDX_DIALOG_OK</code>,
+<code>RDX_DIALOG_CANCEL</code> or <code>RDX_DIALOG_ERROR</code>, <code>paths</code> holds the chosen paths, and <code>error</code> explains a failure.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Option</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>title</code></td><td>Window title</td></tr>
+<tr><td><code>filters</code></td><td><code>{name, extensions}</code> pairs; extensions comma-separated, no dots</td></tr>
+<tr><td><code>default_path</code></td><td>Folder to start in</td></tr>
+<tr><td><code>default_name</code></td><td>Save: suggested file name</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="c-1-1"><a class="header" href="#c-1-1">C</a></h2>
+<pre><code class="language-c">static void open_c(void) {
+  const rdx_file_filter filters[] = {{"Text", "txt,md"}, {"Images", "png,jpg"}};
+  const rdx_dialog_desc desc      = {.title = "Open", .filters = filters, .filter_count = 2};
+  char*                 path      = NULL;
+  switch (rdx_dialog_open(&amp;desc, &amp;path)) {
+    case RDX_DIALOG_OK:
+      printf("chose %s\n", path);
+      rdx_dialog_free(path);
+      break;
+    case RDX_DIALOG_CANCEL:
+      break;
+    case RDX_DIALOG_ERROR:
+      printf("dialog failed: %s\n", rdx_dialog_error());
+      break;
+  }
+}
+</code></pre>
+<p>Each function writes paths that the caller owns: free one path with <code>rdx_dialog_free</code>, and the array from
+<code>rdx_dialog_open_multiple</code> with <code>rdx_dialog_free_paths</code>. Paths are UTF-8 on every platform.</p>
+<h2 id="behavior"><a class="header" href="#behavior">Behavior</a></h2>
+<ul>
+<li><strong>Blocking.</strong> Each call returns when the dialog closes. The raydom window doesn’t redraw meanwhile. Calling from a
+click listener is the usual pattern; the tree can be changed with the result before the listener returns.</li>
+<li><strong>Main thread.</strong> Call after <code>InitWindow</code>, on the thread that owns the window. macOS requires it.</li>
+<li><strong>Parent window.</strong> On macOS and Windows the dialog is attached to the raylib window. On Linux it isn’t, because
+raylib’s window handle there may be X11 or Wayland.</li>
+<li><strong>Unsupported builds.</strong> On the web, or with <code>RAYDOM_FILE_DIALOG=OFF</code>, every call returns <code>RDX_DIALOG_ERROR</code>
+with a message saying so. The API is always present, so code compiles everywhere.</li>
+</ul>
+<h2 id="linux-requirements"><a class="header" href="#linux-requirements">Linux requirements</a></h2>
+<p>Building needs the libdbus development package (<code>libdbus-1-dev</code> on Debian and Ubuntu, <code>dbus-devel</code> on Fedora) and
+<code>pkg-config</code>. At run time, the desktop must provide xdg-desktop-portal, which current GNOME, KDE and most other
+desktops do. Set <code>RAYDOM_FILE_DIALOG=OFF</code> to build without either.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="style-properties"><a class="header" href="#style-properties">Style properties</a></h1>
+<p>Every field of <code>rd_style</code>, generated from the <code>RD_STYLE_PROPS</code> X-macro in <code>include/raydom/style.h</code> and the defaults
+in <code>src/style.c</code> at this version.</p>
+<ul>
+<li><strong>Default</strong> is the value a node has when nothing sets the property and it isn’t inherited.</li>
+<li><em>inherited</em> properties take the parent’s computed value when unset.</li>
+<li><em>paint only</em> properties change drawing without triggering layout. All others trigger relayout when they change.</li>
+</ul>
+<p>In C++, each property is a setter of the same name on <code>rd::Style</code>. Enumerated values are written in full in C, for
+example <code>RD_DISPLAY_GRID</code>.</p>
+<h2 id="box-model"><a class="header" href="#box-model">Box model</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>display</code></td><td><code>FLEX</code></td><td>Layout mode of the node’s children; <code>NONE</code> removes the node from layout, drawing and hit-testing.<br><em><a href="#rd-display"><code>rd_display</code></a></em></td></tr>
+<tr><td><code>position</code></td><td><code>RELATIVE</code></td><td><code>ABSOLUTE</code> takes the node out of flow and places it against the parent’s padding box with <code>inset</code>.<br><em><a href="#rd-position"><code>rd_position</code></a></em></td></tr>
+<tr><td><code>width</code></td><td><code>auto</code></td><td>Border-box width.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>height</code></td><td><code>auto</code></td><td>Border-box height.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>min_width</code></td><td><code>auto</code></td><td>Lower bound on width. <code>auto</code> is 0.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>min_height</code></td><td><code>auto</code></td><td>Lower bound on height. <code>auto</code> is 0.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>max_width</code></td><td><code>auto</code></td><td>Upper bound on width. <code>auto</code> is none.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>max_height</code></td><td><code>auto</code></td><td>Upper bound on height. <code>auto</code> is none.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>margin</code></td><td><code>0px</code></td><td>Outer spacing. <code>auto</code> margins absorb free space in flex layout.<br><em><code>rd_edges</code></em></td></tr>
+<tr><td><code>padding</code></td><td><code>0px</code></td><td>Inner spacing. Percentages resolve against the containing block’s width.<br><em><code>rd_edges</code></em></td></tr>
+<tr><td><code>border_width</code></td><td><code>0px</code></td><td>Border thickness per side, in pixels.<br><em><code>rd_edges</code></em></td></tr>
+<tr><td><code>inset</code></td><td><code>auto</code></td><td>Offsets from the containing block for absolute nodes; relative offsets otherwise.<br><em><code>rd_edges</code></em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="flexbox-1"><a class="header" href="#flexbox-1">Flexbox</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>flex_direction</code></td><td><code>COLUMN</code></td><td>Main axis of a flex container.<br><em><a href="#rd-flex-direction"><code>rd_flex_direction</code></a></em></td></tr>
+<tr><td><code>flex_wrap</code></td><td><code>NOWRAP</code></td><td>Whether flex items wrap onto several lines.<br><em><a href="#rd-flex-wrap"><code>rd_flex_wrap</code></a></em></td></tr>
+<tr><td><code>flex_grow</code></td><td><code>0</code></td><td>Share of positive free space, as <code>rd_num</code>.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>flex_shrink</code></td><td><code>0</code></td><td>Share of negative free space, weighted by basis, as <code>rd_num</code>. Default 0: items don’t shrink.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>flex_basis</code></td><td><code>auto</code></td><td>Main size before free space is distributed.<br><em><code>rd_val</code></em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="alignment-and-gaps"><a class="header" href="#alignment-and-gaps">Alignment and gaps</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>justify_content</code></td><td><code>NORMAL</code></td><td>Distribution of items along the main axis (flex) or of tracks along the row axis (grid).<br><em><a href="#rd-align"><code>rd_align</code></a></em></td></tr>
+<tr><td><code>align_items</code></td><td><code>STRETCH</code></td><td>Default cross-axis alignment of the children.<br><em><a href="#rd-align"><code>rd_align</code></a></em></td></tr>
+<tr><td><code>align_self</code></td><td><code>AUTO</code></td><td>Cross-axis alignment of this item; <code>AUTO</code> uses the parent’s <code>align_items</code>.<br><em><a href="#rd-align"><code>rd_align</code></a></em></td></tr>
+<tr><td><code>align_content</code></td><td><code>NORMAL</code></td><td>Distribution of flex lines or grid rows along the cross axis.<br><em><a href="#rd-align"><code>rd_align</code></a></em></td></tr>
+<tr><td><code>justify_items</code></td><td><code>STRETCH</code></td><td>Grid: default inline-axis alignment of items in their areas.<br><em><a href="#rd-align"><code>rd_align</code></a></em></td></tr>
+<tr><td><code>justify_self</code></td><td><code>AUTO</code></td><td>Grid: inline-axis alignment of this item; <code>AUTO</code> uses the parent’s <code>justify_items</code>.<br><em><a href="#rd-align"><code>rd_align</code></a></em></td></tr>
+<tr><td><code>row_gap</code></td><td><code>0px</code></td><td>Space between rows, or between items in a column flex container.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>column_gap</code></td><td><code>0px</code></td><td>Space between columns, or between items in a row flex container.<br><em><code>rd_val</code></em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="grid-1"><a class="header" href="#grid-1">Grid</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>grid_template_columns</code></td><td>none</td><td>Explicit column tracks, from <code>rd_tracks_create</code>.<br><em><code>rd_tracks</code></em></td></tr>
+<tr><td><code>grid_template_rows</code></td><td>none</td><td>Explicit row tracks, from <code>rd_tracks_create</code>.<br><em><code>rd_tracks</code></em></td></tr>
+<tr><td><code>grid_auto_columns</code></td><td><code>auto</code></td><td>Size of implicitly created columns.<br><em><code>rd_track</code></em></td></tr>
+<tr><td><code>grid_auto_rows</code></td><td><code>auto</code></td><td>Size of implicitly created rows.<br><em><code>rd_track</code></em></td></tr>
+<tr><td><code>grid_auto_flow</code></td><td><code>ROW</code></td><td>Whether auto-placement fills rows or columns first.<br><em><a href="#rd-grid-flow"><code>rd_grid_flow</code></a></em></td></tr>
+<tr><td><code>grid_column_start</code></td><td><code>auto</code></td><td>Start line or span of the item’s columns.<br><em><code>rd_grid_line</code></em></td></tr>
+<tr><td><code>grid_column_end</code></td><td><code>auto</code></td><td>End line or span of the item’s columns.<br><em><code>rd_grid_line</code></em></td></tr>
+<tr><td><code>grid_row_start</code></td><td><code>auto</code></td><td>Start line or span of the item’s rows.<br><em><code>rd_grid_line</code></em></td></tr>
+<tr><td><code>grid_row_end</code></td><td><code>auto</code></td><td>End line or span of the item’s rows.<br><em><code>rd_grid_line</code></em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="paint"><a class="header" href="#paint">Paint</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>background</code></td><td>transparent</td><td>Fill of the border box, inside the rounded corners.<br><em><code>rd_color</code>, paint only</em></td></tr>
+<tr><td><code>border_color</code></td><td>transparent</td><td>Color of the border.<br><em><code>rd_color</code>, paint only</em></td></tr>
+<tr><td><code>border_radius</code></td><td><code>0px</code></td><td>Corner radii.<br><em><code>rd_corners</code>, paint only</em></td></tr>
+<tr><td><code>opacity</code></td><td><code>1</code></td><td>Opacity of the node and its subtree, 0 to 1, as <code>rd_num</code>.<br><em><code>rd_val</code>, paint only</em></td></tr>
+<tr><td><code>box_shadow</code></td><td>none</td><td>Outer shadow: offset, blur, spread and color.<br><em><code>rd_shadow</code>, paint only</em></td></tr>
+<tr><td><code>object_fit</code></td><td><code>FILL</code></td><td>How an image node’s image fills its content box: stretched, contained, covering, natural size, or scaled down.<br><em><a href="#rd-object-fit"><code>rd_object_fit</code></a>, paint only</em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="text"><a class="header" href="#text">Text</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>color</code></td><td><code>rgba(0, 0, 0, 255)</code></td><td>Text color.<br><em><code>rd_color</code>, inherited, paint only</em></td></tr>
+<tr><td><code>font</code></td><td>default font</td><td>Font handle from <code>rd_font_load</code>; <code>{0, true}</code> is the default font.<br><em><code>rd_font</code>, inherited</em></td></tr>
+<tr><td><code>font_size</code></td><td><code>16px</code></td><td>Text size in pixels.<br><em><code>rd_val</code>, inherited</em></td></tr>
+<tr><td><code>line_height</code></td><td><code>1.2</code></td><td>Line box height: <code>rd_num</code> times <code>font_size</code>, <code>rd_px</code>, or <code>rd_pct</code> of <code>font_size</code>.<br><em><code>rd_val</code>, inherited</em></td></tr>
+<tr><td><code>white_space</code></td><td><code>NORMAL</code></td><td>Collapsing of spaces and newlines, and whether lines wrap.<br><em><a href="#rd-white-space"><code>rd_white_space</code></a>, inherited</em></td></tr>
+<tr><td><code>text_overflow</code></td><td><code>CLIP</code></td><td>Treatment of text cut by the box or by <code>line_clamp</code>.<br><em><a href="#rd-text-overflow"><code>rd_text_overflow</code></a>, paint only</em></td></tr>
+<tr><td><code>line_clamp</code></td><td><code>0</code></td><td>Maximum number of lines shown, as <code>rd_num</code>; 0 is unlimited.<br><em><code>rd_val</code></em></td></tr>
+<tr><td><code>text_align</code></td><td><code>START</code></td><td>Horizontal alignment of each line in the content box.<br><em><a href="#rd-text-align"><code>rd_text_align</code></a>, inherited, paint only</em></td></tr>
+<tr><td><code>user_select</code></td><td><code>AUTO</code></td><td>Whether dragging over the text selects it.<br><em><a href="#rd-user-select"><code>rd_user_select</code></a>, inherited, paint only</em></td></tr>
+<tr><td><code>caret_color</code></td><td>transparent</td><td>Input caret color; transparent uses <code>color</code>.<br><em><code>rd_color</code>, inherited, paint only</em></td></tr>
+<tr><td><code>selection_color</code></td><td><code>rgba(91, 140, 255, 90)</code></td><td>Background of selected text.<br><em><code>rd_color</code>, inherited, paint only</em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="scrolling-1"><a class="header" href="#scrolling-1">Scrolling</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>overflow_x</code></td><td><code>VISIBLE</code></td><td><code>HIDDEN</code> clips children horizontally; <code>SCROLL</code> clips and scrolls.<br><em><a href="#rd-overflow"><code>rd_overflow</code></a></em></td></tr>
+<tr><td><code>overflow_y</code></td><td><code>VISIBLE</code></td><td><code>HIDDEN</code> clips children vertically; <code>SCROLL</code> clips and scrolls.<br><em><a href="#rd-overflow"><code>rd_overflow</code></a></em></td></tr>
+<tr><td><code>scrollbar_width</code></td><td><code>8px</code></td><td>Thickness of the scrollbars on a <code>SCROLL</code> axis; <code>0px</code> hides them. They draw over the content edge and take no layout space.<br><em><code>rd_val</code>, paint only</em></td></tr>
+<tr><td><code>scrollbar_color</code></td><td><code>rgba(128, 128, 128, 120)</code></td><td>Scrollbar thumb color; brighter while hovered or dragged.<br><em><code>rd_color</code>, inherited, paint only</em></td></tr>
+<tr><td><code>scrollbar_track_color</code></td><td>transparent</td><td>Color behind the thumb; transparent by default.<br><em><code>rd_color</code>, inherited, paint only</em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="interaction-1"><a class="header" href="#interaction-1">Interaction</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>pointer_events</code></td><td><code>AUTO</code></td><td><code>NONE</code> makes the node invisible to hit-testing.<br><em><a href="#rd-pointer-events"><code>rd_pointer_events</code></a>, inherited, paint only</em></td></tr>
+<tr><td><code>focusable</code></td><td><code>NONE</code></td><td>Whether the node takes focus, and whether Tab reaches it.<br><em><a href="#rd-focusable"><code>rd_focusable</code></a>, paint only</em></td></tr>
+<tr><td><code>cursor</code></td><td><code>AUTO</code></td><td>Mouse cursor over the node. <code>AUTO</code> is text over selectable text and inputs, pointer over links, default elsewhere. Set it in an active variant for a drag cursor.<br><em><a href="#rd-cursor"><code>rd_cursor</code></a>, inherited, paint only</em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="transitions-1"><a class="header" href="#transitions-1">Transitions</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Property</th><th>Default</th><th>Description</th></tr>
+</thead>
+<tbody>
+<tr><td><code>transition_duration</code></td><td><code>0</code></td><td>How long changes to this node’s style animate, in seconds (<code>rd_ms(150)</code>, <code>rd_s(0.2)</code>); 0 changes at once.<br><em><code>rd_val</code>, paint only</em></td></tr>
+<tr><td><code>transition_delay</code></td><td><code>0</code></td><td>Seconds to wait before a change starts animating.<br><em><code>rd_val</code>, paint only</em></td></tr>
+<tr><td><code>transition_easing</code></td><td><code>EASE</code></td><td>The timing curve of transitions.<br><em><a href="#rd-easing"><code>rd_easing</code></a>, paint only</em></td></tr>
+<tr><td><code>transition_properties</code></td><td><code>ALL</code></td><td>Which groups of properties transition, as a mask of <code>RD_TRANSITION_*</code> flags.<br><em><a href="#rd-transition"><code>rd_transition</code></a>, paint only</em></td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="enumerations"><a class="header" href="#enumerations">Enumerations</a></h2>
+<h3 id="rd_display"><a class="header" href="#rd_display">rd_display</a></h3>
+<p><code>RD_DISPLAY_*</code>: <code>FLEX</code>, <code>GRID</code>, <code>NONE</code></p>
+<h3 id="rd_position"><a class="header" href="#rd_position">rd_position</a></h3>
+<p><code>RD_POSITION_*</code>: <code>RELATIVE</code>, <code>ABSOLUTE</code></p>
+<h3 id="rd_flex_direction"><a class="header" href="#rd_flex_direction">rd_flex_direction</a></h3>
+<p><code>RD_FLEX_*</code>: <code>ROW</code>, <code>COLUMN</code>, <code>ROW_REVERSE</code>, <code>COLUMN_REVERSE</code></p>
+<h3 id="rd_flex_wrap"><a class="header" href="#rd_flex_wrap">rd_flex_wrap</a></h3>
+<p><code>RD_FLEX_*</code>: <code>NOWRAP</code>, <code>WRAP</code>, <code>WRAP_REVERSE</code></p>
+<h3 id="rd_align"><a class="header" href="#rd_align">rd_align</a></h3>
+<p><code>RD_ALIGN_*</code>: <code>AUTO</code>, <code>NORMAL</code>, <code>START</code>, <code>END</code>, <code>CENTER</code>, <code>STRETCH</code>, <code>BASELINE</code>, <code>SPACE_BETWEEN</code>, <code>SPACE_AROUND</code>, <code>SPACE_EVENLY</code></p>
+<h3 id="rd_grid_flow"><a class="header" href="#rd_grid_flow">rd_grid_flow</a></h3>
+<p><code>RD_GRID_FLOW_*</code>: <code>ROW</code>, <code>COLUMN</code></p>
+<h3 id="rd_object_fit"><a class="header" href="#rd_object_fit">rd_object_fit</a></h3>
+<p><code>RD_OBJECT_FIT_*</code>: <code>FILL</code>, <code>CONTAIN</code>, <code>COVER</code>, <code>NONE</code>, <code>SCALE_DOWN</code></p>
+<h3 id="rd_white_space"><a class="header" href="#rd_white_space">rd_white_space</a></h3>
+<p><code>RD_WHITE_SPACE_*</code>: <code>NORMAL</code>, <code>NOWRAP</code>, <code>PRE</code>, <code>PRE_WRAP</code></p>
+<h3 id="rd_text_overflow"><a class="header" href="#rd_text_overflow">rd_text_overflow</a></h3>
+<p><code>RD_TEXT_OVERFLOW_*</code>: <code>CLIP</code>, <code>ELLIPSIS</code></p>
+<h3 id="rd_text_align"><a class="header" href="#rd_text_align">rd_text_align</a></h3>
+<p><code>RD_TEXT_ALIGN_*</code>: <code>START</code>, <code>CENTER</code>, <code>END</code></p>
+<h3 id="rd_user_select"><a class="header" href="#rd_user_select">rd_user_select</a></h3>
+<p><code>RD_USER_SELECT_*</code>: <code>AUTO</code>, <code>NONE</code></p>
+<h3 id="rd_overflow"><a class="header" href="#rd_overflow">rd_overflow</a></h3>
+<p><code>RD_OVERFLOW_*</code>: <code>VISIBLE</code>, <code>HIDDEN</code>, <code>SCROLL</code></p>
+<h3 id="rd_pointer_events"><a class="header" href="#rd_pointer_events">rd_pointer_events</a></h3>
+<p><code>RD_POINTER_EVENTS_*</code>: <code>AUTO</code>, <code>NONE</code></p>
+<h3 id="rd_focusable"><a class="header" href="#rd_focusable">rd_focusable</a></h3>
+<p><code>RD_FOCUSABLE_*</code>: <code>NONE</code>, <code>TAB</code>, <code>POINTER</code></p>
+<h3 id="rd_cursor"><a class="header" href="#rd_cursor">rd_cursor</a></h3>
+<p><code>RD_CURSOR_*</code>: <code>AUTO</code>, <code>DEFAULT</code>, <code>POINTER</code>, <code>TEXT</code>, <code>CROSSHAIR</code>, <code>MOVE</code>, <code>NOT_ALLOWED</code>, <code>EW_RESIZE</code>, <code>NS_RESIZE</code>, <code>NWSE_RESIZE</code>, <code>NESW_RESIZE</code>, <code>NONE</code></p>
+<h3 id="rd_easing"><a class="header" href="#rd_easing">rd_easing</a></h3>
+<p><code>RD_EASING_*</code>: <code>LINEAR</code>, <code>EASE</code>, <code>EASE_IN</code>, <code>EASE_OUT</code>, <code>EASE_IN_OUT</code></p>
+<h3 id="rd_transition"><a class="header" href="#rd_transition">rd_transition</a></h3>
+<p><code>RD_TRANSITION_*</code>: <code>COLOR</code>, <code>OPACITY</code>, <code>SHADOW</code>, <code>RADIUS</code>, <code>SIZE</code>, <code>SPACING</code>, <code>INSET</code>, <code>TEXT</code>, <code>ALL</code></p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="values-and-units"><a class="header" href="#values-and-units">Values and units</a></h1>
+<h2 id="lengths-rd_val"><a class="header" href="#lengths-rd_val">Lengths: <code>rd_val</code></a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Constructor</th><th>C++</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>rd_px(v)</code></td><td><code>v_px</code></td><td>Logical pixels</td></tr>
+<tr><td><code>rd_pct(v)</code></td><td><code>v_pct</code></td><td>Percent of the containing block</td></tr>
+<tr><td><code>rd_num(v)</code></td><td><code>rd::num(v)</code></td><td>Unitless: flex factors, opacity, line height multiple, line clamp</td></tr>
+<tr><td><code>rd_fr(v)</code></td><td><code>v_fr</code></td><td>Grid fraction of free space</td></tr>
+<tr><td><code>rd_auto()</code></td><td><code>rd::auto_</code></td><td>Automatic</td></tr>
+<tr><td><code>rd_min_content()</code></td><td><code>rd::min_content</code></td><td>Grid tracks: smallest size without overflow</td></tr>
+<tr><td><code>rd_max_content()</code></td><td><code>rd::max_content</code></td><td>Grid tracks: size without wrapping</td></tr>
+</tbody>
+</table>
+</div>
+<p>Percentages of width resolve against the containing block’s width. Percentages of height resolve against its height
+when that is definite, and are treated as <code>auto</code> otherwise. Padding and margin percentages resolve against the
+width on every side, as in CSS.</p>
+<p>Logical pixels are scaled by raylib’s DPI scale when drawn; layout never sees device pixels.</p>
+<h2 id="colors-rd_color"><a class="header" href="#colors-rd_color">Colors: <code>rd_color</code></a></h2>
+<p><code>rd_hex(0xRRGGBB)</code> (opaque), <code>rd_rgb(r, g, b)</code>, <code>rd_rgba(r, g, b, a)</code>. A zero <code>rd_color</code> is unset. Transparent is
+<code>rd_rgba(0, 0, 0, 0)</code>, which is set.</p>
+<h2 id="edges-and-corners"><a class="header" href="#edges-and-corners">Edges and corners</a></h2>
+<p><code>rd_edges</code> is <code>{top, right, bottom, left}</code>; <code>rd_edges_all(v)</code> and <code>rd_edges_vh(vertical, horizontal)</code> build it.
+<code>rd_corners</code> is <code>{top_left, top_right, bottom_right, bottom_left}</code>; <code>rd_corners_all(v)</code> builds it. Each side is an
+independent <code>rd_val</code>, so <code>.padding.left = rd_px(4)</code> sets one side and leaves the others unset.</p>
+<h2 id="shadows"><a class="header" href="#shadows">Shadows</a></h2>
+<p><code>rd_shadow</code> is <code>{x, y, blur, spread, color}</code>. <code>rd_shadow_of(x, y, blur, color)</code> builds one with zero spread.</p>
+<h2 id="grid-2"><a class="header" href="#grid-2">Grid</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Constructor</th><th>Meaning</th></tr>
+</thead>
+<tbody>
+<tr><td><code>rd_track_of(v)</code></td><td>A track sized <code>v</code>; <code>fr</code> becomes <code>minmax(auto, fr)</code></td></tr>
+<tr><td><code>rd_track_minmax(min, max)</code></td><td>A track between two sizes</td></tr>
+<tr><td><code>rd_tracks_create(ctx, a, n)</code></td><td>Interns a track list; returns a handle</td></tr>
+<tr><td><code>rd_tracks_create_auto(ctx, mode, a, n)</code></td><td><code>repeat(auto-fill, ...)</code> or <code>repeat(auto-fit, ...)</code></td></tr>
+<tr><td><code>rd_tracks_none()</code></td><td>No explicit tracks</td></tr>
+<tr><td><code>rd_line(n)</code></td><td>A grid line, 1-based; negative from the end</td></tr>
+<tr><td><code>rd_span(n)</code></td><td>Span <code>n</code> tracks</td></tr>
+<tr><td><code>rd_line_auto()</code></td><td>Auto placement</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="unset"><a class="header" href="#unset">Unset</a></h2>
+<p>Zero means unset for every style type. That is what makes <code>&amp;(rd_style){.width = rd_px(10)}</code> set only the width,
+and it is why <code>rd_node_merge_style</code> can tell which fields to copy.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="limits"><a class="header" href="#limits">Limits</a></h1>
+<p>What raydom doesn’t do in this version. Behavior outside these limits is unspecified.</p>
+<h2 id="layout-2"><a class="header" href="#layout-2">Layout</a></h2>
+<ul>
+<li>No <code>display: block</code> or <code>inline</code>; every container is flex or grid. Text nodes are leaves.</li>
+<li>Grid: no named lines, no named areas, no <code>dense</code> auto-flow; an auto repeat must be the whole track list.</li>
+<li>No <code>position: fixed</code> or <code>sticky</code>, and no <code>z-index</code>. Children draw in tree order, later siblings on top; content
+that must sit above everything goes in the <a href="#overlay-and-anchoring">overlay</a>.</li>
+<li>No <code>aspect_ratio</code>, no <code>transform</code>. Animate <code>inset</code> to move a node without reflowing its neighbors.</li>
+<li>Transitions don’t animate <code>width: auto</code>, unit changes (px to %), or <code>display</code>; those change at once.</li>
+<li><code>min_width</code>/<code>min_height</code> <code>auto</code> is 0, not the content size.</li>
+</ul>
+<h2 id="text-1"><a class="header" href="#text-1">Text</a></h2>
+<ul>
+<li>One font per text node. No rich text inside a node; use several text nodes in a row.</li>
+<li>No shaping: no ligatures, no contextual forms, no bidirectional text. Pair kerning from the font is applied. Latin, Cyrillic,
+Greek and CJK display; Arabic and Indic scripts don’t shape correctly.</li>
+<li>No hyphenation. Words longer than the line overflow.</li>
+<li>No double- or triple-click word or line selection.</li>
+</ul>
+<h2 id="input"><a class="header" href="#input">Input</a></h2>
+<ul>
+<li>No IME composition events. Text input is one codepoint at a time from raylib.</li>
+<li>No touch or gesture input beyond what raylib reports as the mouse.</li>
+<li>No accessibility tree.</li>
+</ul>
+<h2 id="rendering"><a class="header" href="#rendering">Rendering</a></h2>
+<ul>
+<li>SVG: no text, filters, masks, clip paths, patterns or embedded images. Gradient coordinates written as unitless
+fractions (<code>x2="1"</code>) render as a flat color; use percentages (<code>x2="100%"</code>). <code>currentColor</code> tints the whole SVG.</li>
+<li>No background images; an image is its own node. Images are static (no GIF animation) unless updated with
+<code>rd_image_update</code>.</li>
+<li>Shadows are outer box shadows only.</li>
+<li>No gradients.</li>
+</ul>
+<h2 id="threads"><a class="header" href="#threads">Threads</a></h2>
+<p>A context is single-threaded. Separate contexts on separate threads don’t share state, but raylib drawing must
+happen on the thread that owns the window.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="for-ai-agents"><a class="header" href="#for-ai-agents">For AI agents</a></h1>
+<p>This page is for coding agents and the tools that feed them. It states the facts an agent needs to write correct
+raydom code, in a form that is cheap to retrieve.</p>
+<h2 id="machine-readable-copies"><a class="header" href="#machine-readable-copies">Machine-readable copies</a></h2>
+<p>Every published version of this book has, next to its HTML:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Path</th><th>Contents</th></tr>
+</thead>
+<tbody>
+<tr><td><code>llms.txt</code></td><td>Index of pages with one-line descriptions, per <a href="https://llmstxt.org/">llmstxt.org</a></td></tr>
+<tr><td><code>llms-full.txt</code></td><td>The whole book as one Markdown file, code samples inlined</td></tr>
+<tr><td><code>&lt;page&gt;.md</code></td><td>Each page as Markdown, at the HTML page’s path with <code>.md</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>Use the copy under the version that matches the project’s <code>GIT_TAG</code> or <code>find_package</code> version, for example
+<code>/v0.2.1/llms-full.txt</code>. <code>/latest/</code> follows the newest release; <code>/dev/</code> follows the main branch and may
+describe unreleased API.</p>
+<p>The headers are the ground truth. <code>include/raydom/*.h</code> documents every function in a comment above it, and
+<code>include/raydom/style.h</code> defines every style property in the <code>RD_STYLE_PROPS</code> X-macro.</p>
+<h2 id="rules"><a class="header" href="#rules">Rules</a></h2>
+<ol>
+<li>Create the context after <code>InitWindow</code> and destroy it before <code>CloseWindow</code>. In C++, scope <code>rd::Context</code> in a block
+that ends before <code>CloseWindow</code>.</li>
+<li>Load a font before creating text. There is no built-in font.</li>
+<li>Call <code>rd_update</code> before <code>BeginDrawing</code> and <code>rd_draw</code> between <code>BeginDrawing</code> and <code>EndDrawing</code>, once per frame.</li>
+<li>A new node is detached. Append it under <code>rd_ctx_root(ctx)</code> or a descendant, or it isn’t drawn.</li>
+<li><code>rd_style</code> fields left out are unset, and unset fields fall through to classes, inheritance and defaults.
+Write <code>&amp;(rd_style){.width = rd_px(100)}</code>. Never pass a computed style as an inline style: it sets every
+property and overrides all classes.</li>
+<li>The default <code>flex_direction</code> is column and the default <code>flex_shrink</code> is 0. Set <code>flex_direction = RD_FLEX_ROW</code>
+for rows. Set <code>flex_shrink</code> explicitly if items must shrink.</li>
+<li>Inline styles beat class state variants. Put hover, focus and active styling in classes.</li>
+<li>Lengths need units: <code>rd_px(8)</code>, not <code>8</code>. Unitless values (<code>flex_grow</code>, <code>opacity</code>, <code>line_clamp</code>, multiplier
+<code>line_height</code>) use <code>rd_num</code>.</li>
+<li>Grid track lists are handles: build them with <code>rd_tracks_create</code> (C) or <code>ctx.tracks({...})</code> (C++).</li>
+<li>Handles are values. Store <code>rd_node</code>, not pointers. Check <code>rd_node_alive</code> when a node may have been destroyed.</li>
+<li>Listeners may mutate and destroy nodes, including their own node. A destroyed node is freed when dispatch
+ends.</li>
+<li>Geometry (<code>rd_node_rect</code>, <code>rd_node_bounds</code>) reflects the last layout. After building or changing the tree
+outside the frame loop, call <code>rd_ctx_layout</code> before reading it.</li>
+<li>The C++ layer doesn’t throw. Check returned handles and <code>bool</code> results where failure matters.</li>
+<li>raydom doesn’t own the main loop or the window. Time comes from <code>rd_ctx_set_time</code>, which <code>rd_update</code> calls; use
+<code>rd_ctx_set_timer</code> for delays, and <code>rd_set_event_waiting</code> rather than raylib’s <code>EnableEventWaiting</code>.</li>
+<li>Create controls with their role: <code>rd_node_create_button</code> / <code>ctx.create_button</code> for buttons, <code>rd_node_create_input</code>
+/ <code>ctx.create_input</code> for inputs, <code>rd_node_set_role</code> for headings, lists, links and checkboxes. Don’t build a
+button from a plain node and a click listener; it gets no role and no default focus.</li>
+<li>Put menus, popovers, tooltips and modals in <code>rd_ctx_overlay(ctx)</code> with <code>position: absolute</code>, and position them
+with <code>rd_node_set_anchor</code>. Don’t place them inside the trigger’s subtree, where overflow containers clip them.</li>
+<li>For checkboxes, switches, radio groups, sliders, toasts, menus, selects, modals, tooltips, tabs, splitters,
+lists, tables and trees, use the extras components (<code>rdx_checkbox_create</code>, <code>rdx_menu_open</code>, <code>rdx_list_create</code>,
+…). Listen for <code>RD_EVENT_CHANGE</code>; restyle through <code>rdx_theme(ctx)</code>. For more than a few hundred rows use
+<code>rdx_list_create</code> or <code>rdx_table_create</code>, which only create the rows in view. Build custom popups on the overlay
+only when the extras don’t fit.</li>
+<li>Animate with <code>transition_duration</code> on a class (it animates every style change, layout properties and
+<code>height: auto</code> included) or <code>rd_node_animate</code> for one-off motion. Don’t drive animations from timers by hand.</li>
+</ol>
+<h2 id="minimal-program"><a class="header" href="#minimal-program">Minimal program</a></h2>
+<pre><code class="language-c">#include &lt;raydom/raydom.h&gt;
+#include &lt;raylib.h&gt;
+
+int main(void) {
+  SetConfigFlags(FLAG_WINDOW_HIGHDPI | FLAG_WINDOW_RESIZABLE);
+  InitWindow(800, 600, "hello");
+  rd_ctx* ctx = rd_ctx_create();
+  rd_font_load_file(ctx, FONT_PATH);  // any .ttf or .otf file
+
+  rd_node card = rd_node_create_text(ctx, "Hello from raydom", RD_TEXT_NUL);
+  rd_node_set_style(ctx, card,
+                    &amp;(rd_style){
+                        .padding       = rd_edges_all(rd_px(16)),
+                        .border_radius = rd_corners_all(rd_px(8)),
+                        .background    = rd_hex(0x1a1f2b),
+                        .color         = rd_hex(0xe4e7ee),
+                    });
+  rd_node_append(ctx, rd_ctx_root(ctx), card);
+
+  while (!WindowShouldClose()) {
+    rd_update(ctx);  // input, then layout at the window size
+    BeginDrawing();
+    ClearBackground(BLACK);
+    rd_draw(ctx);
+    EndDrawing();
+  }
+  rd_ctx_destroy(ctx);  // before CloseWindow, so GPU resources are released
+  CloseWindow();
+}
+</code></pre>
+<h2 id="verifying-generated-code"><a class="header" href="#verifying-generated-code">Verifying generated code</a></h2>
+<p>Headless programs can drive input and assert on results without a window; see
+<a href="#without-raylib-input">The frame loop</a>. The repository’s <code>docs/examples/</code> holds
+programs of this kind for each chapter.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="versioning"><a class="header" href="#versioning">Versioning</a></h1>
+<p>raydom follows <a href="https://semver.org/">semantic versioning</a>. Before 1.0, a minor release may break the API; a patch
+release doesn’t. From 1.0, only a major release may break it.</p>
+<h2 id="documentation-versions"><a class="header" href="#documentation-versions">Documentation versions</a></h2>
+<p>Every release tag publishes its own copy of this book, built from the sources at that tag, under <code>/&lt;tag&gt;/</code>. A
+published copy is never rebuilt by later releases, so it keeps describing the version it was built from. The
+version menu in the top bar switches between them and keeps the current page when it exists in the target version.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Path</th><th>Built from</th></tr>
+</thead>
+<tbody>
+<tr><td><code>/vX.Y.Z/</code></td><td>The tag <code>vX.Y.Z</code></td></tr>
+<tr><td><code>/latest/</code></td><td>The newest release tag</td></tr>
+<tr><td><code>/dev/</code></td><td>The <code>main</code> branch</td></tr>
+</tbody>
+</table>
+</div>
+<p>The book’s code samples are compiled, and the headless ones run, by the test suite at each tag, so a version’s
+samples match that version’s API.</p>
+<h2 id="checking-a-version-in-code"><a class="header" href="#checking-a-version-in-code">Checking a version in code</a></h2>
+<pre><code class="language-c">#include &lt;raydom/version.h&gt;
+
+#if RD_VERSION_MAJOR == 0 &amp;&amp; RD_VERSION_MINOR &lt; 2
+// ...
+#endif
+</code></pre>
+<p><code>RD_VERSION_STRING</code> holds the full version.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="elasticlunr-ef4e11c1.min.js"></script>
+        <script src="mark-09e88c2c.min.js"></script>
+        <script src="searcher-09f2665d.js"></script>
+
+        <script src="clipboard-1626706a.min.js"></script>
+        <script src="highlight-abc7f01d.js"></script>
+        <script src="book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+        <script src="theme/version-switcher-ca85feef.js"></script>
+
+        <script>
+        window.addEventListener('load', function() {
+            window.setTimeout(window.print, 100);
+        });
+        </script>
+
+
+    </div>
+    </body>
+</html>

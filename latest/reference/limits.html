@@ -36,7 +36,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-a8891df0.js";
+            window.path_to_searchindex_js = "../searchindex-2bf57da4.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-c393df87.js"></script>
@@ -183,7 +183,7 @@
 <h2 id="layout"><a class="header" href="#layout">Layout</a></h2>
 <ul>
 <li>No <code>display: block</code> or <code>inline</code>; every container is flex or grid. Text nodes are leaves.</li>
-<li>Grid: no named lines, no named areas, no <code>dense</code> auto-flow, no <code>repeat(auto-fill)</code>.</li>
+<li>Grid: no named lines, no named areas, no <code>dense</code> auto-flow; an auto repeat must be the whole track list.</li>
 <li>No <code>position: fixed</code> or <code>sticky</code>, and no <code>z-index</code>. Children draw in tree order, later siblings on top; content
 that must sit above everything goes in the <a href="../guide/overlay.html">overlay</a>.</li>
 <li>No <code>aspect_ratio</code>, no <code>transform</code>. Animate <code>inset</code> to move a node without reflowing its neighbors.</li>

@@ -48,7 +48,7 @@ Agents and tools can read the book as plain Markdown; see [For AI agents](agents
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.1.1)
+    GIT_TAG        v0.2.1)
 FetchContent_MakeAvailable(raydom)
 
 target_link_libraries(your_app PRIVATE raydom::raydom)
@@ -69,7 +69,7 @@ cmake --install build --prefix /your/prefix
 ```
 
 ```cmake
-find_package(raydom 0.1 CONFIG REQUIRED)
+find_package(raydom 0.2 CONFIG REQUIRED)
 target_link_libraries(your_app PRIVATE raydom::raydom)
 ```
 
@@ -213,7 +213,7 @@ project(hello LANGUAGES C CXX)
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.1.1)
+    GIT_TAG        v0.2.1)
 FetchContent_MakeAvailable(raydom)
 
 add_executable(hello main.cc)
@@ -613,6 +613,33 @@ implicit tracks sized by `grid_auto_rows` and `grid_auto_columns`.
 The algorithm follows [CSS Grid §11](https://www.w3.org/TR/css-grid-1/#layout-algorithm). Named lines, named areas
 and `dense` packing are not implemented.
 
+### Auto-repeated tracks
+
+```c
+// Responsive cards: as many columns of at least 260px as fit, sharing the rest.
+rd_track card  = rd_track_minmax(rd_px(260), rd_fr(1));
+rd_node  cards = add(ctx, root,
+                     (rd_style){.display               = RD_DISPLAY_GRID,
+                                .grid_template_columns = rd_tracks_create_auto(ctx, RD_REPEAT_AUTO_FILL, &card, 1),
+                                .column_gap            = rd_px(20),
+                                .row_gap               = rd_px(20)});
+for (int i = 0; i < 5; i++) add(ctx, cards, (rd_style){.height = rd_px(120)});
+```
+
+`rd_tracks_create_auto` is CSS's `repeat(auto-fill, ...)` and `repeat(auto-fit, ...)`: the list repeats as many times
+as fits the grid's content width, so the column count follows the window. Each track counts at its max size when
+that's a length, else its min size, which is why `minmax(260px, 1fr)` means "at least 260px". Without a definite
+width, the grid's max width decides, then its min width; otherwise the list appears once.
+
+- `RD_REPEAT_AUTO_FILL` keeps empty repetitions: three cards in a four-column row leave a gap.
+- `RD_REPEAT_AUTO_FIT` drops repetitions no item occupies, so the cards stretch to fill the row.
+
+The whole list repeats; fixed tracks before or after a repeat aren't supported. C++:
+`ctx.tracks(rd::repeat(rd::auto_fill, {rd::minmax(260_px, 1_fr)}))`.
+
+Track lists are interned: creating a list identical to an existing one returns the same handle, so code that
+rebuilds lists doesn't grow memory.
+
 ## Running layout and reading geometry
 
 ```c
@@ -673,16 +700,24 @@ Leave room with `padding` if content shouldn't sit under the bar.
 
 ## Layout hooks
 
-`rd_ctx_on_layout(ctx, fn, data, destroy)` runs `fn` after every layout, with that layout's geometry and scroll
-offsets. It's for content that depends on its own geometry: a virtualized list binding the rows that scrolled into
-view, a chat log staying scrolled to its end. If hooks change the tree, layout runs once more before
-`rd_ctx_layout` returns, so the change shows in the same frame; hooks don't run for that second pass.
+Layout hooks run after every layout, with that layout's geometry and scroll offsets. They're for content that
+depends on its own geometry: a virtualized list binding the rows that scrolled into view, a chat log staying
+scrolled to its end. If hooks change the tree, layout runs once more before `rd_ctx_layout` returns, so the change
+shows in the same frame; hooks don't run for that second pass.
+
+`rd_node_on_layout(ctx, node, fn, data, destroy)` ties a hook to a node: destroying the node removes the hook and
+runs `destroy(data)`, and the hook is skipped while the node is detached. That's the right lifetime for a hook that
+belongs to a view, and it can't leak. C++: `node.on_layout([&] { ... })`. `rd_ctx_on_layout` adds a hook for the
+context's whole lifetime.
 
 ```c
 static void stick_to_bottom(rd_ctx* ctx, void* data) {
   rd_node log = *(rd_node*)data;
   rd_node_set_scroll(ctx, log, 0, 1e9f);  // clamped to the content just laid out
 }
+
+static rd_node log_node;  // the hook's data must live as long as the hook
+rd_node_on_layout(ctx, log_node, stick_to_bottom, &log_node, NULL);  // removed with the log
 ```
 
 ## Custom measurement
@@ -1499,6 +1534,9 @@ are reported the same way as in C: null handles and `false`.
 
 `get()` and `handle()` return the C values, so C and C++ calls can be mixed freely on one context.
 
+`rd::Node` and `rd::Class` are handles, so their setters are `const`, as with `std::span`: they change the node in
+the context, not the handle. A node captured by value in a lambda, or a `const rd::Node`, can be changed directly.
+
 ## Styles
 
 `rd::Style` has one chainable setter per property, named as in the [reference](../reference/properties.md), plus
@@ -1647,7 +1685,8 @@ rd::Node t = rdx::toast(ctx, {.title    = "Exported",
                               .text     = "report.csv is in your Downloads folder.",
                               .position = RDX_TOAST_TOP_RIGHT,
                               .kind     = RDX_TOAST_SUCCESS});
-rdx::toast(ctx, {.text = "Connection lost", .kind = RDX_TOAST_ERROR, .seconds = -1});  // stays until closed
+std::string host = "db.internal";
+rdx::toast(ctx, {.text = "Lost connection to " + host, .kind = RDX_TOAST_ERROR, .seconds = -1});  // until closed
 ```
 
 | Field      | Meaning                                                                    |
@@ -1657,6 +1696,8 @@ rdx::toast(ctx, {.text = "Connection lost", .kind = RDX_TOAST_ERROR, .seconds = 
 | `position` | `BOTTOM_RIGHT` (zero), `BOTTOM_LEFT`, `TOP_RIGHT`, `TOP_LEFT`, `TOP_CENTER`, `BOTTOM_CENTER` |
 | `kind`     | `INFO` (zero), `SUCCESS`, `WARNING`, `ERROR`: the color of the bar on the left |
 | `seconds`  | How long it stays; 0 means 4, negative until closed                        |
+
+In C++, `rdx::toast` takes `rdx::ToastOptions`, the same fields with `std::string` for the title and text.
 
 Toasts live in the [overlay](../guide/overlay.md), one stack per position, 16px from the window's edges, newest
 nearest the edge. A stack keeps the newest five. Hovering a toast pauses its countdown, which restarts when the
@@ -2301,6 +2342,7 @@ independent `rd_val`, so `.padding.left = rd_px(4)` sets one side and leaves the
 | `rd_track_of(v)`           | A track sized `v`; `fr` becomes `minmax(auto, fr)` |
 | `rd_track_minmax(min, max)`| A track between two sizes                     |
 | `rd_tracks_create(ctx, a, n)` | Interns a track list; returns a handle     |
+| `rd_tracks_create_auto(ctx, mode, a, n)` | `repeat(auto-fill, ...)` or `repeat(auto-fit, ...)` |
 | `rd_tracks_none()`         | No explicit tracks                            |
 | `rd_line(n)`               | A grid line, 1-based; negative from the end   |
 | `rd_span(n)`               | Span `n` tracks                               |
@@ -2321,7 +2363,7 @@ What raydom doesn't do in this version. Behavior outside these limits is unspeci
 ## Layout
 
 - No `display: block` or `inline`; every container is flex or grid. Text nodes are leaves.
-- Grid: no named lines, no named areas, no `dense` auto-flow, no `repeat(auto-fill)`.
+- Grid: no named lines, no named areas, no `dense` auto-flow; an auto repeat must be the whole track list.
 - No `position: fixed` or `sticky`, and no `z-index`. Children draw in tree order, later siblings on top; content
   that must sit above everything goes in the [overlay](../guide/overlay.md).
 - No `aspect_ratio`, no `transform`. Animate `inset` to move a node without reflowing its neighbors.
@@ -2375,7 +2417,7 @@ Every published version of this book has, next to its HTML:
 | `<page>.md`       | Each page as Markdown, at the HTML page's path with `.md`      |
 
 Use the copy under the version that matches the project's `GIT_TAG` or `find_package` version, for example
-`/v0.1.1/llms-full.txt`. `/latest/` follows the newest release; `/dev/` follows the main branch and may
+`/v0.2.1/llms-full.txt`. `/latest/` follows the newest release; `/dev/` follows the main branch and may
 describe unreleased API.
 
 The headers are the ground truth. `include/raydom/*.h` documents every function in a comment above it, and
