@@ -37,7 +37,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-3a3e7567.js";
+            window.path_to_searchindex_js = "searchindex-77a7c2eb.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c393df87.js"></script>
@@ -1383,12 +1383,31 @@ draw on top. raydom flushes raylib’s batch before the call, with no scissor or
 <tr><td><code>content</code></td><td>The node’s content box in screen coordinates, after scrolling</td></tr>
 <tr><td><code>clip</code></td><td>The part of the screen left visible by enclosing overflow containers</td></tr>
 <tr><td><code>dpi</code></td><td>Device pixels per logical pixel</td></tr>
+<tr><td><code>ratio</code></td><td>The pixel ratio the transform is scaled by (see below)</td></tr>
 </tbody>
 </table>
 </div>
 <p><code>rd_paint_scissor(info)</code> clips raylib drawing to the content box within <code>clip</code>; raydom ends the scissor after the
 callback. Restore any other raylib state you change. Rendering to a texture with <code>BeginTextureMode</code> inside the
-callback is safe.</p>
+callback is safe: size the texture and draw into it in device pixels (<code>content</code> times <code>dpi</code>), then call
+<code>rd_paint_restore(info)</code> after <code>EndTextureMode</code>, which resets the transform raydom drew with. raydom restores it
+again after the callback.</p>
+<h2 id="pixel-ratio"><a class="header" href="#pixel-ratio">Pixel ratio</a></h2>
+<p><code>rd_set_pixel_ratio(ctx, r)</code> makes a logical pixel <code>r</code> raylib screen pixels: <code>rd_update</code> divides the pointer and
+the screen size by <code>r</code>, and <code>rd_draw</code> scales its drawing by <code>r</code> and rasterizes text and shapes for it. raylib’s web
+backend renders at CSS resolution, which is blurry on high-density displays; to render at device resolution, size
+raylib’s window (the canvas) in device pixels, show it at CSS size, and set the ratio to <code>devicePixelRatio</code>:</p>
+<pre><code class="language-c">// Each frame, before rd_update. In CSS: canvas { width: 100vw; height: 100vh; }
+double r = emscripten_get_device_pixel_ratio();
+int    w = (int)lround(EM_ASM_DOUBLE(return window.innerWidth;) * r);
+int    h = (int)lround(EM_ASM_DOUBLE(return window.innerHeight;) * r);
+if (w != GetScreenWidth() || h != GetScreenHeight()) SetWindowSize(w, h);
+rd_set_pixel_ratio(ctx, (float)r);
+</code></pre>
+<p>Leave out <code>FLAG_WINDOW_RESIZABLE</code>, whose resize handler sets the canvas back to CSS pixels, and
+<code>FLAG_WINDOW_HIGHDPI</code>, whose scissor scaling raylib applies on the web without rendering at high density. On the
+desktop, raylib’s own <code>FLAG_WINDOW_HIGHDPI</code> handles density and the ratio works as a zoom. Pass logical sizes when
+calling <code>rd_ctx_layout</code> yourself.</p>
 <p>C++: <code>node.paint([](const rd_paint_info&amp; info) { ... })</code>, with the callable owned by the node.</p>
 <p>Pair a canvas with listeners on the same node for interaction: pointer events carry <code>local_x</code> and <code>local_y</code>
 relative to the node’s border box. Use the paint callback for drawing only; it must not change the tree.</p>
@@ -1521,9 +1540,12 @@ std::string shown;
 volume.on(RD_EVENT_INPUT, [&amp;] { shown = std::to_string(static_cast&lt;int&gt;(rdx::slider_value(volume))); });  // while moving
 volume.on(RD_EVENT_CHANGE, [&amp;] { /* save it */ });  // drag released or key pressed
 </code></pre>
+<p><code>rdx_slider_set_range</code> changes the range later, for a timeline whose end moves, without recreating the slider; the
+value is clamped into the new range and no event fires.</p>
 <p>Dragging or pressing anywhere on the track moves it; the drag continues outside the slider. Arrow keys move one step
 (1% of the range when <code>step</code> is 0), Page Up and Page Down a tenth of the range, Home and End to the ends. A zero
-<code>rdx_slider_desc</code> is 0 to 100, continuous. The default width is 200px; set <code>width</code> on the slider to change it.</p>
+<code>rdx_slider_desc</code> is 0 to 100, continuous. With a step, values are <code>min + n * step</code>, as for an HTML range input; when
+the range isn’t a whole number of steps, the largest value is the last step below <code>max</code>. The default width is 200px; set <code>width</code> on the slider to change it.</p>
 <h2 id="toasts"><a class="header" href="#toasts">Toasts</a></h2>
 <pre><code class="language-cpp">rd::Node t = rdx::toast(ctx, {.title    = "Exported",
                               .text     = "report.csv is in your Downloads folder.",
