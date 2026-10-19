@@ -14,7 +14,7 @@ Every published version of this book has, next to its HTML:
 | `<page>.md`       | Each page as Markdown, at the HTML page's path with `.md`      |
 
 Use the copy under the version that matches the project's `GIT_TAG` or `find_package` version, for example
-`/v0.2.3/llms-full.txt`. `/latest/` follows the newest release; `/dev/` follows the main branch and may
+`/v0.2.4/llms-full.txt`. `/latest/` follows the newest release; `/dev/` follows the main branch and may
 describe unreleased API.
 
 The headers are the ground truth. `include/raydom/*.h` documents every function in a comment above it, and
