@@ -48,7 +48,7 @@ Agents and tools can read the book as plain Markdown; see [For AI agents](agents
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.1)
+    GIT_TAG        v0.2.2)
 FetchContent_MakeAvailable(raydom)
 
 target_link_libraries(your_app PRIVATE raydom::raydom)
@@ -213,7 +213,7 @@ project(hello LANGUAGES C CXX)
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.1)
+    GIT_TAG        v0.2.2)
 FetchContent_MakeAvailable(raydom)
 
 add_executable(hello main.cc)
@@ -1022,10 +1022,12 @@ Stopping at the target doesn't undo capture listeners that already ran on ancest
 | `SELECTION_CHANGE`           | The root                   | No      |                                    |
 
 Event fields: `x`, `y` in root coordinates; `local_x`, `local_y` relative to `current`'s border box; `wheel_x`,
-`wheel_y` in notches; `button` (the button that changed) and `buttons` (held mask); `key`, `mods`, `repeat`;
+`wheel_y` in notches; `button` (the button that changed) and `buttons` (held mask); `clicks` for `CLICK`; `key`, `mods`, `repeat`;
 `codepoint` for text; `related` for focus events.
 
-`CLICK` fires for the primary button only.
+`CLICK` fires for the primary button only. `ev->clicks` counts rapid clicks on the same node: 1, then 2 for a double
+click and 3 for a triple, when each follows the last within half a second and four pixels. Keyboard activation
+(Enter or Space) is always 1.
 
 ## Pointer capture
 
@@ -1913,6 +1915,30 @@ Widths are px or fr. `cell` fills each cell; `header` runs when a column header 
 goes: reorder your data, then `rdx_list_refresh(rdx_table_list(table))`. Selection and `CHANGE` are on the body,
 `rdx_table_list`.
 
+### One listener for every row
+
+Rows are reused as the list scrolls, and only their contents are rebuilt, so per-row listeners would follow the
+row node, not the data. Put one listener on the list and ask which row an event came from:
+
+```cpp
+// One listener for every row: rows are reused as the table scrolls, so ask which row a node is in.
+rd::Node rows   = rdx::table_list(table);
+int      opened = -1;
+rows.on(RD_EVENT_CLICK, [&](rd::Event& e) {
+  if (e.clicks() == 2) opened = rdx::list_index_of(rows, e.target());  // double click: open the file
+});
+rows.on(RD_EVENT_POINTER_DOWN, [&](rd::Event& e) {
+  int row = rdx::list_index_of(rows, e.target());
+  if (e.button() != RD_BUTTON_SECONDARY || row < 0) return;
+  rdx::menu(ctx, {{"Open"}, {"Rename"}, {}, {"Delete"}}, {.x = e.x(), .y = e.y()},
+            [row](int item) { (void)row, (void)item; /* act on row */ });
+});
+```
+
+`rdx_list_index_of(ctx, list, node)` returns the row index for the row or anything inside it, or -1. For a table,
+pass `rdx_table_list(table)`; for a tree, `rdx_tree_item_of` returns the item id instead of the visible row.
+`ev->clicks` counts rapid clicks on the same node, so `clicks == 2` is a double click.
+
 ## Tree view
 
 ```cpp
@@ -2376,7 +2402,7 @@ What raydom doesn't do in this version. Behavior outside these limits is unspeci
 - No shaping: no ligatures, no contextual forms, no bidirectional text. Pair kerning from the font is applied. Latin, Cyrillic,
   Greek and CJK display; Arabic and Indic scripts don't shape correctly.
 - No hyphenation. Words longer than the line overflow.
-- No double- or triple-click word or line selection.
+- No double- or triple-click word or line selection in text (`ev->clicks` reports double clicks to listeners).
 
 ## Input
 
@@ -2417,7 +2443,7 @@ Every published version of this book has, next to its HTML:
 | `<page>.md`       | Each page as Markdown, at the HTML page's path with `.md`      |
 
 Use the copy under the version that matches the project's `GIT_TAG` or `find_package` version, for example
-`/v0.2.1/llms-full.txt`. `/latest/` follows the newest release; `/dev/` follows the main branch and may
+`/v0.2.2/llms-full.txt`. `/latest/` follows the newest release; `/dev/` follows the main branch and may
 describe unreleased API.
 
 The headers are the ground truth. `include/raydom/*.h` documents every function in a comment above it, and

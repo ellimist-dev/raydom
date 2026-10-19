@@ -37,7 +37,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-2bf57da4.js";
+            window.path_to_searchindex_js = "searchindex-3a3e7567.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c393df87.js"></script>
@@ -215,7 +215,7 @@ behave as described for this version.</p>
 <pre><code class="language-cmake">include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.1)
+    GIT_TAG        v0.2.2)
 FetchContent_MakeAvailable(raydom)
 
 target_link_libraries(your_app PRIVATE raydom::raydom)
@@ -368,7 +368,7 @@ project(hello LANGUAGES C CXX)
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.1)
+    GIT_TAG        v0.2.2)
 FetchContent_MakeAvailable(raydom)
 
 add_executable(hello main.cc)
@@ -996,9 +996,11 @@ list.append(row);
 </table>
 </div>
 <p>Event fields: <code>x</code>, <code>y</code> in root coordinates; <code>local_x</code>, <code>local_y</code> relative to <code>current</code>’s border box; <code>wheel_x</code>,
-<code>wheel_y</code> in notches; <code>button</code> (the button that changed) and <code>buttons</code> (held mask); <code>key</code>, <code>mods</code>, <code>repeat</code>;
+<code>wheel_y</code> in notches; <code>button</code> (the button that changed) and <code>buttons</code> (held mask); <code>clicks</code> for <code>CLICK</code>; <code>key</code>, <code>mods</code>, <code>repeat</code>;
 <code>codepoint</code> for text; <code>related</code> for focus events.</p>
-<p><code>CLICK</code> fires for the primary button only.</p>
+<p><code>CLICK</code> fires for the primary button only. <code>ev-&gt;clicks</code> counts rapid clicks on the same node: 1, then 2 for a double
+click and 3 for a triple, when each follows the last within half a second and four pixels. Keyboard activation
+(Enter or Space) is always 1.</p>
 <h2 id="pointer-capture"><a class="header" href="#pointer-capture">Pointer capture</a></h2>
 <pre><code class="language-cpp">rd::Node handle = ctx.create(rd::Style().width(20_px).height(20_px));
 float    dragged = 0;
@@ -1711,6 +1713,25 @@ again.</li>
 Widths are px or fr. <code>cell</code> fills each cell; <code>header</code> runs when a column header is clicked, which is where sorting
 goes: reorder your data, then <code>rdx_list_refresh(rdx_table_list(table))</code>. Selection and <code>CHANGE</code> are on the body,
 <code>rdx_table_list</code>.</p>
+<h3 id="one-listener-for-every-row"><a class="header" href="#one-listener-for-every-row">One listener for every row</a></h3>
+<p>Rows are reused as the list scrolls, and only their contents are rebuilt, so per-row listeners would follow the
+row node, not the data. Put one listener on the list and ask which row an event came from:</p>
+<pre><code class="language-cpp">// One listener for every row: rows are reused as the table scrolls, so ask which row a node is in.
+rd::Node rows   = rdx::table_list(table);
+int      opened = -1;
+rows.on(RD_EVENT_CLICK, [&amp;](rd::Event&amp; e) {
+  if (e.clicks() == 2) opened = rdx::list_index_of(rows, e.target());  // double click: open the file
+});
+rows.on(RD_EVENT_POINTER_DOWN, [&amp;](rd::Event&amp; e) {
+  int row = rdx::list_index_of(rows, e.target());
+  if (e.button() != RD_BUTTON_SECONDARY || row &lt; 0) return;
+  rdx::menu(ctx, {{"Open"}, {"Rename"}, {}, {"Delete"}}, {.x = e.x(), .y = e.y()},
+            [row](int item) { (void)row, (void)item; /* act on row */ });
+});
+</code></pre>
+<p><code>rdx_list_index_of(ctx, list, node)</code> returns the row index for the row or anything inside it, or -1. For a table,
+pass <code>rdx_table_list(table)</code>; for a tree, <code>rdx_tree_item_of</code> returns the item id instead of the visible row.
+<code>ev-&gt;clicks</code> counts rapid clicks on the same node, so <code>clicks == 2</code> is a double click.</p>
 <h2 id="tree-view"><a class="header" href="#tree-view">Tree view</a></h2>
 <pre><code class="language-cpp">rd::Node tree = rdx::tree(ctx);
 int      src  = rdx::tree_add(tree, -1, "src");
@@ -2141,7 +2162,7 @@ that must sit above everything goes in the <a href="#overlay-and-anchoring">over
 <li>No shaping: no ligatures, no contextual forms, no bidirectional text. Pair kerning from the font is applied. Latin, Cyrillic,
 Greek and CJK display; Arabic and Indic scripts don’t shape correctly.</li>
 <li>No hyphenation. Words longer than the line overflow.</li>
-<li>No double- or triple-click word or line selection.</li>
+<li>No double- or triple-click word or line selection in text (<code>ev-&gt;clicks</code> reports double clicks to listeners).</li>
 </ul>
 <h2 id="input"><a class="header" href="#input">Input</a></h2>
 <ul>
@@ -2180,7 +2201,7 @@ raydom code, in a form that is cheap to retrieve.</p>
 </table>
 </div>
 <p>Use the copy under the version that matches the project’s <code>GIT_TAG</code> or <code>find_package</code> version, for example
-<code>/v0.2.1/llms-full.txt</code>. <code>/latest/</code> follows the newest release; <code>/dev/</code> follows the main branch and may
+<code>/v0.2.2/llms-full.txt</code>. <code>/latest/</code> follows the newest release; <code>/dev/</code> follows the main branch and may
 describe unreleased API.</p>
 <p>The headers are the ground truth. <code>include/raydom/*.h</code> documents every function in a comment above it, and
 <code>include/raydom/style.h</code> defines every style property in the <code>RD_STYLE_PROPS</code> X-macro.</p>

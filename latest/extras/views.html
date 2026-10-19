@@ -36,7 +36,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-2bf57da4.js";
+            window.path_to_searchindex_js = "../searchindex-3a3e7567.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-c393df87.js"></script>
@@ -232,6 +232,25 @@ again.</li>
 Widths are px or fr. <code>cell</code> fills each cell; <code>header</code> runs when a column header is clicked, which is where sorting
 goes: reorder your data, then <code>rdx_list_refresh(rdx_table_list(table))</code>. Selection and <code>CHANGE</code> are on the body,
 <code>rdx_table_list</code>.</p>
+<h3 id="one-listener-for-every-row"><a class="header" href="#one-listener-for-every-row">One listener for every row</a></h3>
+<p>Rows are reused as the list scrolls, and only their contents are rebuilt, so per-row listeners would follow the
+row node, not the data. Put one listener on the list and ask which row an event came from:</p>
+<pre><code class="language-cpp">// One listener for every row: rows are reused as the table scrolls, so ask which row a node is in.
+rd::Node rows   = rdx::table_list(table);
+int      opened = -1;
+rows.on(RD_EVENT_CLICK, [&amp;](rd::Event&amp; e) {
+  if (e.clicks() == 2) opened = rdx::list_index_of(rows, e.target());  // double click: open the file
+});
+rows.on(RD_EVENT_POINTER_DOWN, [&amp;](rd::Event&amp; e) {
+  int row = rdx::list_index_of(rows, e.target());
+  if (e.button() != RD_BUTTON_SECONDARY || row &lt; 0) return;
+  rdx::menu(ctx, {{"Open"}, {"Rename"}, {}, {"Delete"}}, {.x = e.x(), .y = e.y()},
+            [row](int item) { (void)row, (void)item; /* act on row */ });
+});
+</code></pre>
+<p><code>rdx_list_index_of(ctx, list, node)</code> returns the row index for the row or anything inside it, or -1. For a table,
+pass <code>rdx_table_list(table)</code>; for a tree, <code>rdx_tree_item_of</code> returns the item id instead of the visible row.
+<code>ev-&gt;clicks</code> counts rapid clicks on the same node, so <code>clicks == 2</code> is a double click.</p>
 <h2 id="tree-view"><a class="header" href="#tree-view">Tree view</a></h2>
 <pre><code class="language-cpp">rd::Node tree = rdx::tree(ctx);
 int      src  = rdx::tree_add(tree, -1, "src");

@@ -59,10 +59,12 @@ Stopping at the target doesn't undo capture listeners that already ran on ancest
 | `SELECTION_CHANGE`           | The root                   | No      |                                    |
 
 Event fields: `x`, `y` in root coordinates; `local_x`, `local_y` relative to `current`'s border box; `wheel_x`,
-`wheel_y` in notches; `button` (the button that changed) and `buttons` (held mask); `key`, `mods`, `repeat`;
+`wheel_y` in notches; `button` (the button that changed) and `buttons` (held mask); `clicks` for `CLICK`; `key`, `mods`, `repeat`;
 `codepoint` for text; `related` for focus events.
 
-`CLICK` fires for the primary button only.
+`CLICK` fires for the primary button only. `ev->clicks` counts rapid clicks on the same node: 1, then 2 for a double
+click and 3 for a triple, when each follows the last within half a second and four pixels. Keyboard activation
+(Enter or Space) is always 1.
 
 ## Pointer capture
 
