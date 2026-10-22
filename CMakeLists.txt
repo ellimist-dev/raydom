@@ -113,7 +113,7 @@ if (RAYDOM_BUILD_TESTS AND NOT EMSCRIPTEN)
             target_compile_features(test_render_gl PRIVATE c_std_23)
             add_test(NAME test_render_gl COMMAND test_render_gl)
             # GL drivers keep allocations for the process's life, which LeakSanitizer would report.
-            set_tests_properties(test_render_gl PROPERTIES ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
+            set_tests_properties(test_render_gl PROPERTIES ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0" SKIP_RETURN_CODE 77)
         endif ()
 
         # Programs quoted by the docs. All of them compile; the ones that don't open a window also run.

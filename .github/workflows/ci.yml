@@ -32,7 +32,8 @@ jobs:
         if: runner.os == 'macOS'
         run: brew install just
 
-      # The graphics test draws into a real window: a virtual X display on Linux.
+      # The graphics test draws into a real window: on Linux, in a virtual X display. GitHub's macOS runners have
+      # no OpenGL, so there it reports itself skipped.
       - name: Build
         run: cmake -S . -B build -DRAYDOM_SANITIZE=ON -DRAYDOM_TEST_GRAPHICS=ON && cmake --build build -j 4
 

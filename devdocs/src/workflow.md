@@ -41,7 +41,8 @@ To reproduce the Linux job locally, run the same steps in an `ubuntu:24.04` cont
 
 `-DRAYDOM_TEST_GRAPHICS=ON` adds `test_render_gl`, which opens a window, draws, and checks pixels read back from
 the screen: the only test of `rd_update` and `rd_draw`. It's off by default because it needs a display; CI turns it
-on, under `xvfb-run` on Linux.
+on, under `xvfb-run` on Linux. Without a display or OpenGL, as on GitHub's macOS runners, it reports itself
+skipped.
 
 ## Screenshots
 

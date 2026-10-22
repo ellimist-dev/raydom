@@ -30,6 +30,13 @@ static Image frame(rd_ctx* ctx) {
 int main(void) {
   SetTraceLogLevel(LOG_WARNING);
   InitWindow(320, 240, "raydom gl test");
+  if (!IsWindowReady()) {  // no display or no OpenGL, as on GitHub's macOS runners: skipped, not failed
+    rd_ctx* ctx = rd_ctx_create();
+    rd_update(ctx);  // and raydom stays out of raylib's way rather than crashing
+    rd_draw(ctx);
+    rd_ctx_destroy(ctx);
+    return 77;
+  }
   rd_ctx* ctx = rd_ctx_create();
   rd_font_load_file(ctx, RAYDOM_TEST_FONT);
   rd_node root = rd_ctx_root(ctx);

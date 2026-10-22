@@ -593,7 +593,7 @@ void rd_paint_restore(const rd_paint_info* info) {
 }
 
 void rd_draw(rd_ctx* ctx) {
-  if (!ctx) return;
+  if (!ctx || !IsWindowReady()) return;  // raylib failed to open a window, or hasn't yet
   gpu* g = gpu_get(ctx);
   if (!g) return;
 #ifdef __EMSCRIPTEN__
@@ -755,7 +755,7 @@ static void apply_cursor(rd_ctx* ctx) {
 }
 
 void rd_update(rd_ctx* ctx) {
-  if (!ctx) return;
+  if (!ctx || !IsWindowReady()) return;
   rd_ctx_set_time(ctx, GetTime());
   feed_keyboard(ctx);
   float   ratio = rd_pixel_ratio(ctx);

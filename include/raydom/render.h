@@ -42,7 +42,8 @@ void rd_paint_scissor(const rd_paint_info* info);
 void rd_paint_restore(const rd_paint_info* info);
 
 // raylib integration. rd_update reads raylib's mouse state and lays the tree out at the screen
-// size; rd_draw draws it between BeginDrawing and EndDrawing. Destroy the context before
+// size; rd_draw draws it between BeginDrawing and EndDrawing. Both do nothing without a raylib window
+// (IsWindowReady), for instance when InitWindow failed. Destroy the context before
 // CloseWindow so its textures and shader are released.
 void rd_update(rd_ctx* ctx);
 // Lets raydom manage raylib's event waiting: idle frames wait for input (EnableEventWaiting), except
