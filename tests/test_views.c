@@ -103,8 +103,9 @@ static void sidebar(void) {
   rd_node s   = rdx_split_create(ctx, &(rdx_split_desc){.size = 200, .min_first = 120, .min_second = 100, .collapsible = true});
   rd_node_merge_style(ctx, s, &(rd_style){.width = rd_px(606), .height = rd_px(300)});
   rd_node_append(ctx, rd_ctx_root(ctx), s);
-  int changes = 0;
+  int changes = 0, inputs = 0;
   rd_node_on(ctx, s, RD_EVENT_CHANGE, count, &changes, NULL, 0);
+  rd_node_on(ctx, s, RD_EVENT_INPUT, count, &inputs, NULL, 0);
   rd_ctx_layout(ctx, 800, 600);
   rd_node first = rdx_split_pane(ctx, s, 0), second = rdx_split_pane(ctx, s, 1);
   rd_node handle = rd_node_next_sibling(ctx, first);
@@ -125,6 +126,7 @@ static void sidebar(void) {
   rd_ctx_pointer(ctx, 40, 100, 0, 0, 0);
   rd_ctx_layout(ctx, 1000, 600);
   CHECK(rdx_split_collapsed(ctx, s) && near(rd_node_rect(ctx, second).width, 800) && changes == 1);
+  CHECK(inputs == 2);  // each move that changed something: to 127, then shut
   CHECK(near(rdx_split_size(ctx, s), 200));
 
   // Enter on the focused handle, then a double-click, toggle it; Left at the minimum collapses it.
@@ -287,6 +289,53 @@ static void tables(void) {
   rd_ctx_destroy(ctx);
 }
 
+static int  table_freed = 0;
+static void count_free(void* data) {
+  (void)data;
+  table_freed++;
+}
+
+// The body can be destroyed or kept apart from the table; the data goes once both are gone.
+static void table_ownership(void) {
+  rd_ctx*          ctx    = rd_ctx_create();
+  const rdx_column cols[] = {{"Name", rd_px(100)}};
+  rd_node          t = rdx_table_create(ctx, &(rdx_table_desc){cols, 1, 10, 24, fill_cell, on_header, NULL, count_free});
+  rd_node          body = rdx_table_list(ctx, t);
+  rd_node_destroy(ctx, body);
+  CHECK(rd_node_is_null(rdx_table_list(ctx, t)) && table_freed == 0);
+  click(ctx, rd_node_first_child(ctx, rd_node_first_child(ctx, t)));  // a header click still works
+  rd_node_destroy(ctx, t);
+  CHECK(table_freed == 1);
+
+  t    = rdx_table_create(ctx, &(rdx_table_desc){cols, 1, 10, 24, fill_cell, on_header, NULL, count_free});
+  body = rdx_table_list(ctx, t);
+  rd_node_detach(ctx, body);
+  rd_node_destroy(ctx, t);
+  CHECK(table_freed == 1);
+  rd_node_merge_style(ctx, body, &(rd_style){.height = rd_px(100)});
+  rd_node_append(ctx, rd_ctx_root(ctx), body);
+  rdx_list_refresh(ctx, body);  // still fills its rows
+  rd_ctx_layout(ctx, 800, 600);
+  rd_node_destroy(ctx, body);
+  CHECK(table_freed == 2);
+
+  // A part moved out of its component finds no state: its listeners do nothing.
+  rd_node tabs = rdx_tabs_create(ctx);
+  rdx_tabs_add(ctx, tabs, "One");
+  rd_node bar = rd_node_first_child(ctx, tabs);
+  rd_node_append(ctx, rd_ctx_root(ctx), bar);
+  rd_node_destroy(ctx, tabs);
+  rd_node_focus(ctx, rd_node_first_child(ctx, bar));
+  press(ctx, RD_KEY_RIGHT);
+  rd_node split  = rdx_split_create(ctx, &(rdx_split_desc){.collapsible = true});
+  rd_node handle = rd_node_next_sibling(ctx, rdx_split_pane(ctx, split, 0));
+  rd_node_append(ctx, rd_ctx_root(ctx), handle);
+  rd_node_destroy(ctx, split);
+  rd_node_focus(ctx, handle);
+  press(ctx, RD_KEY_ENTER);
+  rd_ctx_destroy(ctx);
+}
+
 static void trees(void) {
   rd_ctx* ctx  = rd_ctx_create();
   rd_font_load_file(ctx, RAYDOM_TEST_FONT);
@@ -342,6 +391,7 @@ static void trees(void) {
 int main(void) {
   tabs();
   splits();
+  table_ownership();
   sidebar();
   lists();
   tables();

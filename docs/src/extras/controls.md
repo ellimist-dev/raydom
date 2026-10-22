@@ -97,8 +97,12 @@ Toast timers need the clock to advance; with raylib's event waiting, use
 
 ## Restyling
 
-Every part of every control and toast has a class in `rdx_theme(ctx)`. They start with a dark look; restyle them
-for the whole context with `rd_class_set` and `rd_class_set_state`, or add your own classes to individual nodes:
+Every part of every control and toast has a class in `rdx_theme(ctx)`, built from a palette of colors. They start
+with a dark look. To recolor everything, set the palette with `rdx_theme_set_palette`: the classes are redefined from
+it and controls already created update; colors left unset keep theirs, so changing only `accent` works. Set the
+palette first, since it redefines the classes. To change one class, merge into it with `rd_class_merge` or
+`rd_class_merge_state` (C++: `merge` and `merge_on`), which keeps the layout properties you don't mention; or add your
+own classes to individual nodes:
 
 ```cpp
 {{#include ../../examples/controls.cc:theme}}

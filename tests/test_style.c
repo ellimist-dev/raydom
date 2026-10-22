@@ -178,7 +178,43 @@ static void test_shared_states(void) {
   rd_ctx_destroy(ctx);
 }
 
+static void test_class_merge(void) {
+  rd_ctx*  ctx = rd_ctx_create();
+  rd_class c   = rd_class_create(ctx, &(rd_style){.width = rd_px(40), .background = rd_hex(0x111111)});
+  rd_node  n   = rd_node_create(ctx);
+  rd_node_append(ctx, rd_ctx_root(ctx), n);
+  rd_node_add_class(ctx, n, c);
+  rd_ctx_compute_styles(ctx);
+  CHECK(rd_class_merge(ctx, c, &(rd_style){.background = rd_hex(0x222222)}));
+  rd_ctx_compute_styles(ctx);
+  const rd_style* st = rd_node_computed_style(ctx, n);
+  CHECK(st->width.value == 40 && st->background.r == 0x22);  // the width stays
+
+  CHECK(rd_class_merge_state(ctx, c, RD_STATE_HOVER, &(rd_style){.background = rd_hex(0x333333)}));
+  rd_node_set_states(ctx, n, RD_STATE_HOVER, true);
+  rd_ctx_compute_styles(ctx);
+  CHECK(rd_node_computed_style(ctx, n)->background.r == 0x33);
+
+  rd_style got;
+  CHECK(rd_class_get(ctx, c, &got) && got.width.value == 40 && got.background.r == 0x22);
+  CHECK(rd_class_get_state(ctx, c, RD_STATE_HOVER, &got) && got.background.r == 0x33 && got.width.unit == RD_UNIT_UNSET);
+  CHECK(!rd_class_get_state(ctx, c, RD_STATE_ACTIVE, &got) && !got.background.set);  // no variant
+  CHECK(!rd_class_get(ctx, (rd_class){99}, &got) && !rd_class_merge(ctx, (rd_class){99}, &got));
+  rd_ctx_destroy(ctx);
+}
+
+static void test_style_merge(void) {
+  rd_style dst = {.width = rd_px(10), .background = rd_hex(0x111111), .padding = rd_edges_all(rd_px(4))};
+  rd_style_merge(&dst, &(rd_style){.background = rd_hex(0x222222), .padding = {.left = rd_px(9)}});
+  CHECK(dst.width.value == 10 && dst.background.r == 0x22);           // unset in src leaves dst alone
+  CHECK(dst.padding.left.value == 9 && dst.padding.top.value == 4);  // per side
+  rd_style_merge(&dst, &(rd_style){0});
+  CHECK(dst.width.value == 10 && dst.background.set);
+}
+
 int main(void) {
+  test_style_merge();
+  test_class_merge();
   test_defaults();
   test_shared_states();
   test_inheritance();

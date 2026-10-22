@@ -25,8 +25,13 @@ devdocs:
 docs-build:
     mdbook build docs && python3 docs/tools/llms.py
 
+# clang-tidy from $CLANG_TIDY, the PATH, or Homebrew's LLVM.
 lint: build
-    /opt/homebrew/opt/llvm/bin/clang-tidy -p build src/*.c tests/*.c tests/*.cc
+    "${CLANG_TIDY:-$(command -v clang-tidy || echo /opt/homebrew/opt/llvm/bin/clang-tidy)}" -p build src/*.c extras/src/*.c tests/*.c tests/*.cc
+
+# Fails when the README's install snippets don't match the version in CMakeLists.txt.
+check-version:
+    cmake -P cmake/check_version.cmake
 
 # Removes build outputs; keeps the configuration and downloaded raylib.
 clean:

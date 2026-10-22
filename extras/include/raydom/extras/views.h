@@ -8,7 +8,7 @@ extern "C" {
 #endif
 
 // Tabs, splitters, virtualized lists, tables and tree views. Each fires RD_EVENT_CHANGE on its node
-// when the user changes it; the setters fire nothing.
+// when the user changes it, and the splitter INPUT as it moves (see theme.h); the setters fire nothing.
 
 // Tabs: a bar of tabs over the selected tab's panel. Left and Right move between tabs; Tab reaches the
 // bar once.
@@ -22,15 +22,16 @@ bool    rdx_tabs_select(rd_ctx* ctx, rd_node tabs, int index);
 // By default the first pane's share is a fraction of the splitter, so it follows window resizes; with
 // `size`, the first pane keeps a size in pixels instead, as a sidebar does. A collapsible first pane
 // snaps shut when dragged below half its minimum, and opens again when dragged back out, when the
-// handle is double-clicked, or with Enter on the handle; it keeps its size while shut. CHANGE fires
-// when a drag ends having changed something, and on each key or double-click change.
+// handle is double-clicked, or with Enter on the handle; it keeps its size while shut. INPUT fires on
+// every change, during a drag too; CHANGE when a drag ends having changed something, and on each key
+// or double-click change.
 typedef struct rdx_split_desc {
-  bool  vertical;  // panes above and below each other
-  bool  reverse;   // the first pane at the right, or the bottom
-  float fraction;  // the first pane's share; 0 means 0.5
-  float size;      // > 0: the first pane's size in pixels, kept as the splitter resizes
-  float min_first, min_second;  // pixels
-  bool  collapsible, collapsed;  // whether the first pane can collapse, and whether it starts so
+  bool  vertical RD_DEFAULT({});  // panes above and below each other
+  bool  reverse RD_DEFAULT({});   // the first pane at the right, or the bottom
+  float fraction RD_DEFAULT({});  // the first pane's share; 0 means 0.5
+  float size RD_DEFAULT({});      // > 0: the first pane's size in pixels, kept as the splitter resizes
+  float min_first RD_DEFAULT({}), min_second RD_DEFAULT({});  // pixels
+  bool  collapsible RD_DEFAULT({}), collapsed RD_DEFAULT({});  // whether the first pane can collapse, and whether it starts so
 } rdx_split_desc;
 
 rd_node rdx_split_create(rd_ctx* ctx, const rdx_split_desc* desc);
@@ -53,11 +54,11 @@ bool rdx_split_set_direction(rd_ctx* ctx, rd_node split, bool vertical, bool rev
 typedef void (*rdx_row_fn)(rd_ctx* ctx, rd_node row, int index, void* data);
 
 typedef struct rdx_list_desc {
-  int           count;
-  float         row_height;  // 0 means 32
-  rdx_row_fn    fill;
-  void*         data;
-  rd_destroy_fn destroy;  // destroy(data) with the list
+  int           count RD_DEFAULT({});
+  float         row_height RD_DEFAULT({});  // 0 means 32
+  rdx_row_fn    fill RD_DEFAULT({});
+  void*         data RD_DEFAULT({});
+  rd_destroy_fn destroy RD_DEFAULT({});  // destroy(data) with the list; not on failure
 } rdx_list_desc;
 
 rd_node rdx_list_create(rd_ctx* ctx, const rdx_list_desc* desc);
@@ -76,22 +77,22 @@ int     rdx_list_index_of(const rd_ctx* ctx, rd_node list, rd_node node);
 // Table: a header row over a virtualized list whose rows share the header's columns. Column widths are
 // px or fr. cell fills one cell; header, if set, runs when a column header is clicked, for sorting.
 typedef struct rdx_column {
-  const char* title;
-  rd_val      width;  // rd_px(...) or rd_fr(...); unset means 1fr
+  const char* title RD_DEFAULT({});
+  rd_val      width RD_DEFAULT({});  // rd_px(...) or rd_fr(...); unset means 1fr
 } rdx_column;
 
 typedef void (*rdx_cell_fn)(rd_ctx* ctx, rd_node cell, int row, int column, void* data);
 typedef void (*rdx_header_fn)(rd_ctx* ctx, int column, void* data);
 
 typedef struct rdx_table_desc {
-  const rdx_column* columns;  // copied
-  int               column_count;
-  int               count;
-  float             row_height;  // 0 means 32
-  rdx_cell_fn       cell;
-  rdx_header_fn     header;
-  void*             data;
-  rd_destroy_fn     destroy;
+  const rdx_column* columns RD_DEFAULT({});  // copied
+  int               column_count RD_DEFAULT({});
+  int               count RD_DEFAULT({});
+  float             row_height RD_DEFAULT({});  // 0 means 32
+  rdx_cell_fn       cell RD_DEFAULT({});
+  rdx_header_fn     header RD_DEFAULT({});
+  void*             data RD_DEFAULT({});
+  rd_destroy_fn     destroy RD_DEFAULT({});  // destroy(data) once the table and its list are both gone; not on failure
 } rdx_table_desc;
 
 rd_node rdx_table_create(rd_ctx* ctx, const rdx_table_desc* desc);

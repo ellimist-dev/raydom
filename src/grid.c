@@ -501,9 +501,10 @@ static uint32_t repetitions(const rd_track* list, uint32_t n, float definite, fl
 
 // Auto-fit: drops repeated tracks no item occupies. Equivalent to CSS collapsing them and their gaps,
 // because nothing spans them. Renumbers the items that follow.
-static void collapse_empty(grid_item* items, uint32_t n, int a, rd_track* list, uint32_t* explicit_count, uint32_t* nt) {
+static void collapse_empty(rd_ctx* ctx, grid_item* items, uint32_t n, int a, rd_track* list, uint32_t* explicit_count,
+                           uint32_t* nt) {
   uint32_t count = *explicit_count;
-  bool*    used  = calloc(count ? count : 1, sizeof *used);
+  bool*    used  = rd__scratch_alloc(ctx, (count ? count : 1) * sizeof *used);
   if (!used) return;
   for (uint32_t j = 0; j < n; j++)
     for (int32_t t = items[j].start[a]; t < items[j].start[a] + items[j].span[a]; t++)
@@ -518,7 +519,6 @@ static void collapse_empty(grid_item* items, uint32_t n, int a, rd_track* list, 
   }
   *nt -= count - kept;
   *explicit_count = kept;
-  free(used);
 }
 
 rd_size rd__layout_grid(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, bool perform) {
@@ -546,11 +546,12 @@ rd_size rd__layout_grid(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, bool pe
   };
   rd_track implicit[2] = {st->grid_auto_columns, st->grid_auto_rows};
   rd_repeat repeat[2]   = {rd__tracks_repeat(ctx, st->grid_template_columns), rd__tracks_repeat(ctx, st->grid_template_rows)};
-  rd_track* expanded[2] = {NULL, NULL};
+  rd__scratch_mark mark        = rd__scratch_save(ctx);
+  rd_track*        expanded[2] = {NULL, NULL};
   for (int a = 0; a < 2; a++) {
     if (repeat[a] == RD_REPEAT_NONE || !explicit_count[a]) continue;
     uint32_t times = repetitions(list[a], explicit_count[a], definite[a], mn[a] - pb[a], mx[a] - pb[a], gap[a]);
-    expanded[a]    = malloc((size_t)times * explicit_count[a] * sizeof(rd_track));
+    expanded[a]    = rd__scratch_alloc(ctx, (size_t)times * explicit_count[a] * sizeof(rd_track));
     if (!expanded[a]) continue;  // falls back to one repetition
     for (uint32_t r = 0; r < times; r++) memcpy(&expanded[a][(size_t)r * explicit_count[a]], list[a], explicit_count[a] * sizeof(rd_track));
     list[a] = expanded[a];
@@ -560,7 +561,7 @@ rd_size rd__layout_grid(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, bool pe
   uint32_t n = 0;
   for (uint32_t c = s->first_child; c; c = ctx->slots[c].next_sibling) n += in_flow(&ctx->styles[c].computed);
 
-  grid_item* items = n ? calloc(n, sizeof *items) : NULL;
+  grid_item* items = rd__scratch_alloc(ctx, n * sizeof *items);
   uint32_t   m     = 0;
   for (uint32_t c = s->first_child; c && items && m < n; c = ctx->slots[c].next_sibling) {
     const rd_style* cs = &ctx->styles[c].computed;
@@ -586,18 +587,14 @@ rd_size rd__layout_grid(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, bool pe
     for (int a = 0; a < 2; a++)
       if ((uint32_t)(items[j].start[a] + items[j].span[a]) > nt[a]) nt[a] = (uint32_t)(items[j].start[a] + items[j].span[a]);
   for (int a = 0; ok && a < 2; a++)
-    if (repeat[a] == RD_REPEAT_AUTO_FIT && expanded[a]) collapse_empty(items, n, a, expanded[a], &explicit_count[a], &nt[a]);
+    if (repeat[a] == RD_REPEAT_AUTO_FIT && expanded[a]) collapse_empty(ctx, items, n, a, expanded[a], &explicit_count[a], &nt[a]);
 
   grid_track* tracks[2] = {
-      nt[0] ? calloc(nt[0], sizeof(grid_track)) : NULL,
-      nt[1] ? calloc(nt[1], sizeof(grid_track)) : NULL,
+      rd__scratch_alloc(ctx, nt[0] * sizeof(grid_track)),
+      rd__scratch_alloc(ctx, nt[1] * sizeof(grid_track)),
   };
   if (!ok || (nt[0] && !tracks[0]) || (nt[1] && !tracks[1])) {
-    free(items);
-    free(tracks[0]);
-    free(tracks[1]);
-    free(expanded[0]);
-    free(expanded[1]);
+    rd__scratch_restore(ctx, mark);
     return (rd_size){finalize_axis(pb[0], k->wm, k->aw, mn[0], mx[0]), finalize_axis(pb[1], k->hm, k->ah, mn[1], mx[1])};
   }
 
@@ -654,10 +651,6 @@ rd_size rd__layout_grid(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, bool pe
     rd__clamp_scroll(L);
   }
 
-  free(items);
-  free(tracks[0]);
-  free(tracks[1]);
-  free(expanded[0]);
-  free(expanded[1]);
+  rd__scratch_restore(ctx, mark);
   return size;
 }

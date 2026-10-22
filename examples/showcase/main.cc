@@ -18,7 +18,7 @@ const unsigned char kFont[] = {
 };
 
 // Returns the top-level tabs.
-rd::Node build(rd::Context& ctx) {
+rdx::Tabs build(rd::Context& ctx) {
   ctx.root().style(rd::Style().background(rd::hex(kBg)).color(rd::hex(kText)).font_size(14_px));
 
   // The header holds the logo, and the top-level tabs sit under it.
@@ -37,12 +37,12 @@ rd::Node build(rd::Context& ctx) {
   header.append(ctx.create_text("raydom", rd::Style().font_size(18_px)));
   header.append(ctx.create_text("a DOM for raylib", rd::Style().color(rd::hex(kMuted))));
 
-  rd::Node tabs = rdx::tabs(ctx);
+  rdx::Tabs tabs = rdx::tabs(ctx);
   tabs.merge_style(rd::Style().flex(1).min_height(0_px));
   rd::Node bar = tabs.first_child();
   bar.merge_style(rd::Style().padding(10_px, 16_px, 0_px, 16_px).background(rd::hex(kPanel)).border_color(rd::hex(kLine)));
   rd::Style panel = rd::Style().flex(1).min_height(0_px).padding(0_px).row_gap(0_px);
-  rd::Node  tour = rdx::add_tab(tabs, "Tour"), messages = rdx::add_tab(tabs, "Messages"), network = rdx::add_tab(tabs, "Network");
+  rd::Node  tour = tabs.add("Tour"), messages = tabs.add("Messages"), network = tabs.add("Network");
   for (rd::Node p : {tour, messages, network}) p.merge_style(panel);
   tour.append(build_tour(ctx));
   messages.append(build_messages(ctx));
@@ -72,8 +72,8 @@ int main() {  // NOLINT(bugprone-exception-escape): std::bad_alloc should termin
     // Idle frames wait for input, except while a timer is pending, such as a toast counting down.
     if (!shot) rd_set_event_waiting(ctx.get(), true);
     ctx.load_font(kFont, sizeof kFont, false);
-    rd::Node tabs = build(ctx);
-    if (const char* tab = std::getenv("RAYDOM_TAB")) rdx::select_tab(tabs, std::atoi(tab));
+    rdx::Tabs tabs = build(ctx);
+    if (const char* tab = std::getenv("RAYDOM_TAB")) tabs.select(std::atoi(tab));
     float mx = -1, my = -1;
     if (const char* m = std::getenv("RAYDOM_MOUSE")) {
       char* end = nullptr;

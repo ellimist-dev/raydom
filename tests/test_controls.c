@@ -235,6 +235,23 @@ static bool shows(rd_ctx* ctx, rd_node n, const char* want) {
   return s && len == strlen(want) && !memcmp(s, want, len);
 }
 
+// A new palette recolors controls that already exist; unset colors keep theirs.
+static void palette(void) {
+  rd_ctx*  ctx = rd_ctx_create();
+  rd_node  box = rdx_checkbox_create(ctx, NULL);
+  rd_node_append(ctx, rd_ctx_root(ctx), box);
+  rdx_set_checked(ctx, box, true);
+  rdx_palette before, after;
+  rdx_theme_palette(ctx, &before);
+  CHECK(rdx_theme_set_palette(ctx, &(rdx_palette){.accent = rd_hex(0xf92672)}));
+  rd_ctx_compute_styles(ctx);
+  const rd_style* st = rd_node_computed_style(ctx, rd_node_first_child(ctx, box));
+  CHECK(st->background.r == 0xf9 && st->background.g == 0x26 && st->border_color.r == 0xf9);
+  rdx_theme_palette(ctx, &after);
+  CHECK(after.accent.r == 0xf9 && after.text.r == before.text.r && after.surface.b == before.surface.b);
+  rd_ctx_destroy(ctx);
+}
+
 static void numbers(void) {
   rd_ctx* ctx = rd_ctx_create();
   rd_font_load_file(ctx, RAYDOM_TEST_FONT);
@@ -305,6 +322,41 @@ static void numbers(void) {
   CHECK(rdx_number_set_range(ctx, u, 0, 5) && near(rdx_number_value(ctx, u), 0));
   CHECK(!rdx_number_set_value(ctx, u, NAN) && !rdx_number_set_value(ctx, rd_ctx_root(ctx), 1));
 
+  // Steps finer than the places shown become one unit of the last place; steps follow the grid.
+  rd_node g = rdx_number_create(ctx, &(rdx_number_desc){.min = 0, .max = 10, .value = 1, .step = 0.1f});
+  rd_node_append(ctx, rd_ctx_root(ctx), g);
+  rd_ctx_layout(ctx, 800, 600);
+  rd_node_focus(ctx, rdx_number_input(ctx, g));
+  press(ctx, RD_KEY_UP);
+  CHECK(near(rdx_number_value(ctx, g), 2));
+  rd_node q = rdx_number_create(ctx, &(rdx_number_desc){.min = 0, .max = 10, .value = 1.23f, .step = 0.05f, .decimals = 2});
+  rd_node_append(ctx, rd_ctx_root(ctx), q);
+  rd_node_focus(ctx, rdx_number_input(ctx, q));
+  press(ctx, RD_KEY_UP);
+  CHECK(near(rdx_number_value(ctx, q), 1.25f));  // to the next grid point, not 1.28
+  press(ctx, RD_KEY_DOWN);
+  press(ctx, RD_KEY_DOWN);
+  CHECK(near(rdx_number_value(ctx, q), 1.15f));
+  press(ctx, RD_KEY_END);
+  CHECK(near(rdx_number_value(ctx, q), 10));
+  press(ctx, RD_KEY_HOME);
+  CHECK(near(rdx_number_value(ctx, q), 0));
+
+  // Disabled while a stepper is held: the release never arrives, so the repeat stops by itself.
+  rd_ctx_layout(ctx, 800, 600);
+  rdx_number_set_value(ctx, q, 5);
+  rd_node up = rd_node_first_child(ctx, rd_node_last_child(ctx, q));
+  rd_rect ub = rd_node_bounds(ctx, up);
+  int     settled = changes;
+  rd_node_on(ctx, q, RD_EVENT_CHANGE, count, &changes, NULL, 0);
+  rd_ctx_pointer(ctx, ub.x + 4, ub.y + ub.height / 2, RD_BUTTON_PRIMARY, 0, 0);
+  rd_node_set_states(ctx, q, RD_STATE_DISABLED, true);
+  for (double t = 3.05; t < 3.71; t += 0.05) rd_ctx_set_time(ctx, t);
+  float stopped = rdx_number_value(ctx, q);
+  rd_ctx_set_time(ctx, 5);
+  CHECK(rdx_number_value(ctx, q) == stopped && near(stopped, 5.05f) && changes == settled + 1);
+  rd_ctx_pointer(ctx, ub.x + 4, ub.y + ub.height / 2, 0, 0, 0);
+
   rd_node_destroy(ctx, n);  // with no timers left behind
   rd_ctx_set_time(ctx, 3);
   rd_ctx_destroy(ctx);
@@ -315,6 +367,7 @@ int main(void) {
   radios();
   sliders();
   numbers();
+  palette();
   toasts();
   return TEST_RESULT();
 }

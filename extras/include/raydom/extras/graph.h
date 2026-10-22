@@ -24,27 +24,27 @@ typedef struct rdx_edge {
 } rdx_edge;
 
 typedef struct rdx_node_desc {
-  rd_vec2     position;
-  float       radius;  // world units; 0 means 20
-  rd_color    color;
-  const char* label;  // optional
+  rd_vec2     position RD_DEFAULT({});
+  float       radius RD_DEFAULT({});  // world units; 0 means 20
+  rd_color    color RD_DEFAULT({});
+  const char* label RD_DEFAULT({});  // optional
 } rdx_node_desc;
 
 typedef struct rdx_edge_desc {
-  rd_color    color;
-  float       width;  // screen pixels; 0 means 2
-  bool        directed;
-  const char* label;  // optional, drawn at the midpoint
+  rd_color    color RD_DEFAULT({});
+  float       width RD_DEFAULT({});  // screen pixels; 0 means 2
+  bool        directed RD_DEFAULT({});
+  const char* label RD_DEFAULT({});  // optional, drawn at the midpoint
 } rdx_edge_desc;
 
 typedef struct rdx_message {
-  rdx_node from, to;
-  float    progress;  // 0 at from, 1 at to
-  rd_color color;
-  float    radius;  // world units; 0 means 6
+  rdx_node from RD_DEFAULT({}), to RD_DEFAULT({});
+  float    progress RD_DEFAULT({});  // 0 at from, 1 at to
+  rd_color color RD_DEFAULT({});
+  float    radius RD_DEFAULT({});  // world units; 0 means 6
 } rdx_message;
 
-typedef enum rdx_graph_event : uint8_t {
+RD_ENUM typedef enum rdx_graph_event : uint8_t {
   RDX_EVENT_NODE_ENTER,
   RDX_EVENT_NODE_LEAVE,
   RDX_EVENT_NODE_CLICK,  // press and release on the same node without dragging
@@ -66,8 +66,8 @@ void       rdx_graph_set_flags(rdx_graph* g, uint32_t flags);
 // Cleared to this before drawing; transparent by default.
 void     rdx_graph_set_background(rdx_graph* g, rd_color color);
 rd_class rdx_graph_label_class(const rdx_graph* g);
-// One callback for all events, replacing any earlier one.
-void rdx_graph_on(rdx_graph* g, rdx_graph_fn fn, void* data, rd_destroy_fn destroy);
+// One callback for all events, replacing any earlier one. False, keeping nothing, for a null graph.
+bool rdx_graph_on(rdx_graph* g, rdx_graph_fn fn, void* data, rd_destroy_fn destroy);
 
 rdx_node rdx_graph_add_node(rdx_graph* g, const rdx_node_desc* desc);
 // Also removes the node's edges.

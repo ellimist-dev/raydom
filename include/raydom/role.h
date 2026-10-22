@@ -11,7 +11,7 @@ extern "C" {
 // accessibility backend maps them directly. Roles carry no behavior, except that interactive
 // roles (button, link, checkbox, radio button, switch, slider, menu item, combo box, tab, splitter)
 // take focus by default, as inputs do.
-typedef enum rd_role : uint8_t {
+RD_ENUM typedef enum rd_role : uint8_t {
   RD_ROLE_AUTO,  // Derived: text input for inputs, text for text leaves, canvas for paint nodes, else generic.
   RD_ROLE_GENERIC,
   RD_ROLE_GROUP,

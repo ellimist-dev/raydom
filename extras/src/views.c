@@ -12,7 +12,11 @@ typedef struct tabs {
   int     selected;
 } tabs;
 
+// State is attached to the root. Listeners on parts find it through their parents rather than
+// holding it, so a part moved out of its component can't reach freed state.
 static const char tabs_key = 0;
+
+static tabs* tabs_find(const rd_ctx* ctx, rd_node root) { return rd_node_attached(ctx, root, &tabs_key); }
 
 static rd_node nth(const rd_ctx* ctx, rd_node parent, int index) {
   rd_node n = rd_node_first_child(ctx, parent);
@@ -45,13 +49,17 @@ static void pick(rd_ctx* ctx, tabs* t, int index) {
 }
 
 static void tab_click(rd_ctx* ctx, rd_event* ev, void* data) {
-  tabs* t = data;
+  (void)data;
+  tabs* t = tabs_find(ctx, rd_node_parent(ctx, rd_node_parent(ctx, ev->current)));  // tab, bar, root
+  if (!t) return;
   pick(ctx, t, index_in(ctx, t->bar, ev->current));
 }
 
 static void tab_keys(rd_ctx* ctx, rd_event* ev, void* data) {
-  tabs* t   = data;
-  int   n   = (int)rd_node_child_count(ctx, t->bar);
+  (void)data;
+  tabs* t = tabs_find(ctx, rd_node_parent(ctx, ev->current));  // bar, root
+  if (!t) return;
+  int n   = (int)rd_node_child_count(ctx, t->bar);
   int   dir = ev->key == RD_KEY_RIGHT ? 1 : ev->key == RD_KEY_LEFT ? -1 : 0;
   int   to  = ev->key == RD_KEY_HOME ? 0 : ev->key == RD_KEY_END ? n - 1 : dir ? (t->selected + dir + n) % n : -1;
   if (to < 0 || !n) return;
@@ -64,11 +72,12 @@ rd_node rdx_tabs_create(rd_ctx* ctx) {
   const rdx_classes* cl = rdx_theme(ctx);
   tabs*              t  = cl ? calloc(1, sizeof *t) : NULL;
   if (!t) return (rd_node){0};
-  t->root = rd_node_create(ctx);
-  t->bar  = rd_node_create(ctx);
-  if (!rd_node_on(ctx, t->bar, RD_EVENT_KEY_DOWN, tab_keys, t, free, 0).id || !rdx__track(ctx, &tabs_key, t->root, t)) {
-    rd_node_destroy(ctx, t->root);
-    rd_node_destroy(ctx, t->bar);
+  rd_node root = t->root = rd_node_create(ctx), bar = t->bar = rd_node_create(ctx);
+  bool    ok   = rd_node_attach(ctx, root, &tabs_key, t, free);
+  if (!ok) free(t);
+  if (!ok || !rd_node_on(ctx, bar, RD_EVENT_KEY_DOWN, tab_keys, NULL, NULL, 0).id) {
+    rd_node_destroy(ctx, root);  // with t, if attached
+    rd_node_destroy(ctx, bar);
     return (rd_node){0};
   }
   rd_node_add_class(ctx, t->root, cl->tabs);
@@ -79,13 +88,13 @@ rd_node rdx_tabs_create(rd_ctx* ctx) {
 }
 
 rd_node rdx_tabs_add(rd_ctx* ctx, rd_node root, const char* label) {
-  tabs*              t  = rdx__lookup(ctx, &tabs_key, root);
+  tabs*              t  = tabs_find(ctx, root);
   const rdx_classes* cl = rdx_theme(ctx);
   if (!t || !cl) return (rd_node){0};
   rd_node tab = rd_node_create_text(ctx, label ? label : "", RD_TEXT_NUL);
   rd_node_set_role(ctx, tab, RD_ROLE_TAB);
   rd_node_add_class(ctx, tab, cl->tab);
-  rd_node_on(ctx, tab, RD_EVENT_CLICK, tab_click, t, NULL, 0);
+  rd_node_on(ctx, tab, RD_EVENT_CLICK, tab_click, NULL, NULL, 0);
   rd_node_append(ctx, t->bar, tab);
   rd_node panel = rd_node_create(ctx);
   rd_node_set_role(ctx, panel, RD_ROLE_TAB_PANEL);
@@ -97,12 +106,12 @@ rd_node rdx_tabs_add(rd_ctx* ctx, rd_node root, const char* label) {
 }
 
 int rdx_tabs_selected(const rd_ctx* ctx, rd_node root) {
-  tabs* t = rdx__lookup(ctx, &tabs_key, root);
+  tabs* t = tabs_find(ctx, root);
   return t && rd_node_child_count(ctx, t->bar) ? t->selected : -1;
 }
 
 bool rdx_tabs_select(rd_ctx* ctx, rd_node root, int index) {
-  tabs* t = rdx__lookup(ctx, &tabs_key, root);
+  tabs* t = tabs_find(ctx, root);
   if (!t || index < 0 || index >= (int)rd_node_child_count(ctx, t->bar)) return false;
   t->selected = index;
   show_tab(ctx, t);
@@ -124,6 +133,8 @@ typedef struct split {
 } split;
 
 static const char split_key = 0;
+
+static split* split_find(const rd_ctx* ctx, rd_node root) { return rd_node_attached(ctx, root, &split_key); }
 
 static float total(const rd_ctx* ctx, const split* s) {
   rd_rect r = rd_node_rect(ctx, s->root);
@@ -175,14 +186,22 @@ static void orient(rd_ctx* ctx, split* s) {
   apply(ctx, s);
 }
 
+// INPUT for every change, CHANGE once it settles, as for a slider.
+static void changed(rd_ctx* ctx, split* s, bool settled) {
+  rd_node_dispatch(ctx, s->root, RD_EVENT_INPUT);
+  if (settled) rd_node_dispatch(ctx, s->root, RD_EVENT_CHANGE);
+}
+
 static void toggle(rd_ctx* ctx, split* s) {
   s->collapsed = !s->collapsed;
   apply(ctx, s);
-  rd_node_dispatch(ctx, s->root, RD_EVENT_CHANGE);
+  changed(ctx, s, true);
 }
 
 static void handle_pointer(rd_ctx* ctx, rd_event* ev, void* data) {
-  split* s = data;
+  (void)data;
+  split* s = split_find(ctx, rd_node_parent(ctx, ev->current));  // handle, root
+  if (!s) return;
   if (ev->type == RD_EVENT_CLICK) {
     if (ev->clicks == 2 && s->collapsible) toggle(ctx, s);
     return;
@@ -209,6 +228,8 @@ static void handle_pointer(rd_ctx* ctx, rd_event* ev, void* data) {
   float at   = s->vertical ? ev->y - r.y - b.border.top - b.padding.top : ev->x - r.x - b.border.left - b.padding.left;
   float want = (s->reverse ? size - at : at) - handle_size(ctx, s) / 2;
   // Below half the minimum, a collapsible pane snaps shut, keeping the size it had before the drag.
+  float before_fraction = s->fraction, before_size = s->size;
+  bool  before_collapsed = s->collapsed;
   if (s->collapsible && want < (s->min_first > 0 ? s->min_first / 2 : 16)) {
     s->collapsed = true;
     s->fraction  = s->drag_fraction;
@@ -217,11 +238,15 @@ static void handle_pointer(rd_ctx* ctx, rd_event* ev, void* data) {
     s->collapsed = false;
     set_first(ctx, s, want);
   }
+  if (s->fraction == before_fraction && s->size == before_size && s->collapsed == before_collapsed) return;
   apply(ctx, s);
+  changed(ctx, s, false);
 }
 
 static void handle_keys(rd_ctx* ctx, rd_event* ev, void* data) {
-  split* s = data;
+  (void)data;
+  split* s = split_find(ctx, rd_node_parent(ctx, ev->current));
+  if (!s) return;
   if (ev->key == RD_KEY_ENTER && s->collapsible) {
     rd_event_prevent_default(ev);
     toggle(ctx, s);
@@ -244,7 +269,7 @@ static void handle_keys(rd_ctx* ctx, rd_event* ev, void* data) {
     }
   }
   apply(ctx, s);
-  rd_node_dispatch(ctx, s->root, RD_EVENT_CHANGE);
+  changed(ctx, s, true);
 }
 
 rd_node rdx_split_create(rd_ctx* ctx, const rdx_split_desc* desc) {
@@ -265,13 +290,15 @@ rd_node rdx_split_create(rd_ctx* ctx, const rdx_split_desc* desc) {
   s->first         = rd_node_create(ctx);
   s->handle        = rd_node_create(ctx);
   s->second        = rd_node_create(ctx);
-  if (!rd_node_on(ctx, s->handle, RD_EVENT_KEY_DOWN, handle_keys, s, free, 0).id || !rdx__track(ctx, &split_key, s->root, s)) {
-    rd_node nodes[] = {s->root, s->first, s->handle, s->second};
-    for (int j = 0; j < 4; j++) rd_node_destroy(ctx, nodes[j]);
+  rd_event_type types[] = {RD_EVENT_KEY_DOWN, RD_EVENT_POINTER_DOWN, RD_EVENT_POINTER_MOVE, RD_EVENT_POINTER_UP, RD_EVENT_CLICK};
+  rd_node       nodes[] = {s->root, s->first, s->handle, s->second};
+  bool          ok      = rd_node_attach(ctx, s->root, &split_key, s, free);
+  if (!ok) free(s);
+  for (int j = 0; ok && j < 5; j++) ok = rd_node_on(ctx, nodes[2], types[j], j ? handle_pointer : handle_keys, NULL, NULL, 0).id;
+  if (!ok) {
+    for (int j = 0; j < 4; j++) rd_node_destroy(ctx, nodes[j]);  // with s, if attached
     return (rd_node){0};
   }
-  rd_event_type types[] = {RD_EVENT_POINTER_DOWN, RD_EVENT_POINTER_MOVE, RD_EVENT_POINTER_UP, RD_EVENT_CLICK};
-  for (int j = 0; j < 4; j++) rd_node_on(ctx, s->handle, types[j], handle_pointer, s, NULL, 0);
   rd_node_add_class(ctx, s->root, cl->split);
   rd_node_add_class(ctx, s->handle, cl->split_handle);
   rd_node_set_role(ctx, s->handle, RD_ROLE_SPLITTER);
@@ -289,19 +316,19 @@ rd_node rdx_split_create(rd_ctx* ctx, const rdx_split_desc* desc) {
 }
 
 rd_node rdx_split_pane(const rd_ctx* ctx, rd_node root, int index) {
-  split* s = rdx__lookup(ctx, &split_key, root);
+  split* s = split_find(ctx, root);
   return !s ? (rd_node){0} : index == 0 ? s->first : index == 1 ? s->second : (rd_node){0};
 }
 
 float rdx_split_fraction(const rd_ctx* ctx, rd_node root) {
-  split* s = rdx__lookup(ctx, &split_key, root);
+  split* s = split_find(ctx, root);
   if (!s) return 0;
   float size = total(ctx, s);
   return !s->fixed ? s->fraction : size > 0 ? s->size / size : 0;
 }
 
 bool rdx_split_set_fraction(rd_ctx* ctx, rd_node root, float fraction) {
-  split* s = rdx__lookup(ctx, &split_key, root);
+  split* s = split_find(ctx, root);
   if (!s) return false;
   float size = total(ctx, s);
   if (s->fixed && size <= 0) return false;
@@ -314,12 +341,12 @@ bool rdx_split_set_fraction(rd_ctx* ctx, rd_node root, float fraction) {
 }
 
 float rdx_split_size(const rd_ctx* ctx, rd_node root) {
-  split* s = rdx__lookup(ctx, &split_key, root);
+  split* s = split_find(ctx, root);
   return s ? first_size(ctx, s) : 0;
 }
 
 bool rdx_split_set_size(rd_ctx* ctx, rd_node root, float size) {
-  split* s = rdx__lookup(ctx, &split_key, root);
+  split* s = split_find(ctx, root);
   if (!s || size < 0 || (!s->fixed && total(ctx, s) <= 0)) return false;
   set_first(ctx, s, size);
   apply(ctx, s);
@@ -327,12 +354,12 @@ bool rdx_split_set_size(rd_ctx* ctx, rd_node root, float size) {
 }
 
 bool rdx_split_collapsed(const rd_ctx* ctx, rd_node root) {
-  split* s = rdx__lookup(ctx, &split_key, root);
+  split* s = split_find(ctx, root);
   return s && s->collapsed;
 }
 
 bool rdx_split_set_collapsed(rd_ctx* ctx, rd_node root, bool collapsed) {
-  split* s = rdx__lookup(ctx, &split_key, root);
+  split* s = split_find(ctx, root);
   if (!s || (collapsed && !s->collapsible)) return false;
   s->collapsed = collapsed;
   apply(ctx, s);
@@ -340,7 +367,7 @@ bool rdx_split_set_collapsed(rd_ctx* ctx, rd_node root, bool collapsed) {
 }
 
 bool rdx_split_set_direction(rd_ctx* ctx, rd_node root, bool vertical, bool reverse) {
-  split* s = rdx__lookup(ctx, &split_key, root);
+  split* s = split_find(ctx, root);
   if (!s) return false;
   s->vertical = vertical;
   s->reverse  = reverse;

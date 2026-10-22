@@ -2,6 +2,7 @@
 
 #include <raydom/extras/graph.h>
 
+#include <memory>
 #include <raydom/raydom.hh>
 #include <string>
 #include <type_traits>
@@ -34,11 +35,12 @@ public:
   template <class F>
   Graph& on(F&& f) {
     using Fn = std::decay_t<F>;
-    Fn* p    = new (std::nothrow) Fn(std::forward<F>(f));
+    std::unique_ptr<Fn> p(new (std::nothrow) Fn(std::forward<F>(f)));
     if (!p) return *this;
-    rdx_graph_on(
-        g_, [](rdx_graph*, rdx_graph_event ev, rdx_node n, void* d) { (*static_cast<Fn*>(d))(ev, n); }, p,
-        [](void* d) { delete static_cast<Fn*>(d); });
+    if (rdx_graph_on(
+            g_, [](rdx_graph*, rdx_graph_event ev, rdx_node n, void* d) noexcept { (*static_cast<Fn*>(d))(ev, n); }, p.get(),
+            [](void* d) noexcept { delete static_cast<Fn*>(d); }))
+      p.release();
     return *this;
   }
 

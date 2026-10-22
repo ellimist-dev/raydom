@@ -49,8 +49,13 @@ int main() {
   assert(remembered && rdx::checked(sync) && rdx::radio_selected(size) == 1 && shown == "100");
 
   // ANCHOR: theme
+  // Every control at once: the accent, and anything else the palette names.
+  rdx_palette palette{};
+  palette.accent = rd_hex(0xf92672);
+  rdx_theme_set_palette(ctx.get(), &palette);
+  // One class: merge changes only the properties given, keeping the theme's layout.
   const rdx_classes* theme = rdx_theme(ctx.get());
-  rd::Class(ctx.get(), theme->check_box).on(RD_STATE_CHECKED, rd::Style().background(rd::hex(0x4cc38a)));  // green
+  rd::Class(ctx.get(), theme->check_box).merge_on(RD_STATE_CHECKED, rd::Style().background(rd::hex(0x4cc38a)));  // green
   // ANCHOR_END: theme
 
   // ANCHOR: toast

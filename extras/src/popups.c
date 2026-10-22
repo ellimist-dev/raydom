@@ -23,56 +23,19 @@ typedef struct popup {
 typedef struct select_state select_state;
 typedef struct tip          tip;
 
-// An owned object found by its node; alive(node) means the object hasn't been freed yet.
-typedef struct entry {
-  rd_node node;
-  void*   obj;
-} entry;
-
-typedef struct list {
-  entry*   items;
-  uint32_t len, cap;
-} list;
 
 typedef struct manager {
   popup*   open;  // bottom to top
   uint32_t open_len, open_cap;
-  list     selects, tips;
   bool     hooked;
 } manager;
 
-static const char key = 0;
+static const char key = 0, select_key = 0, tip_key = 0;
 
 static void manager_free(void* data) {
   manager* m = data;
   free(m->open);
-  free(m->selects.items);
-  free(m->tips.items);
   free(m);
-}
-
-static bool list_put(list* l, rd_node n, void* obj) {
-  if (l->len == l->cap) {
-    uint32_t cap = l->cap ? l->cap * 2 : 8;
-    entry*   p   = realloc(l->items, cap * sizeof *p);
-    if (!p) return false;
-    l->items = p;
-    l->cap   = cap;
-  }
-  l->items[l->len++] = (entry){n, obj};
-  return true;
-}
-
-static void* list_find(const rd_ctx* ctx, list* l, rd_node n) {
-  uint32_t kept = 0;
-  void*    hit  = NULL;
-  for (uint32_t j = 0; j < l->len; j++) {
-    if (!rd_node_alive(ctx, l->items[j].node)) continue;  // its object is gone with it
-    if (rd_node_eq(l->items[j].node, n)) hit = l->items[j].obj;
-    l->items[kept++] = l->items[j];
-  }
-  l->len = kept;
-  return hit;
 }
 
 static bool inside(const rd_ctx* ctx, rd_node outer, rd_node n) {
@@ -319,15 +282,13 @@ static rd_node build_menu(rd_ctx* ctx, manager* m, pkind kind, const rdx_menu_it
                           rd_anchor anchor, menu_state init, rd_node restore) {
   rdx__theme* t  = rdx__theme_get(ctx);
   menu_state* st = t ? malloc(sizeof *st) : NULL;
-  if (!st) {
-    if (init.destroy) init.destroy(init.data);
-    return (rd_node){0};
-  }
+  if (!st) return (rd_node){0};  // init.data stays the caller's
   *st                   = init;
   st->m                 = m;
   const rdx_classes* cl = &t->classes;
   rd_node            menu = rd_node_create(ctx);
   if (!rd_node_on(ctx, menu, RD_EVENT_KEY_DOWN, menu_keys, st, menu_state_free, 0).id) {
+    st->destroy = NULL;
     menu_state_free(st);
     rd_node_destroy(ctx, menu);
     return (rd_node){0};
@@ -362,6 +323,7 @@ static rd_node build_menu(rd_ctx* ctx, manager* m, pkind kind, const rdx_menu_it
   rd_node_set_anchor(ctx, menu, &anchor);
   fade_in(ctx, menu, 0.12);
   if (!push_popup(m, (popup){.node = menu, .anchor = anchor.node, .restore = restore, .kind = kind})) {
+    st->destroy = NULL;
     rd_node_destroy(ctx, menu);
     return (rd_node){0};
   }
@@ -370,10 +332,7 @@ static rd_node build_menu(rd_ctx* ctx, manager* m, pkind kind, const rdx_menu_it
 
 rd_node rdx_menu_open(rd_ctx* ctx, const rdx_menu_desc* desc) {
   manager* m = manager_get(ctx);
-  if (!m || !desc) {
-    if (desc && desc->destroy) desc->destroy(desc->data);
-    return (rd_node){0};
-  }
+  if (!m || !desc) return (rd_node){0};
   rd_node restore = rd_node_is_null(desc->anchor.node) ? rd_ctx_focused(ctx) : desc->anchor.node;
   rd_node menu    = build_menu(ctx, m, P_MENU, desc->items, desc->count, desc->anchor,
                                (menu_state){.fn = desc->fn, .data = desc->data, .destroy = desc->destroy}, restore);
@@ -523,15 +482,12 @@ rd_node rdx_select_create(rd_ctx* ctx, const char* const* options, size_t count,
   rd_node_set_image(ctx, chevron, t->chevron);
   rd_node_append(ctx, s->node, chevron);
   rd_node_on(ctx, s->node, RD_EVENT_KEY_DOWN, select_keys, s, NULL, 0);
-  list_put(&m->selects, s->node, s);
+  rd_node_attach(ctx, s->node, &select_key, s, NULL);  // owned by the click listener
   show_selection(ctx, s);
   return s->node;
 }
 
-static select_state* select_find(const rd_ctx* ctx, rd_node n) {
-  manager* m = rd_ctx_extension(ctx, &key);
-  return m ? list_find(ctx, &m->selects, n) : NULL;
-}
+static select_state* select_find(const rd_ctx* ctx, rd_node n) { return rd_node_attached(ctx, n, &select_key); }
 
 int rdx_select_selected(const rd_ctx* ctx, rd_node select) {
   select_state* s = select_find(ctx, select);
@@ -624,8 +580,7 @@ rd_node rdx_modal_open(rd_ctx* ctx, const rdx_modal_desc* desc) {
   modal_data* md = malloc(sizeof *md);
   if (md) *md = (modal_data){d.persistent, d.data, d.destroy};
   if (!md || !rd_node_on(ctx, backdrop, RD_EVENT_POINTER_DOWN, backdrop_press, md, modal_data_free, 0).id) {
-    if (md) modal_data_free(md);
-    else if (d.destroy) d.destroy(d.data);
+    free(md);  // d.data stays the caller's
     rd_node_destroy(ctx, backdrop);
     return (rd_node){0};
   }
@@ -642,6 +597,7 @@ rd_node rdx_modal_open(rd_ctx* ctx, const rdx_modal_desc* desc) {
              .on_close   = d.on_close,
              .data       = d.data};
   if (!push_popup(m, p)) {
+    md->destroy = NULL;
     rd_node_destroy(ctx, backdrop);
     return (rd_node){0};
   }
@@ -717,21 +673,21 @@ bool rdx_tooltip_attach(rd_ctx* ctx, rd_node node, const char* text) {
   if (!m || !rd_node_alive(ctx, node)) return false;
   char* copy = dup(text ? text : "");
   if (!copy) return false;
-  tip* t = list_find(ctx, &m->tips, node);
+  tip* t = rd_node_attached(ctx, node, &tip_key);
   if (t) {
     free(t->text);
     t->text = copy;
     return true;
   }
   t = calloc(1, sizeof *t);
-  if (!t || !list_put(&m->tips, node, t)) {
+  if (!t || !rd_node_attach(ctx, node, &tip_key, t, NULL)) {  // owned by the enter listener
     free(t);
     free(copy);
     return false;
   }
   *t = (tip){ctx, m, node, copy, {0}};
   if (!rd_node_on(ctx, node, RD_EVENT_POINTER_ENTER, tip_event, t, tip_free, 0).id) {
-    m->tips.len--;
+    rd_node_attach(ctx, node, &tip_key, NULL, NULL);
     free(copy);
     free(t);
     return false;

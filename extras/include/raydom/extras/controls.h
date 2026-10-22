@@ -33,9 +33,9 @@ bool    rdx_radio_select(rd_ctx* ctx, rd_node group, int index);
 // Slider. Drag or click the track; arrow keys step, Page Up and Down move a tenth of the range,
 // Home and End go to the ends. INPUT fires on every change, CHANGE when a drag or key press ends.
 typedef struct rdx_slider_desc {
-  float min, max;  // max <= min means 0 to 100
-  float value;     // clamped to the range
-  float step;      // 0 for continuous
+  float min RD_DEFAULT({}), max RD_DEFAULT({});  // max <= min means 0 to 100
+  float value RD_DEFAULT({});     // clamped to the range
+  float step RD_DEFAULT({});      // 0 for continuous
 } rdx_slider_desc;
 
 rd_node rdx_slider_create(rd_ctx* ctx, const rdx_slider_desc* desc);
@@ -52,10 +52,10 @@ bool    rdx_slider_set_range(rd_ctx* ctx, rd_node slider, float min, float max);
 // and the stepper buttons step, repeating while held. INPUT fires on every change of the value;
 // CHANGE when it settles: on commit, on each key, and when a held stepper is released.
 typedef struct rdx_number_desc {
-  float min, max;  // max <= min: unbounded
-  float value;     // clamped and rounded
-  float step;      // 0: one unit of the last decimal place shown
-  int   decimals;  // places after the point, 0 to 6
+  float min RD_DEFAULT({}), max RD_DEFAULT({});  // max <= min: unbounded
+  float value RD_DEFAULT({});     // clamped and rounded
+  float step RD_DEFAULT({});      // 0: one unit of the last decimal place shown
+  int   decimals RD_DEFAULT({});  // places after the point, 0 to 6
 } rdx_number_desc;
 
 rd_node rdx_number_create(rd_ctx* ctx, const rdx_number_desc* desc);

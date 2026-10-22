@@ -1,6 +1,7 @@
 #ifndef RAYDOM_EXTRAS_DIALOG_H
 #define RAYDOM_EXTRAS_DIALOG_H
 
+#include <raydom/tree.h>  // RD_DEFAULT
 #include <stddef.h>
 #include <stdint.h>
 
@@ -13,24 +14,24 @@ extern "C" {
 // redraw meanwhile. Call from the main thread after InitWindow, for example from a click listener.
 // Builds without dialog support (the web, or RAYDOM_FILE_DIALOG=OFF) return RDX_DIALOG_ERROR.
 
-typedef enum rdx_dialog_result : uint8_t {
+RD_ENUM typedef enum rdx_dialog_result : uint8_t {
   RDX_DIALOG_OK,
   RDX_DIALOG_CANCEL,
   RDX_DIALOG_ERROR,  // rdx_dialog_error says why
 } rdx_dialog_result;
 
 typedef struct rdx_file_filter {
-  const char* name;        // "Images"
-  const char* extensions;  // "png,jpg": comma-separated, without dots
+  const char* name RD_DEFAULT({});        // "Images"
+  const char* extensions RD_DEFAULT({});  // "png,jpg": comma-separated, without dots
 } rdx_file_filter;
 
 // Every field is optional; a null desc uses the defaults.
 typedef struct rdx_dialog_desc {
-  const char*            title;
-  const rdx_file_filter* filters;
-  size_t                 filter_count;
-  const char*            default_path;  // starting folder
-  const char*            default_name;  // save: suggested file name
+  const char*            title RD_DEFAULT({});
+  const rdx_file_filter* filters RD_DEFAULT({});
+  size_t                 filter_count RD_DEFAULT({});
+  const char*            default_path RD_DEFAULT({});  // starting folder
+  const char*            default_name RD_DEFAULT({});  // save: suggested file name
 } rdx_dialog_desc;
 
 // Paths are UTF-8 and owned by the caller: free them with rdx_dialog_free and rdx_dialog_free_paths.

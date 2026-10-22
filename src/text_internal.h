@@ -96,6 +96,7 @@ uint32_t rd__text_cp_of_byte(const rd_text* t, size_t byte);
 // line. dx shifts content horizontally, for scrolled inputs.
 size_t rd__text_byte_at(rd_ctx* ctx, uint32_t i, float x, float y, float dx);
 // Lines drawn under line_clamp.
+uint32_t rd__line_clamp(const rd_style* st);
 uint32_t rd__text_visible_lines(const rd_style* st, const rd__text_layout* tl);
 
 bool rd__input_multiline(const struct rd__input* in);

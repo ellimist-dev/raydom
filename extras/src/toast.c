@@ -6,15 +6,11 @@ enum { POSITIONS = 6, MAX_SHOWN = 5 };
 static const float  MARGIN          = 16;
 static const double DEFAULT_SECONDS = 4;
 
-// One stack per position, created in the overlay on first use.
 typedef struct toast toast;
 
-// One stack per position, created in the overlay on first use, and the live toasts.
+// One stack per position, created in the overlay on first use.
 typedef struct stacks {
-  rd_node  of[POSITIONS];
-  rd_node* nodes;  // live toasts' nodes and state; a node that's gone means its state is too
-  toast**  toasts;
-  uint32_t len, cap;
+  rd_node of[POSITIONS];
 } stacks;
 
 struct toast {
@@ -25,16 +21,11 @@ struct toast {
   bool     closing;  // fading out
 };
 
-static void stacks_free(void* p) {
-  stacks* s = p;
-  free(s->nodes);
-  free((void*)s->toasts);
-  free(s);
-}
+static void stacks_free(void* p) { free(p); }
 
 static const double ENTER = 0.22, EXIT = 0.18;
 
-static const char key = 0;
+static const char key = 0, toast_key = 0;
 
 static rd_node stack_for(rd_ctx* ctx, const rdx_classes* cl, rdx_toast_position pos) {
   stacks* s = rd_ctx_extension(ctx, &key);
@@ -132,38 +123,18 @@ static rd_node text_part(rd_ctx* ctx, rd_node parent, const char* s, rd_class cl
   return n;
 }
 
-static void remember(rd_ctx* ctx, stacks* s, toast* t) {
-  uint32_t kept = 0;
-  for (uint32_t j = 0; j < s->len; j++) {
-    if (!rd_node_alive(ctx, s->nodes[j])) continue;
-    s->nodes[kept]    = s->nodes[j];
-    s->toasts[kept++] = s->toasts[j];
-  }
-  s->len = kept;
-  if (s->len == s->cap) {
-    uint32_t cap = s->cap ? s->cap * 2 : 8;
-    rd_node* n   = realloc(s->nodes, cap * sizeof *n);
-    if (n) s->nodes = n;
-    toast** q = n ? (toast**)realloc((void*)s->toasts, cap * sizeof *q) : NULL;
-    if (!q) return;  // rdx_toast_close won't find it; it still closes itself
-    s->toasts = q;
-    s->cap    = cap;
-  }
-  s->nodes[s->len]    = t->node;
-  s->toasts[s->len++] = t;
-}
-
 rd_node rdx_toast_show(rd_ctx* ctx, const rdx_toast_desc* desc) {
   const rdx_classes* cl = rdx_theme(ctx);
   rdx_toast_desc     d  = desc ? *desc : (rdx_toast_desc){0};
-  if (!cl || d.position >= POSITIONS) return (rd_node){0};
+  if (!cl || (int)d.position >= POSITIONS) return (rd_node){0};
   rd_node stack = stack_for(ctx, cl, d.position);
   toast*  t     = rd_node_is_null(stack) ? NULL : calloc(1, sizeof *t);
   if (!t) return (rd_node){0};
 
   rd_node card = rd_node_create(ctx);
   *t           = (toast){ctx, card, {0}, d.seconds == 0 ? DEFAULT_SECONDS : d.seconds, false};
-  if (!rd_node_on(ctx, card, RD_EVENT_POINTER_ENTER, hover, t, toast_free, 0).id) {
+  // Owned by the enter listener; attached only to be found by rdx_toast_close.
+  if (!rd_node_attach(ctx, card, &toast_key, t, NULL) || !rd_node_on(ctx, card, RD_EVENT_POINTER_ENTER, hover, t, toast_free, 0).id) {
     free(t);
     rd_node_destroy(ctx, card);
     return (rd_node){0};
@@ -214,13 +185,11 @@ rd_node rdx_toast_show(rd_ctx* ctx, const rdx_toast_desc* desc) {
       break;
   }
   rd_node_animate(ctx, card, &from, &to, ENTER, RD_EASING_EASE_OUT, NULL, NULL);
-  remember(ctx, rd_ctx_extension(ctx, &key), t);
   start(t);
   return card;
 }
 
 void rdx_toast_close(rd_ctx* ctx, rd_node node) {
-  stacks* s = rd_ctx_extension(ctx, &key);
-  for (uint32_t j = 0; s && j < s->len; j++)
-    if (rd_node_eq(s->nodes[j], node) && rd_node_alive(ctx, node)) dismiss(ctx, s->toasts[j]);
+  toast* t = rd_node_attached(ctx, node, &toast_key);
+  if (t) dismiss(ctx, t);
 }

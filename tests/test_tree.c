@@ -115,7 +115,69 @@ static void test_growth(void) {
   rd_ctx_destroy(ctx);
 }
 
+static void test_attach(void) {
+  rd_ctx*           ctx = rd_ctx_create();
+  static const char a = 0, b = 0;
+  int               x = 1, y = 2;
+  rd_node           n = rd_node_create(ctx);
+  destroyed           = 0;
+  CHECK(rd_node_attach(ctx, n, &a, &x, count_destroy) && rd_node_attach(ctx, n, &b, &y, count_destroy));
+  CHECK(rd_node_attached(ctx, n, &a) == &x && rd_node_attached(ctx, n, &b) == &y);  // keys don't collide
+  CHECK(rd_node_userdata(ctx, n) == NULL);                                           // userdata stays the app's
+  CHECK(rd_node_attach(ctx, n, &a, &y, count_destroy) && destroyed == 1);            // replacing destroys the old
+  CHECK(rd_node_attach(ctx, n, &a, &y, count_destroy) && destroyed == 1);            // the same data isn't
+  CHECK(rd_node_attach(ctx, n, &b, NULL, NULL) && destroyed == 2 && !rd_node_attached(ctx, n, &b));  // removal
+  rd_node_destroy(ctx, n);
+  CHECK(destroyed == 3 && !rd_node_attached(ctx, n, &a));  // freed with the node
+  CHECK(!rd_node_attach(ctx, n, &a, &x, count_destroy) && destroyed == 3);  // a dead node keeps nothing
+  rd_node m = rd_node_create(ctx);  // reuses n's slot: nothing carried over
+  CHECK(!rd_node_attached(ctx, m, &a));
+  rd_node_attach(ctx, m, &a, &x, count_destroy);
+  rd_ctx_destroy(ctx);
+  CHECK(destroyed == 4);
+}
+
+// Destroying a subtree and computing styles walk without recursion, so depth can't exhaust the stack.
+// The chain is built from the bottom up, so each append marks only an unattached parent.
+static void test_deep_tree(void) {
+  enum { DEPTH = 20000 };  // deep enough that the old recursive style walk overflowed an 8 MB stack
+  rd_ctx* ctx  = rd_ctx_create();
+  rd_node leaf = rd_node_create(ctx), top = leaf;
+  destroyed    = 0;
+  rd_node_set_userdata(ctx, leaf, NULL, count_destroy);
+  for (int d = 1; d < DEPTH; d++) {
+    rd_node n = rd_node_create(ctx);
+    rd_node_set_userdata(ctx, n, NULL, count_destroy);
+    rd_node_append(ctx, n, top);
+    top = n;
+  }
+  rd_node_set_style(ctx, top, &(rd_style){.color = rd_hex(0x123456)});
+  rd_node_append(ctx, rd_ctx_root(ctx), top);
+  rd_ctx_compute_styles(ctx);
+  CHECK(rd_node_computed_style(ctx, leaf)->color.g == 0x34);  // inherited DEPTH levels down
+  rd_node_destroy(ctx, top);
+  CHECK(destroyed == DEPTH && !rd_node_alive(ctx, leaf) && rd_ctx_node_count(ctx) == 1);
+  rd_ctx_destroy(ctx);
+}
+
+static void test_extensions(void) {
+  rd_ctx*           ctx = rd_ctx_create();
+  static const char key = 0, other = 0;
+  int               x = 1, y = 2;
+  destroyed           = 0;
+  CHECK(rd_ctx_extension(ctx, &key) == NULL);
+  CHECK(rd_ctx_set_extension(ctx, &key, &x, count_destroy) && rd_ctx_extension(ctx, &key) == &x);
+  CHECK(rd_ctx_set_extension(ctx, &key, &y, count_destroy) && destroyed == 1 && rd_ctx_extension(ctx, &key) == &y);
+  CHECK(rd_ctx_set_extension(ctx, &other, &x, NULL) && rd_ctx_extension(ctx, &other) == &x);
+  CHECK(!rd_ctx_set_extension(ctx, NULL, &x, NULL));
+  rd_ctx_destroy(ctx);
+  CHECK(destroyed == 2);
+}
+
 int main(void) {
+  test_extensions();
+  test_attach();
+  test_deep_tree();
   test_append_order();
   test_move_and_cycles();
   test_destroy_subtree();

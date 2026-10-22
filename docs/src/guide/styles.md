@@ -20,7 +20,10 @@ Colors: `rd_hex(0xRRGGBB)`, `rd_rgb`, `rd_rgba`. Box sides: `rd_edges_all`, `rd_
 ## Classes
 
 A class is a reusable style with optional variants per state. Classes live until the context is destroyed;
-`rd_class_set` replaces a class's base style and restyles every node that uses it.
+`rd_class_set` replaces a class's base style and restyles every node that uses it. `rd_class_merge` (and
+`rd_class_merge_state` for a variant) changes only the properties set in its style, as `rd_node_merge_style` does for
+a node: recolor a class without restating its layout. `rd_class_get` and `rd_class_get_state` copy a class's styles
+out. In C++: `cls.merge(style)`, `cls.merge_on(state, style)`, `cls.base()` and `cls.state(state)`.
 
 ```c
 {{#include ../../examples/styles.c:classes}}

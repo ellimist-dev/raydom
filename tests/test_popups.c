@@ -240,7 +240,28 @@ static void tooltips(void) {
   rd_ctx_destroy(ctx);
 }
 
+static int  freed = 0;
+static void count_free(void* data) {
+  (void)data;
+  freed++;
+}
+
+// A call that fails keeps nothing: the data is still the caller's.
+static void failures(void) {
+  rd_ctx*             ctx    = rd_ctx_create();
+  rd_node             gone   = rd_node_create(ctx);
+  const rdx_menu_item item[] = {{"Copy", NULL, false}};
+  rd_node_destroy(ctx, gone);
+  CHECK(!rdx_context_menu_attach(ctx, gone, item, 1, on_choose, NULL, count_free) && freed == 0);
+  rd_node target = rd_node_create(ctx);
+  CHECK(rdx_context_menu_attach(ctx, target, item, 1, on_choose, NULL, count_free));
+  rd_node_destroy(ctx, target);
+  CHECK(freed == 1);
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
+  failures();
   menus();
   selects();
   modals();

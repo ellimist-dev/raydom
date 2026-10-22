@@ -27,7 +27,7 @@ typedef struct vlist {
   float         spacer_h;
   bool          refill;  // fill every bound row again at the next update
   rd_role       row_role;
-  table*        table;  // set for a table's body
+  table*        table;  // set for a table's body, which holds a reference to it
   tree*         tree;   // set for a tree
 } vlist;
 
@@ -105,7 +105,7 @@ static void update(rd_ctx* ctx, vlist* l) {
 // Each list's layout hook: lives as long as the list's node, and skips while it's detached.
 static void hook(rd_ctx* ctx, void* data) { update(ctx, data); }
 
-static vlist* find(const rd_ctx* ctx, rd_node n) { return rdx__lookup(ctx, &list_key, n); }
+static vlist* find(const rd_ctx* ctx, rd_node n) { return rd_node_attached(ctx, n, &list_key); }
 
 static void scroll_to(rd_ctx* ctx, vlist* l, int index) {
   if (index < 0 || index >= l->count) return;
@@ -172,13 +172,11 @@ static void list_keys(rd_ctx* ctx, rd_event* ev, void* data) {
   if (set_selected(ctx, l, to)) rd_node_dispatch(ctx, l->node, RD_EVENT_CHANGE);
 }
 
+// The list's state is attached to its node. On failure the caller still owns desc->data.
 static vlist* list_new(rd_ctx* ctx, const rdx_list_desc* desc, rd_role row_role) {
   const rdx_classes* cl = rdx_theme(ctx);
   vlist*             l  = cl ? calloc(1, sizeof *l) : NULL;
-  if (!l) {
-    if (desc && desc->destroy) desc->destroy(desc->data);
-    return NULL;
-  }
+  if (!l) return NULL;
   rdx_list_desc d = desc ? *desc : (rdx_list_desc){0};
   l->count        = d.count > 0 ? d.count : 0;
   l->row_h        = d.row_height > 0 ? d.row_height : DEFAULT_ROW;
@@ -188,12 +186,16 @@ static vlist* list_new(rd_ctx* ctx, const rdx_list_desc* desc, rd_role row_role)
   l->selected     = -1;
   l->spacer_h     = -1;
   l->row_role     = row_role;
-  l->node         = rd_node_create(ctx);
-  l->spacer       = rd_node_create(ctx);
-  if (!rd_node_on(ctx, l->node, RD_EVENT_KEY_DOWN, list_keys, l, vlist_free, 0).id ||
-      !rdx__track(ctx, &list_key, l->node, l) || !rd_node_on_layout(ctx, l->node, hook, l, NULL)) {
-    rd_node_destroy(ctx, l->node);
-    rd_node_destroy(ctx, l->spacer);
+  rd_node node = l->node = rd_node_create(ctx), spacer = l->spacer = rd_node_create(ctx);
+  bool    ok   = rd_node_attach(ctx, node, &list_key, l, vlist_free);
+  if (!ok) free(l);
+  if (ok && (!rd_node_on(ctx, node, RD_EVENT_KEY_DOWN, list_keys, l, NULL, 0).id || !rd_node_on_layout(ctx, node, hook, l, NULL))) {
+    l->destroy = NULL;  // the data stays the caller's
+    ok         = false;
+  }
+  if (!ok) {
+    rd_node_destroy(ctx, node);  // with l, if attached
+    rd_node_destroy(ctx, spacer);
     return NULL;
   }
   rd_node_add_class(ctx, l->node, cl->list);
@@ -243,9 +245,11 @@ void rdx_list_scroll_to(rd_ctx* ctx, rd_node list, int index) {
 
 // Tables.
 
+// Shared by the root, which it's attached to, and the body list, whose rows it fills: freed when both
+// are gone, so the application may destroy or keep the body on its own.
 struct table {
-  rd_node       root, header;
-  vlist*        body;
+  rd_node       root, header, body;
+  int           refs;
   int           columns;
   rd_tracks     tracks;
   rdx_cell_fn   cell;
@@ -256,9 +260,13 @@ struct table {
 
 static const char table_key = 0;
 
+static table* table_find(const rd_ctx* ctx, rd_node root) { return rd_node_attached(ctx, root, &table_key); }
+
 static void header_click(rd_ctx* ctx, rd_event* ev, void* data) {
-  table* t = data;
-  int    k = 0;
+  (void)data;
+  table* t = table_find(ctx, rd_node_parent(ctx, rd_node_parent(ctx, ev->current)));  // cell, header, root
+  if (!t) return;
+  int k = 0;
   for (rd_node n = rd_node_first_child(ctx, t->header); !rd_node_is_null(n); n = rd_node_next_sibling(ctx, n), k++)
     if (rd_node_eq(n, ev->current) && t->on_header) t->on_header(ctx, k, t->data);
 }
@@ -274,24 +282,20 @@ static void table_fill(rd_ctx* ctx, rd_node row, int index, void* data) {
   }
 }
 
-// Freed with the body list.
-static void table_free(void* p) {
+static void table_release(void* p) {
   table* t = p;
+  if (--t->refs > 0) return;
   if (t->destroy) t->destroy(t->data);
   free(t);
 }
 
 rd_node rdx_table_create(rd_ctx* ctx, const rdx_table_desc* desc) {
   const rdx_classes* cl = rdx_theme(ctx);
-  if (!cl || !desc || desc->column_count <= 0) {
-    if (desc && desc->destroy) desc->destroy(desc->data);
-    return (rd_node){0};
-  }
+  if (!cl || !desc || desc->column_count <= 0) return (rd_node){0};
   table*    t      = calloc(1, sizeof *t);
   rd_track* tracks = t ? malloc((size_t)desc->column_count * sizeof *tracks) : NULL;
   if (!tracks) {
     free(t);
-    if (desc->destroy) desc->destroy(desc->data);
     return (rd_node){0};
   }
   *t = (table){.columns = desc->column_count, .cell = desc->cell, .on_header = desc->header, .data = desc->data,
@@ -303,13 +307,25 @@ rd_node rdx_table_create(rd_ctx* ctx, const rdx_table_desc* desc) {
   t->tracks = rd_tracks_create(ctx, tracks, (uint32_t)desc->column_count);
   free(tracks);
 
-  vlist* body = list_new(ctx, &(rdx_list_desc){desc->count, desc->row_height, table_fill, t, table_free}, RD_ROLE_ROW);
-  if (!body) return (rd_node){0};  // table_free ran
-  t->body     = body;
+  vlist* body = list_new(ctx, &(rdx_list_desc){desc->count, desc->row_height, table_fill, t, table_release}, RD_ROLE_ROW);
+  if (!body) {
+    free(t);
+    return (rd_node){0};
+  }
+  t->refs     = 1;  // the body's
+  t->body     = body->node;
   body->table = t;
-  rd_node_set_style(ctx, t->body->node, &(rd_style){.flex_grow = rd_num(1), .flex_basis = rd_px(0)});
+  rd_node_set_style(ctx, t->body, &(rd_style){.flex_grow = rd_num(1), .flex_basis = rd_px(0)});
 
-  t->root   = rd_node_create(ctx);
+  t->root = rd_node_create(ctx);
+  t->refs++;
+  if (!rd_node_attach(ctx, t->root, &table_key, t, table_release)) {
+    t->refs--;
+    t->destroy = NULL;  // the data stays the caller's
+    rd_node_destroy(ctx, t->root);
+    rd_node_destroy(ctx, t->body);  // releases t
+    return (rd_node){0};
+  }
   t->header = rd_node_create(ctx);
   rd_node_add_class(ctx, t->root, cl->table);
   rd_node_set_role(ctx, t->root, RD_ROLE_TABLE);
@@ -320,18 +336,17 @@ rd_node rdx_table_create(rd_ctx* ctx, const rdx_table_desc* desc) {
     rd_node h = rd_node_create_text(ctx, desc->columns[c].title ? desc->columns[c].title : "", RD_TEXT_NUL);
     rd_node_add_class(ctx, h, cl->table_header_cell);
     rd_node_set_role(ctx, h, RD_ROLE_COLUMN_HEADER);
-    rd_node_on(ctx, h, RD_EVENT_CLICK, header_click, t, NULL, 0);
+    rd_node_on(ctx, h, RD_EVENT_CLICK, header_click, NULL, NULL, 0);
     rd_node_append(ctx, t->header, h);
   }
   rd_node_append(ctx, t->root, t->header);
-  rd_node_append(ctx, t->root, t->body->node);
-  rdx__track(ctx, &table_key, t->root, t);
+  rd_node_append(ctx, t->root, t->body);
   return t->root;
 }
 
 rd_node rdx_table_list(const rd_ctx* ctx, rd_node root) {
-  table* t = rdx__lookup(ctx, &table_key, root);
-  return t && rd_node_alive(ctx, t->body->node) ? t->body->node : (rd_node){0};
+  table* t = table_find(ctx, root);
+  return t && rd_node_alive(ctx, t->body) ? t->body : (rd_node){0};
 }
 
 // Trees: items in an array, flattened into the visible ones for the list.
@@ -469,7 +484,10 @@ rd_node rdx_tree_create(rd_ctx* ctx, float row_height) {
   if (!t) return (rd_node){0};
   t->first_root = t->last_root = t->selected = -1;
   vlist* l = list_new(ctx, &(rdx_list_desc){0, row_height, tree_fill, t, tree_free}, RD_ROLE_TREE_ITEM);
-  if (!l) return (rd_node){0};
+  if (!l) {
+    tree_free(t);
+    return (rd_node){0};
+  }
   t->list = l;
   l->tree = t;
   rd_node_set_role(ctx, l->node, RD_ROLE_TREE);

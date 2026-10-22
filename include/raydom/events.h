@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-typedef enum rd_event_type : uint8_t {
+RD_ENUM typedef enum rd_event_type : uint8_t {
   RD_EVENT_POINTER_DOWN,
   RD_EVENT_POINTER_UP,
   RD_EVENT_POINTER_MOVE,
@@ -29,7 +29,7 @@ typedef enum rd_event_type : uint8_t {
   RD_EVENT_TYPE_COUNT,
 } rd_event_type;
 
-typedef enum rd_event_phase : uint8_t {
+RD_ENUM typedef enum rd_event_phase : uint8_t {
   RD_PHASE_CAPTURE,
   RD_PHASE_TARGET,
   RD_PHASE_BUBBLE,
@@ -39,7 +39,7 @@ enum { RD_BUTTON_PRIMARY   = 1u << 0,
        RD_BUTTON_SECONDARY = 1u << 1,
        RD_BUTTON_MIDDLE    = 1u << 2 };
 
-typedef enum rd_key : uint16_t {
+RD_ENUM typedef enum rd_key : uint16_t {
   RD_KEY_UNKNOWN,
   RD_KEY_TAB,
   RD_KEY_ENTER,

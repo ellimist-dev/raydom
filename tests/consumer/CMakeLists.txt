@@ -6,15 +6,21 @@ project(raydom_consumer LANGUAGES C CXX)
 option(CONSUMER_FIND_PACKAGE "Use find_package instead of FetchContent" OFF)
 
 if (CONSUMER_FIND_PACKAGE)
-    find_package(raydom 0.1 CONFIG REQUIRED)
+    # The version of the source tree this test sits in: the installed package must accept it.
+    file(STRINGS ${CMAKE_CURRENT_LIST_DIR}/../../CMakeLists.txt line REGEX "^project\\(raydom VERSION")
+    string(REGEX MATCH "[0-9]+\\.[0-9]+" want "${line}")
+    find_package(raydom ${want} CONFIG REQUIRED)
 else ()
     include(FetchContent)
     FetchContent_Declare(raydom SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/../..)
     FetchContent_MakeAvailable(raydom)
 endif ()
 
+# C11 with -pedantic: the C headers mustn't need C23 or warn.
 add_executable(consumer_c main.c)
 target_link_libraries(consumer_c PRIVATE raydom::raydom)
+set_target_properties(consumer_c PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
+target_compile_options(consumer_c PRIVATE -Wall -Wextra -pedantic -Werror)
 
 add_executable(consumer_cpp main.cc)
 target_link_libraries(consumer_cpp PRIVATE raydom::extras)

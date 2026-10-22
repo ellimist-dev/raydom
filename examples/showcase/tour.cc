@@ -48,10 +48,15 @@ struct App {
   rd::Node name, email, notes, notes_count, summary;
   rd::Node file_result;
   rd::Node popover, popover_toggle, popups_result;
-  rd::Node anim_box, anim_easing, views_status, files_rows;
+  rd::Node        anim_box, views_status;
+  rdx::RadioGroup anim_easing;
+  rdx::List       files_rows;
   bool     files_reversed = false;
   bool     anim_wide = false;
-  rd::Node controls_summary, check_a, check_b, switch_a, switch_b, sizes, volume, toast_position;
+  rd::Node        controls_summary;
+  rdx::Toggle     check_a, check_b, switch_a, switch_b;
+  rdx::RadioGroup sizes, toast_position;
+  rdx::Slider     volume;
   float    drag_x = 0, drag_w = 0;
 
   void log(std::string line) {
@@ -719,12 +724,12 @@ rd::Node build_images(const rd::Context& ctx, const Theme& t) {
 
 void describe_controls(App& app) {
   const char* sizes[] = {"small", "medium", "large"};
-  int         size    = rdx::radio_selected(app.sizes);
+  int         size    = app.sizes.selected();
   char        line[200];
   std::snprintf(line, sizeof line, "newsletter: %s | beta: %s | sync: %s | size: %s | volume: %.0f",
-                rdx::checked(app.check_a) ? "yes" : "no", rdx::checked(app.check_b) ? "yes" : "no",
-                rdx::checked(app.switch_a) ? "on" : "off", size >= 0 ? sizes[size] : "none",
-                static_cast<double>(rdx::slider_value(app.volume)));
+                app.check_a.checked() ? "yes" : "no", app.check_b.checked() ? "yes" : "no",
+                app.switch_a.checked() ? "on" : "off", size >= 0 ? sizes[size] : "none",
+                static_cast<double>(app.volume.value()));
   app.controls_summary.text(line);
 }
 
@@ -738,33 +743,33 @@ rd::Node build_controls(const rd::Context& ctx, const Theme& t, App& app) {
   rd::Node checks = column();
   app.check_a     = rdx::checkbox(ctx, "Email me updates");
   app.check_b     = rdx::checkbox(ctx, "Join the beta");
-  rd::Node locked = rdx::checkbox(ctx, "Disabled");
-  rdx::set_checked(locked, true);
+  rdx::Toggle locked = rdx::checkbox(ctx, "Disabled");
+  locked.set_checked(true);
   locked.set_state(RD_STATE_DISABLED, true);
   checks.append(labeled(app.check_a, "checkbox")).append(labeled(app.check_b, "checkbox")).append(labeled(locked, "checkbox: disabled"));
 
   rd::Node switches = column();
   app.switch_a      = rdx::toggle_switch(ctx, "Sync");
   app.switch_b      = rdx::toggle_switch(ctx, "Dark mode");
-  rdx::set_checked(app.switch_b, true);
+  app.switch_b.set_checked(true);
   switches.append(labeled(app.switch_a, "switch")).append(labeled(app.switch_b, "switch"));
 
   app.sizes = rdx::radio_group(ctx);
-  for (const char* s : {"Small", "Medium", "Large"}) rdx::add_radio(app.sizes, s);
-  rdx::radio_select(app.sizes, 1);
+  for (const char* s : {"Small", "Medium", "Large"}) app.sizes.add(s);
+  app.sizes.select(1);
 
   rd::Node sliders = column();
   app.volume       = rdx::slider(ctx, {.min = 0, .max = 100, .value = 40, .step = 1});
   rd::Node live    = text(ctx, "volume: 40").add_class(t.muted);
   app.volume.on(RD_EVENT_INPUT, [&app, live]() mutable {
-    live.text("volume: " + std::to_string(static_cast<int>(rdx::slider_value(app.volume))));
+    live.text("volume: " + std::to_string(static_cast<int>(app.volume.value())));
   });
   rd::Node fine = rdx::slider(ctx, {.min = 0, .max = 1, .value = 0.25f});
   sliders.append(labeled(app.volume, "slider: step 1")).append(live).append(labeled(fine, "slider: continuous"));
 
   grid.append(checks).append(switches).append(labeled(app.sizes, "radio group")).append(sliders);
   app.controls_summary = text(ctx, "").add_class(t.code);
-  for (rd::Node n : {app.check_a, app.check_b, app.switch_a, app.sizes, app.volume})
+  for (rd::Node n : std::initializer_list<rd::Node>{app.check_a, app.check_b, app.switch_a, app.sizes, app.volume})
     n.on(RD_EVENT_CHANGE, [&app] { describe_controls(app); });
   describe_controls(app);
   body.append(grid).append(app.controls_summary);
@@ -774,8 +779,8 @@ rd::Node build_controls(const rd::Context& ctx, const Theme& t, App& app) {
   rd::Node toasts    = ctx.create(rd::Style().flex_direction(RD_FLEX_ROW).flex_wrap(RD_FLEX_WRAP).gap(32_px));
   app.toast_position = rdx::radio_group(ctx);
   for (const char* p : {"Bottom right", "Bottom left", "Top right", "Top left", "Top center", "Bottom center"})
-    rdx::add_radio(app.toast_position, p);
-  rdx::radio_select(app.toast_position, 0);
+    app.toast_position.add(p);
+  app.toast_position.select(0);
   rd::Node kinds = ctx.create(rd::Style().flex_direction(RD_FLEX_ROW).align_items(RD_ALIGN_START).gap(10_px));
   const std::pair<const char*, rdx_toast_kind> kinds_list[] = {
       {"Info", RDX_TOAST_INFO}, {"Success", RDX_TOAST_SUCCESS}, {"Warning", RDX_TOAST_WARNING}, {"Error", RDX_TOAST_ERROR}};
@@ -786,7 +791,7 @@ rd::Node build_controls(const rd::Context& ctx, const Theme& t, App& app) {
                                      "Storage is almost full.", "Couldn't reach the server."};
       rdx::toast(ctx, {.title    = name,
                        .text     = bodies[kind],
-                       .position = static_cast<rdx_toast_position>(rdx::radio_selected(app.toast_position)),
+                       .position = static_cast<rdx_toast_position>(app.toast_position.selected()),
                        .kind     = kind});
     });
     kinds.append(b);
@@ -855,8 +860,8 @@ rd::Node build_animation(const rd::Context& ctx, const Theme& t, App& app) {
   // Width, with siblings reflowing, under each easing.
   app.anim_easing = rdx::radio_group(ctx);
   app.anim_easing.merge_style(rd::Style().flex_direction(RD_FLEX_ROW).column_gap(16_px));
-  for (const char* e : {"linear", "ease", "ease-in", "ease-out", "ease-in-out"}) rdx::add_radio(app.anim_easing, e);
-  rdx::radio_select(app.anim_easing, 1);
+  for (const char* e : {"linear", "ease", "ease-in", "ease-out", "ease-in-out"}) app.anim_easing.add(e);
+  app.anim_easing.select(1);
   rd::Node lane = ctx.create(rd::Style().flex_direction(RD_FLEX_ROW).align_items(RD_ALIGN_CENTER).column_gap(10_px));
   app.anim_box  = ctx.create(rd::Style()
                                  .width(120_px)
@@ -871,7 +876,7 @@ rd::Node build_animation(const rd::Context& ctx, const Theme& t, App& app) {
                                        RD_EASING_EASE_IN_OUT};
     app.anim_wide = !app.anim_wide;
     app.anim_box.merge_style(rd::Style()
-                                 .transition_easing(curves[std::max(0, rdx::radio_selected(app.anim_easing))])
+                                 .transition_easing(curves[std::max(0, app.anim_easing.selected())])
                                  .width(app.anim_wide ? 420_px : 120_px)
                                  .background(rd::hex(app.anim_wide ? kAccent : kAccentLo)));
   });
@@ -883,25 +888,25 @@ rd::Node build_views(const rd::Context& ctx, const Theme& t, App& app) {
   auto [root, body] = section(ctx, t, "Views",
                               "Tabs, a splitter, a tree, and virtualized lists and tables: only the rows in view exist, "
                               "so 100,000 rows cost the same as 20.");
-  rd::Node tabs = rdx::tabs(ctx);
+  rdx::Tabs tabs = rdx::tabs(ctx);
   tabs.merge_style(rd::Style().max_width(900_px));
 
   // Files: a tree and a table side by side.
-  rd::Node files = rdx::add_tab(tabs, "Files");
-  rd::Node split = rdx::split(ctx, {.fraction = 0.3f, .min_first = 140, .min_second = 240});
+  rd::Node   files = tabs.add("Files");
+  rdx::Split split = rdx::split(ctx, {.fraction = 0.3f, .min_first = 140, .min_second = 240});
   split.merge_style(rd::Style().height(320_px).border_width(1_px).border_color(rd::hex(kLine)).border_radius(8_px).overflow_y(RD_OVERFLOW_HIDDEN));
-  rd::Node tree = rdx::tree(ctx, 26);
+  rdx::Tree tree = rdx::tree(ctx, 26);
   tree.merge_style(rd::Style().flex(1));
-  int src = rdx::tree_add(tree, -1, "src"), docs = rdx::tree_add(tree, -1, "docs"), ex = rdx::tree_add(tree, -1, "examples");
-  for (const char* f : {"tree.c", "style.c", "layout.c", "grid.c", "text.c", "render.c", "anim.c"}) rdx::tree_add(tree, src, f);
-  int ext = rdx::tree_add(tree, src, "external");
-  for (const char* f : {"stb_truetype.h", "stb_image.h", "nanosvg.h"}) rdx::tree_add(tree, ext, f);
-  for (const char* f : {"book.toml", "src", "examples"}) rdx::tree_add(tree, docs, f);
-  for (const char* f : {"showcase", "network", "messages"}) rdx::tree_add(tree, ex, f);
-  rdx::tree_expand(tree, src);
-  rdx::pane(split, 0).append(tree);
+  int src = tree.add(-1, "src"), docs = tree.add(-1, "docs"), ex = tree.add(-1, "examples");
+  for (const char* f : {"tree.c", "style.c", "layout.c", "grid.c", "text.c", "render.c", "anim.c"}) tree.add(src, f);
+  int ext = tree.add(src, "external");
+  for (const char* f : {"stb_truetype.h", "stb_image.h", "nanosvg.h"}) tree.add(ext, f);
+  for (const char* f : {"book.toml", "src", "examples"}) tree.add(docs, f);
+  for (const char* f : {"showcase", "network", "messages"}) tree.add(ex, f);
+  tree.expand(src);
+  split.pane(0).append(tree);
 
-  rd::Node table = rdx::table(ctx, {{"Name", 1_fr}, {"Size", 90_px}, {"Modified", 140_px}}, 10000, 28,
+  rdx::Table table = rdx::table(ctx, {{"Name", 1_fr}, {"Size", 90_px}, {"Modified", 140_px}}, 10000, 28,
                               {.cell =
                                    [&app](rd::Node cell, int row, int col) {
                                      int  n = app.files_reversed ? 9999 - row : row;
@@ -915,18 +920,18 @@ rd::Node build_views(const rd::Context& ctx, const Theme& t, App& app) {
                                    [&app](int col) {
                                      if (col != 0) return;  // Name sorts; the others don't
                                      app.files_reversed = !app.files_reversed;
-                                     rdx::list_refresh(app.files_rows);
+                                     app.files_rows.refresh();
                                    }});
   table.merge_style(rd::Style().flex(1).border_width(0_px).border_radius(0_px));
-  rdx::pane(split, 1).append(table);
+  split.pane(1).append(table);
   files.append(split);
 
   app.views_status = text(ctx, "Select a folder or a file.").add_class(t.muted);
-  tree.on(RD_EVENT_CHANGE, [&app, tree] { app.views_status.text("tree: " + rdx::tree_label(tree, rdx::tree_selected(tree))); });
-  rd::Node rows  = rdx::table_list(table);
+  tree.on(RD_EVENT_CHANGE, [&app, tree] { app.views_status.text("tree: " + tree.label(tree.selected_item())); });
+  rdx::List rows = table.list();
   app.files_rows = rows;
   rows.on(RD_EVENT_CHANGE, [&app, rows] {
-    int  r = rdx::list_selected(rows);
+    int  r = rows.selected();
     char buf[64];
     std::snprintf(buf, sizeof buf, "table: row %d of 10,000", r + 1);
     app.views_status.text(buf);
@@ -934,7 +939,7 @@ rd::Node build_views(const rd::Context& ctx, const Theme& t, App& app) {
   files.append(app.views_status);
 
   // A long list.
-  rd::Node many = rdx::add_tab(tabs, "100,000 rows");
+  rd::Node many = tabs.add("100,000 rows");
   rd::Node list = rdx::list(ctx, 100000, 30, [&ctx, &t](rd::Node row, int i) {
     char buf[48];
     std::snprintf(buf, sizeof buf, "Item %d", i + 1);
@@ -946,7 +951,7 @@ rd::Node build_views(const rd::Context& ctx, const Theme& t, App& app) {
   many.append(list).append(text(ctx, "Scroll, drag the scrollbar, or focus the list and use the arrow keys, Page Up/Down, "
                                      "Home and End.").add_class(t.muted));
 
-  rd::Node about = rdx::add_tab(tabs, "About");
+  rd::Node about = tabs.add("About");
   about.append(text(ctx, "A virtualized list keeps a spacer as tall as every row and positions the few rows in view "
                          "over it. A layout hook rebinds rows as the list scrolls, in the same frame.").add_class(t.muted));
   body.append(labeled(tabs, "tabs"));
@@ -1007,10 +1012,10 @@ rd::Node build_popups(const rd::Context& ctx, const Theme& t, App& app) {
   rdx::tooltip(file, "A menu anchored to its button");
 
   // A select.
-  rd::Node theme = rdx::select(ctx, {"System", "Light", "Dark", "High contrast"}, "Theme");
+  rdx::Select theme = rdx::select(ctx, {"System", "Light", "Dark", "High contrast"}, "Theme");
   theme.on(RD_EVENT_CHANGE, [&app, theme] {
     const char* names[] = {"System", "Light", "Dark", "High contrast"};
-    app.popups_result.text(std::string("select: ") + names[rdx::selected(theme)]);
+    app.popups_result.text(std::string("select: ") + names[theme.selected()]);
   });
   rdx::tooltip(theme, "Up and Down change it without opening");
 

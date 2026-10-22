@@ -372,9 +372,9 @@ rd::Node build(rd::Context& ctx, Messages& m) {
                         .line_height(rd::num(1.35f));
 
   // Sidebar: search and conversations, most recent first.
-  rd::Node split = rdx::split(ctx, {.fraction = 0.3f, .min_first = 240, .min_second = 380});
+  rdx::Split split = rdx::split(ctx, {.fraction = 0.3f, .min_first = 240, .min_second = 380});
   split.merge_style(rd::Style().flex(1).min_height(0_px));
-  rd::Node side = rdx::pane(split, 0);
+  rd::Node side = split.pane(0);
   side.merge_style(rd::Style().background(rd::hex(kPanel)).padding(14_px, 10_px).row_gap(10_px));
   side.append(ctx.create_text("Messages", rd::Style().font_size(20_px).padding(0_px, 6_px)));
   m.search = ctx.create_input(false, rd::Style(field).margin(0_px, 4_px)).placeholder("Search");
@@ -420,7 +420,7 @@ rd::Node build(rd::Context& ctx, Messages& m) {
   m.search.on(RD_EVENT_INPUT, [&m] { filter(m); });
 
   // The conversation: header, log and composer.
-  rd::Node chat = rdx::pane(split, 1);
+  rd::Node chat = split.pane(1);
   rd::Node head = ctx.create(rd::Style()
                                  .flex_direction(RD_FLEX_ROW)
                                  .align_items(RD_ALIGN_CENTER)

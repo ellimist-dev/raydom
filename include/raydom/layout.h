@@ -23,7 +23,7 @@ typedef struct rd_box {
   rd_insets margin, border, padding;
 } rd_box;
 
-typedef enum rd_measure_mode : uint8_t {
+RD_ENUM typedef enum rd_measure_mode : uint8_t {
   RD_MEASURE_UNDEFINED,  // Size freely (max-content). The size argument is NaN.
   RD_MEASURE_EXACTLY,
   RD_MEASURE_AT_MOST,

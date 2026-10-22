@@ -72,8 +72,16 @@ not yet used to skip it. **Revisit:** for very large trees, by skipping unchange
 ## An SDF shader for boxes
 
 Rounded corners, borders and shadows come from one fragment shader computing distance to a rounded rectangle, not
-from tessellated meshes. Antialiasing is exact and per-corner radii and per-side borders are cheap. **Cost:** a
-batch flush per rounded box; square boxes avoid it. **Revisit:** if batch flushes dominate frame time.
+from tessellated meshes. Antialiasing is exact and per-corner radii and per-side borders are cheap.
+
+Everything raydom draws goes through this one shader, so draws batch. A quad's vertex normal carries what varies
+per box: (width, height, radius), or (0, 0, 0) for a plain textured quad such as a glyph or a square rectangle; the
+fill is the vertex color. Borders, stroke color, blur, uneven radii and image placement are uniforms, uploaded (with a
+flush) only when they differ from the last box's, which they usually don't for boxes styled by the same class.
+Before this, every rounded box flushed the batch and uploaded its uniforms: about 600 ms a frame for 1,500 bordered,
+labeled boxes on an M-series Mac, against about 7 ms after. **Cost:** boxes whose borders, stroke or uneven radii
+differ still flush between each other. **Revisit:** if those dominate, move more per-box data into vertex attributes
+with a custom vertex buffer.
 
 ## stb_truetype, no shaping
 

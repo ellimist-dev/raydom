@@ -1,9 +1,10 @@
-add_library(raydom_extras STATIC src/graph.c src/dialog.c src/theme.c src/controls.c src/toast.c src/popups.c src/registry.c src/views.c src/lists.c)
+add_library(raydom_extras STATIC src/graph.c src/dialog.c src/theme.c src/controls.c src/toast.c src/popups.c src/views.c src/lists.c)
 add_library(raydom::extras ALIAS raydom_extras)
 set_target_properties(raydom_extras PROPERTIES EXPORT_NAME extras)
 target_include_directories(raydom_extras PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
                                                 $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>)
 target_link_libraries(raydom_extras PUBLIC raydom)
+target_compile_features(raydom_extras PRIVATE c_std_23)
 target_compile_options(raydom_extras PRIVATE ${RAYDOM_WARNINGS} ${RAYDOM_SANITIZERS})
 
 # nativefiledialog-extended, vendored in src/external/nfd and compiled into this library.
@@ -33,5 +34,5 @@ if (RAYDOM_FILE_DIALOG AND NOT EMSCRIPTEN)
     endif ()
     target_compile_definitions(raydom_extras PRIVATE RDX_DIALOG_NATIVE)
     set_source_files_properties(${nfd}/nfd_cocoa.m ${nfd}/nfd_win.cpp ${nfd}/nfd_portal.cpp
-                                PROPERTIES COMPILE_OPTIONS "-w;$<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions;-fno-rtti>")
+                                PROPERTIES COMPILE_OPTIONS "$<IF:$<C_COMPILER_ID:MSVC>,/w,-w>;${RAYDOM_NO_EXCEPTIONS};$<$<AND:$<COMPILE_LANGUAGE:CXX>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-fno-rtti>")
 endif ()

@@ -44,10 +44,21 @@ static uint32_t slot_alloc(rd_ctx* ctx) {
   return i;
 }
 
+// Runs the entries' destroy callbacks and frees them.
+static void attachments_free(rd__attachment* a) {
+  while (a) {
+    rd__attachment* next = a->next;
+    if (a->destroy) a->destroy(a->data);
+    free(a);
+    a = next;
+  }
+}
+
 static void slot_free(rd_ctx* ctx, uint32_t i) {
-  rd_slot*      s  = &ctx->slots[i];
-  void*         ud = s->userdata;
-  rd_destroy_fn fn = s->destroy;
+  rd_slot*        s   = &ctx->slots[i];
+  void*           ud  = s->userdata;
+  rd_destroy_fn   fn  = s->destroy;
+  rd__attachment* att = s->attached;
   if (s->flags & RD_FLAG_HAS_HOOK) rd__hooks_drop_node(ctx, i);
   rd__style_slot_free(ctx, i);
   rd__layout_slot_free(ctx, i);
@@ -55,9 +66,11 @@ static void slot_free(rd_ctx* ctx, uint32_t i) {
   s->flags        = 0;
   s->userdata     = NULL;
   s->destroy      = NULL;
+  s->attached     = NULL;
   s->next_sibling = ctx->free_head;
   ctx->free_head  = i;
   ctx->live--;
+  attachments_free(att);
   if (fn) fn(ud);
 }
 
@@ -94,14 +107,19 @@ static void link_node(rd_ctx* ctx, uint32_t parent, uint32_t i, uint32_t ref) {
   p->child_count++;
 }
 
-static void destroy_rec(rd_ctx* ctx, uint32_t i) {
-  uint32_t c = ctx->slots[i].first_child;
-  while (c) {
-    uint32_t next = ctx->slots[c].next_sibling;
-    destroy_rec(ctx, c);
-    c = next;
+// Frees top's subtree, children before parents, without recursion: a deep tree mustn't exhaust the stack
+// (WebAssembly's is small). Each node freed is unlinked from its parent, so the walk needs no memory.
+static void destroy_rec(rd_ctx* ctx, uint32_t top) {
+  uint32_t i = top;
+  for (;;) {
+    while (ctx->slots[i].first_child) i = ctx->slots[i].first_child;
+    uint32_t parent = ctx->slots[i].parent, next = ctx->slots[i].next_sibling;
+    bool     last   = i == top;
+    if (!last) ctx->slots[parent].first_child = next;
+    slot_free(ctx, i);
+    if (last) return;
+    i = next ? next : parent;
   }
-  slot_free(ctx, i);
 }
 
 rd_ctx* rd_ctx_create(void) {
@@ -134,6 +152,7 @@ void rd_ctx_destroy(rd_ctx* ctx) {
     rd__style_slot_free(ctx, i);
     rd__layout_slot_free(ctx, i);
     rd__events_slot_free(ctx, i);
+    attachments_free(s->attached);
     if (s->destroy) s->destroy(s->userdata);
   }
   rd__style_ctx_free(ctx);
@@ -148,6 +167,7 @@ void rd_ctx_destroy(rd_ctx* ctx) {
   rd__timers_free(ctx);
   rd__render_ctx_free(ctx);
   rd__events_ctx_free(ctx);
+  rd__scratch_free(ctx);
   free(ctx->events);
   free(ctx->layouts);
   free(ctx->styles);
@@ -237,6 +257,40 @@ bool rd_node_set_userdata(rd_ctx* ctx, rd_node node, void* data, rd_destroy_fn d
 void* rd_node_userdata(const rd_ctx* ctx, rd_node node) {
   rd_slot* s = rd__slot(ctx, node);
   return s ? s->userdata : NULL;
+}
+
+bool rd_node_attach(rd_ctx* ctx, rd_node node, const void* key, void* data, rd_destroy_fn destroy) {
+  rd_slot* s = rd__slot(ctx, node);
+  if (!s || !key) return false;
+  rd__attachment** link = &s->attached;
+  while (*link && (*link)->key != key) link = &(*link)->next;
+  rd__attachment* a = *link;
+  if (!data) {  // removal
+    if (!a) return true;
+    *link   = a->next;
+    a->next = NULL;
+    attachments_free(a);
+    return true;
+  }
+  if (a) {
+    rd__attachment old = *a;
+    a->data            = data;
+    a->destroy         = destroy;
+    if (old.destroy && old.data != data) old.destroy(old.data);
+    return true;
+  }
+  a = malloc(sizeof *a);
+  if (!a) return false;
+  *a = (rd__attachment){key, data, destroy, s->attached};
+  s->attached = a;
+  return true;
+}
+
+void* rd_node_attached(const rd_ctx* ctx, rd_node node, const void* key) {
+  rd_slot* s = rd__slot(ctx, node);
+  for (rd__attachment* a = s ? s->attached : NULL; a; a = a->next)
+    if (a->key == key) return a->data;
+  return NULL;
 }
 
 bool rd_ctx_set_extension(rd_ctx* ctx, const void* key, void* data, rd_destroy_fn destroy) {

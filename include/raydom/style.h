@@ -10,7 +10,7 @@ extern "C" {
 // Every style type reserves zero for "unset", so a zero-initialized rd_style sets nothing
 // and designated initializers set only what they name.
 
-typedef enum rd_unit : uint8_t {
+RD_ENUM typedef enum rd_unit : uint8_t {
   RD_UNIT_UNSET,
   RD_UNIT_AUTO,
   RD_UNIT_PX,
@@ -55,7 +55,7 @@ typedef struct rd_tracks {
   bool     set;
 } rd_tracks;
 
-typedef enum rd_grid_line_kind : uint8_t {
+RD_ENUM typedef enum rd_grid_line_kind : uint8_t {
   RD_GRID_LINE_UNSET,
   RD_GRID_LINE_AUTO,
   RD_GRID_LINE_INDEX,
@@ -68,33 +68,33 @@ typedef struct rd_grid_line {
   rd_grid_line_kind kind;
 } rd_grid_line;
 
-typedef enum rd_grid_flow : uint8_t {
+RD_ENUM typedef enum rd_grid_flow : uint8_t {
   RD_GRID_FLOW_UNSET,
   RD_GRID_FLOW_ROW,
   RD_GRID_FLOW_COLUMN,
 } rd_grid_flow;
 
-typedef enum rd_display : uint8_t {
+RD_ENUM typedef enum rd_display : uint8_t {
   RD_DISPLAY_UNSET,
   RD_DISPLAY_FLEX,
   RD_DISPLAY_GRID,
   RD_DISPLAY_NONE,
 } rd_display;
 
-typedef enum rd_position : uint8_t {
+RD_ENUM typedef enum rd_position : uint8_t {
   RD_POSITION_UNSET,
   RD_POSITION_RELATIVE,
   RD_POSITION_ABSOLUTE,
 } rd_position;
 
-typedef enum rd_overflow : uint8_t {
+RD_ENUM typedef enum rd_overflow : uint8_t {
   RD_OVERFLOW_UNSET,
   RD_OVERFLOW_VISIBLE,
   RD_OVERFLOW_HIDDEN,
   RD_OVERFLOW_SCROLL,
 } rd_overflow;
 
-typedef enum rd_flex_direction : uint8_t {
+RD_ENUM typedef enum rd_flex_direction : uint8_t {
   RD_FLEX_DIRECTION_UNSET,
   RD_FLEX_ROW,
   RD_FLEX_COLUMN,
@@ -102,7 +102,7 @@ typedef enum rd_flex_direction : uint8_t {
   RD_FLEX_COLUMN_REVERSE,
 } rd_flex_direction;
 
-typedef enum rd_flex_wrap : uint8_t {
+RD_ENUM typedef enum rd_flex_wrap : uint8_t {
   RD_FLEX_WRAP_UNSET,
   RD_FLEX_NOWRAP,
   RD_FLEX_WRAP,
@@ -112,7 +112,7 @@ typedef enum rd_flex_wrap : uint8_t {
 // Shared by the justify_* and align_* properties.
 // Values a property doesn't accept are treated as its default during layout.
 // NORMAL is start for flex justify_content, stretch everywhere else.
-typedef enum rd_align : uint8_t {
+RD_ENUM typedef enum rd_align : uint8_t {
   RD_ALIGN_UNSET,
   RD_ALIGN_AUTO,
   RD_ALIGN_NORMAL,
@@ -132,7 +132,7 @@ typedef struct rd_font {
   bool     set;
 } rd_font;
 
-typedef enum rd_white_space : uint8_t {
+RD_ENUM typedef enum rd_white_space : uint8_t {
   RD_WHITE_SPACE_UNSET,
   RD_WHITE_SPACE_NORMAL,    // Collapse spaces and newlines, wrap.
   RD_WHITE_SPACE_NOWRAP,    // Collapse, don't wrap.
@@ -140,13 +140,13 @@ typedef enum rd_white_space : uint8_t {
   RD_WHITE_SPACE_PRE_WRAP,  // Preserve, wrap.
 } rd_white_space;
 
-typedef enum rd_pointer_events : uint8_t {
+RD_ENUM typedef enum rd_pointer_events : uint8_t {
   RD_POINTER_EVENTS_UNSET,
   RD_POINTER_EVENTS_AUTO,
   RD_POINTER_EVENTS_NONE,  // Not hit-tested; children inherit it unless they set auto.
 } rd_pointer_events;
 
-typedef enum rd_focusable : uint8_t {
+RD_ENUM typedef enum rd_focusable : uint8_t {
   RD_FOCUSABLE_UNSET,
   RD_FOCUSABLE_NONE,
   RD_FOCUSABLE_TAB,      // Focusable by pointer, code and Tab.
@@ -155,7 +155,7 @@ typedef enum rd_focusable : uint8_t {
 
 // Mouse cursor over the node. AUTO picks text over selectable text and inputs, pointer over links,
 // and default elsewhere. To show a different cursor while dragging, set it in a class's active variant.
-typedef enum rd_cursor : uint8_t {
+RD_ENUM typedef enum rd_cursor : uint8_t {
   RD_CURSOR_UNSET,
   RD_CURSOR_AUTO,
   RD_CURSOR_DEFAULT,
@@ -172,7 +172,7 @@ typedef enum rd_cursor : uint8_t {
 } rd_cursor;
 
 // How an image fills its content box. The image is centered, and cropped where it overflows.
-typedef enum rd_object_fit : uint8_t {
+RD_ENUM typedef enum rd_object_fit : uint8_t {
   RD_OBJECT_FIT_UNSET,
   RD_OBJECT_FIT_FILL,        // Stretched to the box.
   RD_OBJECT_FIT_CONTAIN,     // Scaled to fit inside, keeping the aspect ratio.
@@ -182,7 +182,7 @@ typedef enum rd_object_fit : uint8_t {
 } rd_object_fit;
 
 // Timing curves for transitions and animations; the CSS cubic-bezier curves of the same names.
-typedef enum rd_easing : uint8_t {
+RD_ENUM typedef enum rd_easing : uint8_t {
   RD_EASING_UNSET,
   RD_EASING_LINEAR,
   RD_EASING_EASE,
@@ -192,7 +192,7 @@ typedef enum rd_easing : uint8_t {
 } rd_easing;
 
 // Which properties transition_duration animates, as a mask. Unset means all.
-typedef enum rd_transition : uint8_t {
+RD_ENUM typedef enum rd_transition : uint8_t {
   RD_TRANSITION_UNSET   = 0,
   RD_TRANSITION_COLOR   = 1u << 0,  // background, border, text, caret, selection and scrollbar colors
   RD_TRANSITION_OPACITY = 1u << 1,
@@ -205,19 +205,19 @@ typedef enum rd_transition : uint8_t {
   RD_TRANSITION_ALL     = 0xff,
 } rd_transition;
 
-typedef enum rd_user_select : uint8_t {
+RD_ENUM typedef enum rd_user_select : uint8_t {
   RD_USER_SELECT_UNSET,
   RD_USER_SELECT_AUTO,  // Text can be selected by dragging.
   RD_USER_SELECT_NONE,
 } rd_user_select;
 
-typedef enum rd_text_overflow : uint8_t {
+RD_ENUM typedef enum rd_text_overflow : uint8_t {
   RD_TEXT_OVERFLOW_UNSET,
   RD_TEXT_OVERFLOW_CLIP,
   RD_TEXT_OVERFLOW_ELLIPSIS,  // Cut lines that don't fit, and the last line shown under line_clamp, with "…".
 } rd_text_overflow;
 
-typedef enum rd_text_align : uint8_t {
+RD_ENUM typedef enum rd_text_align : uint8_t {
   RD_TEXT_ALIGN_UNSET,
   RD_TEXT_ALIGN_START,
   RD_TEXT_ALIGN_CENTER,
@@ -297,7 +297,7 @@ typedef struct rd_style {
 } rd_style;
 
 // Bit order is precedence: later states' class variants win.
-typedef enum rd_state : uint8_t {
+RD_ENUM typedef enum rd_state : uint8_t {
   RD_STATE_HOVER         = 1u << 0,
   RD_STATE_CHECKED       = 1u << 1,  // Set by the application or a control: a ticked checkbox, an on switch.
   RD_STATE_FOCUS_WITHIN  = 1u << 2,  // The node or a descendant has focus.
@@ -405,7 +405,7 @@ rd_tracks rd_tracks_create(rd_ctx* ctx, const rd_track* tracks, uint32_t count);
 // once), each track counted at its max size if that's definite, else its min size; a track with
 // neither repeats once. AUTO_FIT then removes the repetitions no item occupies, and their gaps, so the
 // remaining tracks share the space. The repeated tracks are the whole list.
-typedef enum rd_repeat : uint8_t {
+RD_ENUM typedef enum rd_repeat : uint8_t {
   RD_REPEAT_NONE,
   RD_REPEAT_AUTO_FILL,
   RD_REPEAT_AUTO_FIT,
@@ -422,6 +422,14 @@ rd_class rd_class_create(rd_ctx* ctx, const rd_style* base);
 bool     rd_class_set(rd_ctx* ctx, rd_class cls, const rd_style* base);
 // Applied while the node has `state`. Null style removes the variant.
 bool rd_class_set_state(rd_ctx* ctx, rd_class cls, rd_state state, const rd_style* style);
+// Copy the properties set in style over the class's base, or its variant for a state (creating it), as
+// rd_node_merge_style does for a node: to recolor a class without restating its layout.
+bool rd_class_merge(rd_ctx* ctx, rd_class cls, const rd_style* style);
+bool rd_class_merge_state(rd_ctx* ctx, rd_class cls, rd_state state, const rd_style* style);
+// Copy the class's base, or its variant for a state, into out. False for an unknown class, or a state
+// with no variant (out is then all unset).
+bool rd_class_get(const rd_ctx* ctx, rd_class cls, rd_style* out);
+bool rd_class_get_state(const rd_ctx* ctx, rd_class cls, rd_state state, rd_style* out);
 
 // Inline style wins over classes. Null clears it.
 bool rd_node_set_style(rd_ctx* ctx, rd_node node, const rd_style* style);

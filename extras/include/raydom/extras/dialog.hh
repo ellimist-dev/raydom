@@ -9,17 +9,17 @@
 namespace rdx {
 
 struct DialogOptions {
-  std::string                  title;
-  std::vector<rdx_file_filter> filters;  // {"Images", "png,jpg"}
-  std::string                  default_path;
-  std::string                  default_name;
+  std::string                  title{};
+  std::vector<rdx_file_filter> filters{};  // {"Images", "png,jpg"}
+  std::string                  default_path{};
+  std::string                  default_name{};
 };
 
 // status is OK, CANCEL or ERROR; on ERROR, error says why.
 struct DialogResult {
   rdx_dialog_result        status = RDX_DIALOG_CANCEL;
-  std::vector<std::string> paths;
-  std::string              error;
+  std::vector<std::string> paths{};
+  std::string              error{};
 
   explicit operator bool() const { return status == RDX_DIALOG_OK; }
   const std::string& path() const {

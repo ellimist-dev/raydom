@@ -35,8 +35,8 @@ const char* rd_node_text(const rd_ctx* ctx, rd_node node, size_t* len);
 
 // A byte range drawn with a background, and optionally its own text color (alpha 0 keeps the node's).
 typedef struct rd_highlight {
-  size_t   start, end;
-  rd_color background, color;
+  size_t   start RD_DEFAULT({}), end RD_DEFAULT({});
+  rd_color background RD_DEFAULT({}), color RD_DEFAULT({});
 } rd_highlight;
 
 // Replaces the text node's highlights; null or 0 clears them. Ranges are copied, kept across

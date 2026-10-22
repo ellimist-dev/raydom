@@ -247,7 +247,9 @@ static void build(const rd_ctx* ctx, uint32_t i, const rd_style* parent, rd_styl
   }
 }
 
-static void compute_rec(rd_ctx* ctx, uint32_t i, const rd_style* parent, bool force) {
+// One node: recomputed if dirty or forced. True if its children need visiting; RD_FLAG_FORCE_CHILDREN
+// then says whether they must be recomputed whatever their flags, because inherited values changed.
+static bool compute_node(rd_ctx* ctx, uint32_t i, const rd_style* parent, bool force) {
   rd_slot*       s              = &ctx->slots[i];
   rd_node_style* ns             = &ctx->styles[i];
   bool           force_children = false;
@@ -265,23 +267,47 @@ static void compute_rec(rd_ctx* ctx, uint32_t i, const rd_style* parent, bool fo
   }
   bool descend = force_children || (s->flags & RD_FLAG_SUBTREE_STYLE_DIRTY);
   s->flags &= ~(RD_FLAG_STYLE_DIRTY | RD_FLAG_SUBTREE_STYLE_DIRTY);
-  if (!descend) return;
-  for (uint32_t c = s->first_child; c; c = ctx->slots[c].next_sibling)
-    compute_rec(ctx, c, &ns->computed, force_children);
+  if (force_children) s->flags |= RD_FLAG_FORCE_CHILDREN;
+  return descend;
+}
+
+// Pre-order over top's subtree without recursion (deep trees, small WebAssembly stacks): down to a first
+// child, else across to a sibling, else up, clearing each parent's force flag on the way out.
+static void compute_tree(rd_ctx* ctx, uint32_t top, const rd_style* top_parent) {
+  uint32_t i = top;
+  bool     descend = compute_node(ctx, i, top_parent, false);
+  for (;;) {
+    uint32_t child = descend ? ctx->slots[i].first_child : 0;
+    if (child) {
+      i       = child;
+      descend = compute_node(ctx, i, &ctx->styles[ctx->slots[i].parent].computed,
+                             ctx->slots[ctx->slots[i].parent].flags & RD_FLAG_FORCE_CHILDREN);
+      continue;
+    }
+    while (i != top && !ctx->slots[i].next_sibling) {
+      ctx->slots[i].flags &= ~RD_FLAG_FORCE_CHILDREN;
+      i = ctx->slots[i].parent;
+    }
+    ctx->slots[i].flags &= ~RD_FLAG_FORCE_CHILDREN;
+    if (i == top) return;
+    i               = ctx->slots[i].next_sibling;
+    uint32_t parent = ctx->slots[i].parent;
+    descend = compute_node(ctx, i, &ctx->styles[parent].computed, ctx->slots[parent].flags & RD_FLAG_FORCE_CHILDREN);
+  }
 }
 
 void rd__style_check_defaults(void) { assert(style_complete(&default_style)); }
 
 void rd_ctx_compute_styles(rd_ctx* ctx) {
   if (!ctx) return;
-  compute_rec(ctx, ctx->root, NULL, false);
+  compute_tree(ctx, ctx->root, NULL);
 }
 
 const rd_style* rd_node_computed_style(rd_ctx* ctx, rd_node node) {
   if (!rd__slot(ctx, node)) return NULL;
   uint32_t top = node.index;
   while (ctx->slots[top].parent) top = ctx->slots[top].parent;
-  compute_rec(ctx, top, NULL, false);
+  compute_tree(ctx, top, NULL);
   return &ctx->styles[node.index].computed;
 }
 
@@ -442,6 +468,38 @@ bool rd_class_set_state(rd_ctx* ctx, rd_class cls, rd_state state, const rd_styl
   }
   invalidate_class(ctx, cls.id);
   return true;
+}
+
+bool rd_class_merge(rd_ctx* ctx, rd_class cls, const rd_style* style) {
+  rd_class_data* cd = class_get(ctx, cls);
+  if (!cd || !style) return false;
+  rd_style_merge(&cd->base, style);
+  invalidate_class(ctx, cls.id);
+  return true;
+}
+
+bool rd_class_merge_state(rd_ctx* ctx, rd_class cls, rd_state state, const rd_style* style) {
+  rd_class_data* cd = class_get(ctx, cls);
+  int            k  = state_index(state);
+  if (!cd || k < 0 || !style) return false;
+  rd_style_merge(&cd->states[k], style);
+  cd->state_mask |= state;
+  invalidate_class(ctx, cls.id);
+  return true;
+}
+
+bool rd_class_get(const rd_ctx* ctx, rd_class cls, rd_style* out) {
+  const rd_class_data* cd = class_get(ctx, cls);
+  if (out) *out = cd ? cd->base : (rd_style){0};
+  return cd != NULL;
+}
+
+bool rd_class_get_state(const rd_ctx* ctx, rd_class cls, rd_state state, rd_style* out) {
+  const rd_class_data* cd = class_get(ctx, cls);
+  int                  k  = state_index(state);
+  bool                 ok = cd && k >= 0 && (cd->state_mask & state);
+  if (out) *out = ok ? cd->states[k] : (rd_style){0};
+  return ok;
 }
 
 bool rd_node_set_style(rd_ctx* ctx, rd_node node, const rd_style* style) {

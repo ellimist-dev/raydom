@@ -307,11 +307,11 @@ static rd_size layout_flex(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, bool
   for (uint32_t c = s->first_child; c; c = ctx->slots[c].next_sibling)
     if (in_flow(&ctx->styles[c].computed)) n++;
 
-  flex_item* items = n ? calloc(n, sizeof *items) : NULL;
-  flex_line* lines = n ? calloc(n, sizeof *lines) : NULL;
+  rd__scratch_mark mark  = rd__scratch_save(ctx);
+  flex_item*       items = rd__scratch_alloc(ctx, n * sizeof *items);
+  flex_line*       lines = rd__scratch_alloc(ctx, n * sizeof *lines);
   if (n && (!items || !lines)) {
-    free(items);
-    free(lines);
+    rd__scratch_restore(ctx, mark);
     return (rd_size){finalize_axis(pb[0], mode[0], avail[0], mn[0], mx[0]),
                      finalize_axis(pb[1], mode[1], avail[1], mn[1], mx[1])};
   }
@@ -541,8 +541,7 @@ static rd_size layout_flex(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, bool
     rd__clamp_scroll(L);
   }
 
-  free(items);
-  free(lines);
+  rd__scratch_restore(ctx, mark);
   return (rd_size){size[0], size[1]};
 }
 

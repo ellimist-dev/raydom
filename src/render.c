@@ -10,11 +10,14 @@
 
 enum { ATLAS_SIZE = 2048 };
 
+// One shader draws everything raydom draws, so consecutive draws batch. A vertex's normal holds what
+// varies per quad: (0, 0, 0) for a plain textured quad (text, sharp rectangles, raylib's own shapes), or
+// (width, height, radius) for a rounded box drawn as a signed distance field, with radius -1 when the
+// corners differ and come from the radii uniform. The fill is the vertex color. Uniforms hold what
+// rarely changes between boxes (borders, stroke, blur, image placement), so most boxes share them.
 static const char* FS_BODY =
-    "uniform vec2 size;\n"
     "uniform vec4 radii;\n"
     "uniform vec4 borders;\n"
-    "uniform vec4 fill;\n"
     "uniform vec4 stroke;\n"
     "uniform float blur;\n"
     "uniform float scale;\n"
@@ -33,8 +36,12 @@ static const char* FS_BODY =
     "  return box(d, h, min(pick(d, r), min(h.x, h.y)));\n"
     "}\n"
     "void main() {\n"
+    "  if (fragBox.x <= 0.0) { OUT_COLOR = TEX(texture0, fragTexCoord) * fragColor; return; }\n"
+    "  vec2 size = fragBox.xy;\n"
+    "  vec4 rad = fragBox.z >= 0.0 ? vec4(fragBox.z) : radii;\n"
+    "  vec4 fill = fragColor;\n"
     "  vec2 p = fragTexCoord;\n"
-    "  float outer = sdf(p, vec2(0.0), size, radii);\n"
+    "  float outer = sdf(p, vec2(0.0), size, rad);\n"
     // Images: sampled inside imgrect, masked by the rounded box.
     "  if (textured > 0.5) {\n"
     "    vec2 q = (p - imgrect.xy) / imgrect.zw;\n"
@@ -49,8 +56,8 @@ static const char* FS_BODY =
     "  }\n"
     "  vec2 lo = vec2(borders.w, borders.x);\n"
     "  vec2 hi = size - vec2(borders.y, borders.z);\n"
-    "  vec4 ir = max(radii - vec4(max(borders.w, borders.x), max(borders.x, borders.y), max(borders.y, borders.z),\n"
-    "                             max(borders.z, borders.w)), 0.0);\n"
+    "  vec4 ir = max(rad - vec4(max(borders.w, borders.x), max(borders.x, borders.y), max(borders.y, borders.z),\n"
+    "                           max(borders.z, borders.w)), 0.0);\n"
     "  float cov = clamp(0.5 - outer * scale, 0.0, 1.0);\n"
     "  float inside = clamp(0.5 - sdf(p, lo, hi, ir) * scale, 0.0, 1.0);\n"
     "  vec4 c = mix(vec4(stroke.rgb * stroke.a, stroke.a), vec4(fill.rgb * fill.a, fill.a), inside) * cov;\n"
@@ -61,6 +68,7 @@ static const char* FS_330 =
     "#version 330\n"
     "in vec2 fragTexCoord;\n"
     "in vec4 fragColor;\n"
+    "in vec3 fragBox;\n"
     "out vec4 finalColor;\n"
     "#define OUT_COLOR finalColor\n"
     "#define TEX texture\n";
@@ -69,6 +77,7 @@ static const char* FS_120 =
     "#version 120\n"
     "varying vec2 fragTexCoord;\n"
     "varying vec4 fragColor;\n"
+    "varying vec3 fragBox;\n"
     "#define OUT_COLOR gl_FragColor\n"
     "#define TEX texture2D\n";
 
@@ -77,22 +86,65 @@ static const char* FS_100 =
     "precision mediump float;\n"
     "varying vec2 fragTexCoord;\n"
     "varying vec4 fragColor;\n"
+    "varying vec3 fragBox;\n"
     "#define OUT_COLOR gl_FragColor\n"
     "#define TEX texture2D\n";
 
-enum { U_SIZE,
-       U_RADII,
+// raylib's default vertex shader, passing the normal through as well.
+static const char* VS_BODY =
+    "uniform mat4 mvp;\n"
+    "void main() {\n"
+    "  fragTexCoord = vertexTexCoord;\n"
+    "  fragColor = vertexColor;\n"
+    "  fragBox = vertexNormal;\n"
+    "  gl_Position = mvp * vec4(vertexPosition, 1.0);\n"
+    "}\n";
+
+static const char* VS_330 =
+    "#version 330\n"
+    "in vec3 vertexPosition;\n"
+    "in vec2 vertexTexCoord;\n"
+    "in vec3 vertexNormal;\n"
+    "in vec4 vertexColor;\n"
+    "out vec2 fragTexCoord;\n"
+    "out vec4 fragColor;\n"
+    "out vec3 fragBox;\n";
+
+static const char* VS_120 =
+    "#version 120\n"
+    "attribute vec3 vertexPosition;\n"
+    "attribute vec2 vertexTexCoord;\n"
+    "attribute vec3 vertexNormal;\n"
+    "attribute vec4 vertexColor;\n"
+    "varying vec2 fragTexCoord;\n"
+    "varying vec4 fragColor;\n"
+    "varying vec3 fragBox;\n";
+
+static const char* VS_100 =
+    "#version 100\n"
+    "attribute vec3 vertexPosition;\n"
+    "attribute vec2 vertexTexCoord;\n"
+    "attribute vec3 vertexNormal;\n"
+    "attribute vec4 vertexColor;\n"
+    "varying vec2 fragTexCoord;\n"
+    "varying vec4 fragColor;\n"
+    "varying vec3 fragBox;\n";
+
+enum { U_RADII,
        U_BORDERS,
-       U_FILL,
        U_STROKE,
        U_BLUR,
-       U_SCALE,
        U_TEXTURED,
        U_IMGRECT,
        U_UVRECT,
+       U_SCALE,
        U_COUNT };
-static const char* UNIFORMS[U_COUNT] = {"size", "radii", "borders", "fill", "stroke",
-                                        "blur", "scale", "textured", "imgrect", "uvrect"};
+static const char* UNIFORMS[U_COUNT] = {"radii", "borders", "stroke", "blur", "textured", "imgrect", "uvrect", "scale"};
+
+// The uniforms a box needs, in the order of UNIFORMS (scale aside, which is set once per draw).
+typedef struct box_uniforms {
+  float radii[4], borders[4], stroke[4], blur, textured, imgrect[4], uvrect[4];
+} box_uniforms;
 
 typedef struct glyph_slot {
   uint64_t key;  // 0 when empty
@@ -106,25 +158,29 @@ typedef struct gpu {
   int         shelf_x, shelf_y, shelf_h;
   glyph_slot* glyphs;
   uint32_t    glyph_cap, glyph_count;
-  uint8_t*    scratch;
-  size_t      scratch_cap;
-  bool        in_shader;
+  uint8_t*     scratch;
+  size_t       scratch_cap;
+  bool         in_shader;
+  box_uniforms uniforms;  // as last uploaded; a box with the same ones joins the batch
+  bool         uniforms_set;
 } gpu;
 
 static gpu* gpu_get(rd_ctx* ctx) {
   if (ctx->gpu) return ctx->gpu;
   gpu* g = calloc(1, sizeof *g);
   if (!g) return NULL;
-  int         v      = rlGetVersion();
-  const char* prefix = v == RL_OPENGL_ES_20 ? FS_100 : v == RL_OPENGL_21 ? FS_120
-                                                                         : FS_330;
-  size_t      plen = strlen(prefix), blen = strlen(FS_BODY);
-  char*       src = malloc(plen + blen + 1);
-  if (src) {
-    snprintf(src, plen + blen + 1, "%s%s", prefix, FS_BODY);
-    g->shader = LoadShaderFromMemory(NULL, src);
-    free(src);
+  int         v  = rlGetVersion();
+  const char* fp = v == RL_OPENGL_ES_20 ? FS_100 : v == RL_OPENGL_21 ? FS_120 : FS_330;
+  const char* vp = v == RL_OPENGL_ES_20 ? VS_100 : v == RL_OPENGL_21 ? VS_120 : VS_330;
+  size_t      fl = strlen(fp) + strlen(FS_BODY) + 1, vl = strlen(vp) + strlen(VS_BODY) + 1;
+  char *      fs = malloc(fl), *vs = malloc(vl);
+  if (fs && vs) {
+    snprintf(fs, fl, "%s%s", fp, FS_BODY);
+    snprintf(vs, vl, "%s%s", vp, VS_BODY);
+    g->shader = LoadShaderFromMemory(vs, fs);
   }
+  free(fs);
+  free(vs);
   for (int j = 0; j < U_COUNT; j++) g->loc[j] = GetShaderLocation(g->shader, UNIFORMS[j]);
   Image img = GenImageColor(ATLAS_SIZE, ATLAS_SIZE, BLANK);
   g->atlas  = LoadTextureFromImage(img);
@@ -262,12 +318,14 @@ static void shader_mode(gpu* g, bool on) {
   g->in_shader = on;
 }
 
+// box is the vertex normal: (0, 0, 0) for a plain textured quad, or a rounded box (see FS_BODY).
 static void textured_quad(unsigned int tex, float u0, float v0, float u1, float v1, float x0, float y0, float x1,
-                          float y1, Color c) {
+                          float y1, Color c, Vector3 box) {
   rlCheckRenderBatchLimit(4);
   rlSetTexture(tex);
   rlBegin(RL_QUADS);
   rlColor4ub(c.r, c.g, c.b, c.a);
+  rlNormal3f(box.x, box.y, box.z);
   rlTexCoord2f(u0, v0);
   rlVertex2f(x0, y0);
   rlTexCoord2f(u0, v1);
@@ -277,36 +335,49 @@ static void textured_quad(unsigned int tex, float u0, float v0, float u1, float 
   rlTexCoord2f(u1, v0);
   rlVertex2f(x1, y0);
   rlEnd();
+  rlNormal3f(0, 0, 0);  // raylib's own shapes that follow are plain quads
   rlSetTexture(0);
 }
 
-static void set_vec4(gpu* g, int u, float a, float b, float c, float d) {
-  float v[4] = {a, b, c, d};
-  SetShaderValue(g->shader, g->loc[u], v, SHADER_UNIFORM_VEC4);
+static const Vector3 PLAIN = {0, 0, 0};
+
+static void set_color4(float out[4], rd_color c) {
+  out[0] = (float)c.r / 255.0f, out[1] = (float)c.g / 255.0f, out[2] = (float)c.b / 255.0f, out[3] = (float)c.a / 255.0f;
 }
 
-static void set_color(gpu* g, int u, rd_color c) {
-  set_vec4(g, u, (float)c.r / 255.0f, (float)c.g / 255.0f, (float)c.b / 255.0f, (float)c.a / 255.0f);
+// Uploads a box's uniforms, flushing the batch first, only if they differ from the last ones.
+static void box_uniforms_use(gpu* g, const box_uniforms* u) {
+  if (g->uniforms_set && !memcmp(&g->uniforms, u, sizeof *u)) return;
+  rlDrawRenderBatchActive();
+  SetShaderValue(g->shader, g->loc[U_RADII], u->radii, SHADER_UNIFORM_VEC4);
+  SetShaderValue(g->shader, g->loc[U_BORDERS], u->borders, SHADER_UNIFORM_VEC4);
+  SetShaderValue(g->shader, g->loc[U_STROKE], u->stroke, SHADER_UNIFORM_VEC4);
+  SetShaderValue(g->shader, g->loc[U_BLUR], &u->blur, SHADER_UNIFORM_FLOAT);
+  SetShaderValue(g->shader, g->loc[U_TEXTURED], &u->textured, SHADER_UNIFORM_FLOAT);
+  SetShaderValue(g->shader, g->loc[U_IMGRECT], u->imgrect, SHADER_UNIFORM_VEC4);
+  SetShaderValue(g->shader, g->loc[U_UVRECT], u->uvrect, SHADER_UNIFORM_VEC4);
+  g->uniforms     = *u;
+  g->uniforms_set = true;
+}
+
+// The radius for the vertex when every corner has it, or -1 to read the radii uniform.
+static float even_radius(const float radii[4], box_uniforms* u) {
+  if (radii[0] == radii[1] && radii[1] == radii[2] && radii[2] == radii[3]) return radii[0];
+  memcpy(u->radii, radii, sizeof u->radii);
+  return -1;
 }
 
 // Local coordinates run from -pad to size + pad over the quad, so the shader sees the box at
 // [0, size] with room for antialiasing or blur outside it.
 static void sdf_quad(gpu* g, Rectangle r, float pad, const float radii[4], const float border[4], rd_color fill,
-                     rd_color stroke, float blur, float dpi) {
-  shader_mode(g, true);
-  rlDrawRenderBatchActive();
-  float size[2] = {r.width, r.height};
-  SetShaderValue(g->shader, g->loc[U_SIZE], size, SHADER_UNIFORM_VEC2);
-  set_vec4(g, U_RADII, radii[0], radii[1], radii[2], radii[3]);
-  set_vec4(g, U_BORDERS, border[0], border[1], border[2], border[3]);
-  set_color(g, U_FILL, fill);
-  set_color(g, U_STROKE, stroke);
-  SetShaderValue(g->shader, g->loc[U_BLUR], &blur, SHADER_UNIFORM_FLOAT);
-  SetShaderValue(g->shader, g->loc[U_SCALE], &dpi, SHADER_UNIFORM_FLOAT);
-  float off = 0;
-  SetShaderValue(g->shader, g->loc[U_TEXTURED], &off, SHADER_UNIFORM_FLOAT);
+                     rd_color stroke, float blur) {
+  box_uniforms u = {.blur = blur};
+  float        k = even_radius(radii, &u);
+  memcpy(u.borders, border, sizeof u.borders);
+  if (border[0] > 0 || border[1] > 0 || border[2] > 0 || border[3] > 0) set_color4(u.stroke, stroke);
+  box_uniforms_use(g, &u);
   textured_quad(rlGetTextureIdDefault(), -pad, -pad, r.width + pad, r.height + pad, r.x - pad, r.y - pad,
-                r.x + r.width + pad, r.y + r.height + pad, WHITE);
+                r.x + r.width + pad, r.y + r.height + pad, to_color(fill), (Vector3){r.width, r.height, k});
 }
 
 static void draw_rect(gpu* g, const rd__cmd* c, float dpi) {
@@ -315,10 +386,9 @@ static void draw_rect(gpu* g, const rd__cmd* c, float dpi) {
   if (rounded) {
     float border[4];
     for (int j = 0; j < 4; j++) border[j] = c->border[j] > 0 ? fmaxf(snap(c->border[j], dpi), 1 / dpi) : 0;
-    sdf_quad(g, r, 1, c->radii, border, c->fill, c->stroke, 0, dpi);
+    sdf_quad(g, r, 1, c->radii, border, c->fill, c->stroke, 0);
     return;
   }
-  shader_mode(g, false);
   if (c->fill.a) DrawRectangleRec(r, to_color(c->fill));
   if (!c->stroke.a) return;
   Color s = to_color(c->stroke);
@@ -342,7 +412,7 @@ static void draw_run(gpu* g, rd__font* f, float size, const char* s, size_t len,
     if (sl && sl->w) {
       float gx = (roundf(x * dpi) + (float)sl->ox) / dpi, gy = (base * dpi + (float)sl->oy) / dpi;
       textured_quad(g->atlas.id, (float)sl->x * inv, (float)sl->y * inv, (float)(sl->x + sl->w) * inv,
-                    (float)(sl->y + sl->h) * inv, gx, gy, gx + (float)sl->w / dpi, gy + (float)sl->h / dpi, col);
+                    (float)(sl->y + sl->h) * inv, gx, gy, gx + (float)sl->w / dpi, gy + (float)sl->h / dpi, col, PLAIN);
     }
     x += (float)adv * units;
     prev = glyph;
@@ -353,7 +423,6 @@ static void draw_placeholder(gpu* g, rd_ctx* ctx, const rd__cmd* c, float dpi) {
   rd__text_layout tl;
   rd__input_view  v;
   if (!rd__text_layout_get(ctx, c->node, c->rect.width, &tl) || !rd__input_view_get(ctx, c->node, &v)) return;
-  shader_mode(g, false);
   draw_run(g, tl.font, tl.size, v.placeholder, v.placeholder_len, c->rect.x + c->dx,
            snap(c->rect.y + tl.baseline, dpi), to_color(c->fill), dpi);
 }
@@ -365,7 +434,7 @@ static void draw_glyph(gpu* g, const rd__text_layout* tl, int32_t glyph, float p
   float inv = 1 / (float)ATLAS_SIZE;
   float gx = (roundf(x * dpi) + (float)s->ox) / dpi, gy = (base * dpi + (float)s->oy) / dpi;
   textured_quad(g->atlas.id, (float)s->x * inv, (float)s->y * inv, (float)(s->x + s->w) * inv, (float)(s->y + s->h) * inv,
-                gx, gy, gx + (float)s->w / dpi, gy + (float)s->h / dpi, col);
+                gx, gy, gx + (float)s->w / dpi, gy + (float)s->h / dpi, col, PLAIN);
 }
 
 // The highlight color of a glyph, if a highlight with a text color covers it.
@@ -381,7 +450,6 @@ static Color glyph_color(const rd_text* t, uint32_t byte, Color base, float op) 
 static void draw_text(gpu* g, rd_ctx* ctx, const rd__cmd* c, float dpi) {
   rd__text_layout tl;
   if (!rd__text_layout_get(ctx, c->node, c->rect.width, &tl)) return;
-  shader_mode(g, false);
   const rd_style* st    = &ctx->styles[c->node].computed;
   const rd_text*  t     = rd__text_get(ctx, c->node);
   float           px    = roundf(tl.size * dpi * 4) / 4;
@@ -447,10 +515,9 @@ static bool image_texture(rd__image* im, Texture2D* out) {
       im->tex_h   = t.height;
     }
     Texture2D t = {im->tex, im->tex_w, im->tex_h, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
-    if (t.id) {
-      GenTextureMipmaps(&t);
-      SetTextureFilter(t, t.mipmaps > 1 ? TEXTURE_FILTER_TRILINEAR : TEXTURE_FILTER_BILINEAR);
-    }
+    if (!t.id) return false;  // keeps the pixels to try again on the next draw
+    GenTextureMipmaps(&t);
+    SetTextureFilter(t, t.mipmaps > 1 ? TEXTURE_FILTER_TRILINEAR : TEXTURE_FILTER_BILINEAR);
     free(im->pixels);
     im->pixels = NULL;
     im->dirty  = false;
@@ -475,28 +542,22 @@ static void draw_image(gpu* g, rd_ctx* ctx, const rd__cmd* c, float dpi) {
                  c->src.height * im->raster_scale};
   bool rounded = c->radii[0] > 0 || c->radii[1] > 0 || c->radii[2] > 0 || c->radii[3] > 0;
   if (!rounded) {
-    shader_mode(g, false);
     DrawTexturePro(t, (Rectangle){src.x, src.y, src.width, src.height},
                    (Rectangle){c->dest.x, c->dest.y, c->dest.width, c->dest.height}, (Vector2){0, 0}, 0,
                    to_color(c->fill));
     return;
   }
   // The quad covers the content box; the shader samples inside dest and masks to the rounded corners.
-  Rectangle box = {c->rect.x, c->rect.y, c->rect.width, c->rect.height};
-  shader_mode(g, true);
-  rlDrawRenderBatchActive();
-  float size[2] = {box.width, box.height}, on = 1;
-  SetShaderValue(g->shader, g->loc[U_SIZE], size, SHADER_UNIFORM_VEC2);
-  set_vec4(g, U_RADII, c->radii[0], c->radii[1], c->radii[2], c->radii[3]);
-  set_color(g, U_FILL, c->fill);
-  SetShaderValue(g->shader, g->loc[U_SCALE], &dpi, SHADER_UNIFORM_FLOAT);
-  SetShaderValue(g->shader, g->loc[U_TEXTURED], &on, SHADER_UNIFORM_FLOAT);
-  set_vec4(g, U_IMGRECT, c->dest.x - box.x, c->dest.y - box.y, c->dest.width, c->dest.height);
-  set_vec4(g, U_UVRECT, src.x / (float)t.width, src.y / (float)t.height, (src.x + src.width) / (float)t.width,
-           (src.y + src.height) / (float)t.height);
+  Rectangle    box = {c->rect.x, c->rect.y, c->rect.width, c->rect.height};
+  box_uniforms u   = {.textured = 1,
+                      .imgrect  = {c->dest.x - box.x, c->dest.y - box.y, c->dest.width, c->dest.height},
+                      .uvrect   = {src.x / (float)t.width, src.y / (float)t.height, (src.x + src.width) / (float)t.width,
+                                   (src.y + src.height) / (float)t.height}};
+  float        k   = even_radius(c->radii, &u);
+  box_uniforms_use(g, &u);
   textured_quad(t.id, -1, -1, box.width + 1, box.height + 1, box.x - 1, box.y - 1, box.x + box.width + 1,
-                box.y + box.height + 1, WHITE);
-  rlDrawRenderBatchActive();
+                box.y + box.height + 1, to_color(c->fill), (Vector3){box.width, box.height, k});
+  (void)dpi;
 }
 
 float rd_pixel_ratio(const rd_ctx* ctx) { return ctx && ctx->pixel_ratio > 0 ? ctx->pixel_ratio : 1; }
@@ -543,7 +604,7 @@ void rd_draw(rd_ctx* ctx) {
   if (dpi <= 0) dpi = 1;
 #endif
   float  ratio = rd_pixel_ratio(ctx);
-  Matrix base  = rlGetMatrixModelview();
+  Matrix base  = rlGetMatrixModelview(), outer = draw_matrix;  // outer: a paint callback may draw another context
   dpi *= ratio;
   if (ratio != 1) {
     rlDrawRenderBatchActive();
@@ -551,6 +612,11 @@ void rd_draw(rd_ctx* ctx) {
     rlScalef(ratio, ratio, 1);
   }
   draw_matrix = rlGetMatrixModelview();
+  // Everything below draws with raydom's shader, so it batches; scale is constant for the draw.
+  shader_mode(g, true);
+  rlNormal3f(0, 0, 0);
+  g->uniforms_set = false;
+  SetShaderValue(g->shader, g->loc[U_SCALE], &dpi, SHADER_UNIFORM_FLOAT);
 
   uint32_t       n;
   const rd__cmd* cmds    = rd__display_list(ctx, &n);
@@ -561,7 +627,7 @@ void rd_draw(rd_ctx* ctx) {
     switch (c->kind) {
       case RD_CMD_SHADOW:
         sdf_quad(g, snap_rect(c->rect, dpi), c->blur + 1, c->radii, (float[4]){0}, c->fill, c->fill,
-                 fmaxf(c->blur, 0.5f / dpi), dpi);
+                 fmaxf(c->blur, 0.5f / dpi));
         break;
       case RD_CMD_RECT:
         draw_rect(g, c, dpi);
@@ -576,7 +642,6 @@ void rd_draw(rd_ctx* ctx) {
         draw_image(g, ctx, c, dpi);
         break;
       case RD_CMD_FILL: {
-        shader_mode(g, false);
         Rectangle r = snap_rect(c->rect, dpi);
         if (r.width < 1 / dpi) r.width = 1 / dpi;
         DrawRectangleRec(r, to_color(c->fill));
@@ -590,7 +655,7 @@ void rd_draw(rd_ctx* ctx) {
       case RD_CMD_PAINT: {
         rd_node_layout* L = &ctx->layouts[c->node];
         if (!L->paint_fn) break;
-        shader_mode(g, false);
+        shader_mode(g, false);  // the callback draws with raylib's own shader
         rlDrawRenderBatchActive();
         if (clipped) EndScissorMode();
         rd_paint_info info = {rd__handle(ctx, c->node), c->rect, c->clip, dpi, ratio};
@@ -598,6 +663,8 @@ void rd_draw(rd_ctx* ctx) {
         rlDrawRenderBatchActive();
         EndScissorMode();
         rlSetMatrixModelview(draw_matrix);  // in case the callback reset it
+        rlNormal3f(0, 0, 0);
+        shader_mode(g, true);
         if (clipped) scissor(clip, ratio);
         break;
       }
@@ -611,6 +678,7 @@ void rd_draw(rd_ctx* ctx) {
     rlDrawRenderBatchActive();
     rlSetMatrixModelview(base);
   }
+  draw_matrix      = outer;
   ctx->paint_dirty = false;
 }
 

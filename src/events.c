@@ -131,10 +131,16 @@ static void invoke(rd_ctx* ctx, rd_event* ev, rd_node node, rd_event_phase phase
 }
 
 static void dispatch(rd_ctx* ctx, rd_event* ev, bool bubbles) {
-  rd__chain path = {0};
-  for (uint32_t i = ev->target.index; i; i = ctx->slots[i].parent)
-    if (!rd__chain_push(&path, rd__handle(ctx, i))) break;
-  if (!path.len) return;
+  // The target and its ancestors, captured now: listeners may move or destroy nodes.
+  uint32_t depth = 0;
+  for (uint32_t i = ev->target.index; i; i = ctx->slots[i].parent) depth++;
+  rd__scratch_mark mark = rd__scratch_save(ctx);
+  rd__chain        path = {.nodes = rd__scratch_alloc(ctx, depth * sizeof(rd_node))};
+  for (uint32_t i = ev->target.index; i && path.nodes; i = ctx->slots[i].parent) path.nodes[path.len++] = rd__handle(ctx, i);
+  if (!path.len) {
+    rd__scratch_restore(ctx, mark);
+    return;
+  }
 
   ctx->dispatch_depth++;
   for (uint32_t k = path.len; k-- > 1 && !ev->stopped;) invoke(ctx, ev, path.nodes[k], RD_PHASE_CAPTURE, true);
@@ -144,7 +150,7 @@ static void dispatch(rd_ctx* ctx, rd_event* ev, bool bubbles) {
     invoke(ctx, ev, path.nodes[k], RD_PHASE_BUBBLE, false);
   ctx->dispatch_depth--;
 
-  free(path.nodes);
+  rd__scratch_restore(ctx, mark);
   if (!ctx->dispatch_depth) flush_deferred(ctx);
 }
 
@@ -556,7 +562,7 @@ void rd_ctx_pointer(rd_ctx* ctx, float x, float y, uint8_t buttons, float wheel_
     if ((ctx->pointer_buttons & RD_BUTTON_PRIMARY) && rd__slot(ctx, cap) && rd_node_is_input(ctx, cap))
       rd__input_pointer(ctx, cap.index, x, y, true);
     else if ((ctx->pointer_buttons & RD_BUTTON_PRIMARY) && ctx->selecting)
-      rd__selection_drag(ctx, hit.index, x, y);
+      rd__selection_drag(ctx, rd__slot(ctx, hit) ? hit.index : 0, x, y);  // 0 if a listener destroyed it
   }
 
   for (uint8_t b = 1; b && b <= RD_BUTTON_MIDDLE; b = (uint8_t)(b << 1)) {
@@ -575,7 +581,7 @@ void rd_ctx_pointer(rd_ctx* ctx, float x, float y, uint8_t buttons, float wheel_
         pointer_focus(ctx, t, x, y);
         // Text selection starts unless a listener or an input took the pointer.
         if (rd_node_is_null(ctx->capture))
-          rd__selection_begin(ctx, hit.index, x, y);
+          rd__selection_begin(ctx, rd__slot(ctx, hit) ? hit.index : 0, x, y);  // 0 if a listener destroyed it
         else
           rd_ctx_clear_selection(ctx);
       }

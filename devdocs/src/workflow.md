@@ -7,7 +7,7 @@ Everything runs through the `Justfile`.
 | `just build`     | Configures with `RAYDOM_SANITIZE=ON` and builds library, tests, examples |
 | `just test`      | `build`, then `ctest --output-on-failure`                              |
 | `just showcase`  | Runs the showcase                                                      |
-| `just lint`      | clang-tidy over `src/` and `tests/` with the repo's `.clang-tidy`      |
+| `just lint`      | clang-tidy over `src/`, `extras/src/` and `tests/` with the repo's `.clang-tidy` |
 | `just consumer`  | Builds `tests/consumer` against raydom via FetchContent and via an installed package |
 | `just docs`      | Serves the user book with live reload                                  |
 | `just docs-build`| Builds the user book as published, with `llms.txt`                     |
@@ -23,7 +23,8 @@ examples (`anonymous_pro_bold.ttf`), which is why they need a downloaded raylib 
 
 `just build` compiles the library, tests and examples with AddressSanitizer and UBSan. Most memory bugs in this
 codebase have surfaced as a sanitizer report in an ordinary test run, so leave them on while developing. Release
-builds and installs don't use them; the flags are private to raydom's targets.
+builds and installs don't use them: the sanitizer link flag reaches only this tree's programs, never an installed
+package.
 
 ## Before sending a change
 
@@ -34,7 +35,13 @@ builds and installs don't use them; the flags are private to raydom's targets.
    property reference regenerates from the source, but its description lives in `docs/tools/preprocess.py`.
 5. Look at the showcase for anything visual. Screenshots help in review; see below.
 
-There is no CI for tests yet; the workflow in `.github/` only publishes documentation. Run the suite locally.
+CI (`.github/workflows/ci.yml`) runs the tests with sanitizers on Linux (GCC) and macOS (Apple Clang), `just consumer`,
+`just check-version` and both book builds, on pull requests and before every docs publish (`docs.yml` calls it).
+To reproduce the Linux job locally, run the same steps in an `ubuntu:24.04` container.
+
+`-DRAYDOM_TEST_GRAPHICS=ON` adds `test_render_gl`, which opens a window, draws, and checks pixels read back from
+the screen: the only test of `rd_update` and `rd_draw`. It's off by default because it needs a display; CI turns it
+on, under `xvfb-run` on Linux.
 
 ## Screenshots
 

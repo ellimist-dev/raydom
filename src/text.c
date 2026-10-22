@@ -199,7 +199,7 @@ static rd_size text_measure(void* data, float w, rd_measure_mode wm, float h, rd
   float          limit = wm == RD_MEASURE_UNDEFINED ? INFINITY : wm == RD_MEASURE_MIN_CONTENT ? 0
                                                                                               : w;
   break_result   r     = break_lines(t, limit, wraps(ws), collapses(ws), NULL);
-  uint32_t       clamp = st->line_clamp.value > 0 ? (uint32_t)st->line_clamp.value : 0;
+  uint32_t       clamp = rd__line_clamp(st);
   if (clamp && !t->input && r.lines > clamp) r.lines = clamp;
   if (t->input) {
     if (r.lines == 0) r.lines = 1;
@@ -355,15 +355,21 @@ size_t rd__text_byte_at(rd_ctx* ctx, uint32_t i, float x, float y, float dx) {
   float   lx    = x - b.x - L->border[EDGE_L] - L->padding[EDGE_L] + dx;
   float   ly    = y - b.y - L->border[EDGE_T] - L->padding[EDGE_T];
   int     shown = (int)rd__text_visible_lines(st, &tl);
-  int     line  = (int)floorf(ly / tl.line_height);
+  int     line  = tl.line_height > 0 ? (int)fminf(floorf(ly / tl.line_height), (float)INT32_MAX) : 0;  // a 0px line height stacks every line at the top
   if (line < 0) return 0;
   if (line >= shown) return shown < (int)tl.line_count ? t->offsets[tl.lines[shown - 1].cp_end] : t->len;
   float off = rd__text_align_offset(st, width, tl.lines[line].width);
   return t->offsets[rd__text_cp_at(&tl, (uint32_t)line, lx - off)];
 }
 
+// line_clamp as a count; values beyond uint32_t mean no limit to speak of.
+uint32_t rd__line_clamp(const rd_style* st) {
+  float v = st->line_clamp.value;
+  return v > 0 ? (v < (float)UINT32_MAX ? (uint32_t)v : UINT32_MAX) : 0;
+}
+
 uint32_t rd__text_visible_lines(const rd_style* st, const rd__text_layout* tl) {
-  uint32_t clamp = st->line_clamp.value > 0 ? (uint32_t)st->line_clamp.value : 0;
+  uint32_t clamp = rd__line_clamp(st);
   return clamp && clamp < tl->line_count ? clamp : tl->line_count;
 }
 

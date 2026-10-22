@@ -397,7 +397,45 @@ static void test_click_count(void) {
   rd_ctx_destroy(ctx);
 }
 
+static void prevent_it(rd_ctx* ctx, rd_event* ev, void* data) {
+  (void)ctx;
+  (void)data;
+  rd_event_prevent_default(ev);
+}
+
+// rd_node_dispatch runs capture, target and bubble like any event; its result says whether a listener
+// prevented the default. Releasing capture hands pointer events back to hit testing.
+static void test_dispatch_and_release(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_node a   = rd_node_create(ctx), b = rd_node_create(ctx);
+  rd_node_set_style(ctx, a, &(rd_style){.width = rd_px(100), .height = rd_px(100)});
+  rd_node_set_style(ctx, b, &(rd_style){.width = rd_px(50), .height = rd_px(50)});
+  rd_node_append(ctx, rd_ctx_root(ctx), a);
+  rd_node_append(ctx, a, b);
+  rd_ctx_layout(ctx, 800, 600);
+  reset();
+  listen(ctx, a, RD_EVENT_CHANGE, 1, RD_LISTEN_CAPTURE);
+  listen(ctx, b, RD_EVENT_CHANGE, 2, 0);
+  listen(ctx, a, RD_EVENT_CHANGE, 3, 0);
+  CHECK(rd_node_dispatch(ctx, b, RD_EVENT_CHANGE));
+  CHECK(log_len == 3 && log_[0].tag == 1 && log_[0].phase == RD_PHASE_CAPTURE && log_[1].tag == 2 &&
+        log_[2].tag == 3 && log_[2].phase == RD_PHASE_BUBBLE && rd_node_eq(log_[2].target, b));
+  rd_node_on(ctx, a, RD_EVENT_CHANGE, prevent_it, NULL, NULL, 0);
+  CHECK(!rd_node_dispatch(ctx, b, RD_EVENT_CHANGE));
+
+  reset();
+  listen(ctx, a, RD_EVENT_POINTER_MOVE, 4, 0);
+  rd_node_set_pointer_capture(ctx, b);
+  rd_ctx_pointer(ctx, 80, 80, 0, 0, 0);  // over a only, but b has the pointer
+  CHECK(log_len == 1 && rd_node_eq(log_[0].target, b));
+  rd_node_release_pointer_capture(ctx, b);
+  rd_ctx_pointer(ctx, 81, 81, 0, 0, 0);
+  CHECK(log_len == 2 && rd_node_eq(log_[1].target, a) && rd_node_is_null(rd_ctx_pointer_capture(ctx)));
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
+  test_dispatch_and_release();
   test_propagation_order();
   test_click_count();
   test_stop();

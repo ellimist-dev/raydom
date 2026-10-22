@@ -20,69 +20,27 @@ typedef struct control {
   rd_timer repeat;     // NUMBER: a held stepper's
 } control;
 
-// Controls by node slot index, so lookups are O(1) and the nodes' userdata stays the application's.
-typedef struct registry {
-  control** items;
-  uint32_t  cap;
-} registry;
-
+// A control's state is attached to its node (rd_node_attach), so it lives exactly as long as the node.
 static const char key = 0;
 
-static void registry_free(void* data) {
-  registry* r = data;
-  free((void*)r->items);
-  free(r);
-}
-
-static registry* registry_get(rd_ctx* ctx) {
-  registry* r = rd_ctx_extension(ctx, &key);
-  if (r || !ctx) return r;
-  r = calloc(1, sizeof *r);
-  if (r && !rd_ctx_set_extension(ctx, &key, r, registry_free)) {
-    free(r);
-    r = NULL;
-  }
-  return r;
-}
-
 static control* find(const rd_ctx* ctx, rd_node n, kind k) {
-  const registry* r = rd_ctx_extension(ctx, &key);
-  if (!r || !rd_node_alive(ctx, n) || n.index >= r->cap) return NULL;
-  control* c = r->items[n.index];
-  return c && rd_node_eq(c->node, n) && (k == ANY || c->kind == k) ? c : NULL;
+  control* c = rd_node_attached(ctx, n, &key);
+  return c && (k == ANY || c->kind == k) ? c : NULL;
 }
 
-// A control lives as long as its node: it's the data of the control's main listener, which frees it.
-static void control_free(void* data) { free(data); }
-
-// Registers the control for n, with fn as the listener that owns it. Destroys n on failure.
+// Attaches a control to n, with fn listening for type. Destroys n on failure.
 static control* attach(rd_ctx* ctx, rd_node n, kind k, rd_event_type type, rd_event_fn fn) {
-  registry* r = rd_node_is_null(n) ? NULL : registry_get(ctx);
-  control*  c = r ? calloc(1, sizeof *c) : NULL;
-  if (!c) {
-    rd_node_destroy(ctx, n);
-    return NULL;
-  }
-  if (n.index >= r->cap) {
-    uint32_t  cap = r->cap ? r->cap : 64;
-    while (cap <= n.index) cap *= 2;
-    control** p = (control**)realloc((void*)r->items, cap * sizeof *p);
-    if (!p) {
-      free(c);
-      rd_node_destroy(ctx, n);
-      return NULL;
-    }
-    memset((void*)(p + r->cap), 0, (cap - r->cap) * sizeof *p);
-    r->items = p;
-    r->cap   = cap;
-  }
-  *c = (control){.node = n, .kind = k};
-  if (!rd_node_on(ctx, n, type, fn, c, control_free, 0).id) {
+  control* c = rd_node_is_null(n) ? NULL : calloc(1, sizeof *c);
+  if (c) *c = (control){.node = n, .kind = k};
+  if (!c || !rd_node_attach(ctx, n, &key, c, free)) {
     free(c);
     rd_node_destroy(ctx, n);
     return NULL;
   }
-  r->items[n.index] = c;
+  if (!rd_node_on(ctx, n, type, fn, c, NULL, 0).id) {
+    rd_node_destroy(ctx, n);  // frees c
+    return NULL;
+  }
   return c;
 }
 
@@ -283,10 +241,11 @@ bool rdx_radio_select(rd_ctx* ctx, rd_node group, int index) {
 // Values are min + n * step, as for an HTML range input: when the range isn't a whole number of steps,
 // the largest value is the last step below max, not max.
 static float snap(const control* c, float v) {
-  v = fminf(c->max, fmaxf(c->min, v));
-  if (c->step <= 0) return v;
-  float last = c->min + floorf((c->max - c->min) / c->step + 1e-4f) * c->step;
-  return fminf(last, c->min + roundf((v - c->min) / c->step) * c->step);
+  v          = fminf(c->max, fmaxf(c->min, v));
+  float step = fminf(c->step, c->max - c->min);  // a step wider than the range still reaches max
+  if (step <= 0) return v;
+  float last = c->min + floorf((c->max - c->min) / step + 1e-4f) * step;
+  return fminf(last, c->min + roundf((v - c->min) / step) * step);
 }
 
 static void show_value(rd_ctx* ctx, control* c) {
@@ -468,7 +427,23 @@ static void number_text(rd_ctx* ctx, rd_event* ev, void* data) {
   if (!ok || disabled(ctx, c)) rd_event_prevent_default(ev);
 }
 
-static float number_step(const control* c) { return c->step > 0 ? c->step : (float)pow(10, -c->decimals); }
+// At least one unit of the last place shown, or a step would round back to where it started.
+static double number_step(const control* c) { return fmax(c->step, pow(10, -c->decimals)); }
+
+// n steps from the value along the grid of min + k * step (0 + k * step when unbounded), as an HTML
+// number input does: from a value between grid points, the first step lands on the next point.
+static double number_steps(const control* c, double n) {
+  double step = number_step(c), base = bounded(c) ? c->min : 0;
+  double k = ((double)c->value - base) / step;
+  k        = n > 0 ? floor(k + 1e-4) + n : ceil(k - 1e-4) + n;  // values are floats: tolerate their error
+  return base + k * step;
+}
+
+static void number_stop(rd_ctx* ctx, control* c) {
+  rd_ctx_clear_timer(ctx, c->repeat);
+  c->repeat = (rd_timer){0};
+  if (c->value != c->drag_start) rd_node_dispatch(ctx, c->node, RD_EVENT_CHANGE);
+}
 
 static void number_keys(rd_ctx* ctx, rd_event* ev, void* data) {
   control* c = data;
@@ -476,19 +451,24 @@ static void number_keys(rd_ctx* ctx, rd_event* ev, void* data) {
     if (ev->key != RD_KEY_TAB) rd_event_prevent_default(ev);
     return;
   }
-  double step = number_step(c), by;
+  double to;
   switch (ev->key) {
     case RD_KEY_UP:
-      by = ev->mods & RD_MOD_SHIFT ? 10 * step : step;
+      to = number_steps(c, ev->mods & RD_MOD_SHIFT ? 10 : 1);
       break;
     case RD_KEY_DOWN:
-      by = ev->mods & RD_MOD_SHIFT ? -10 * step : -step;
+      to = number_steps(c, ev->mods & RD_MOD_SHIFT ? -10 : -1);
       break;
     case RD_KEY_PAGE_UP:
-      by = 10 * step;
+      to = number_steps(c, 10);
       break;
     case RD_KEY_PAGE_DOWN:
-      by = -10 * step;
+      to = number_steps(c, -10);
+      break;
+    case RD_KEY_HOME:
+    case RD_KEY_END:
+      if (!bounded(c)) return;  // otherwise the field's own caret movement
+      to = ev->key == RD_KEY_HOME ? c->min : c->max;
       break;
     case RD_KEY_ESCAPE:
       rd_event_prevent_default(ev);
@@ -498,7 +478,7 @@ static void number_keys(rd_ctx* ctx, rd_event* ev, void* data) {
       return;
   }
   rd_event_prevent_default(ev);
-  number_to(ctx, c, (double)c->value + by, true);
+  number_to(ctx, c, to, true);
 }
 
 // A held stepper: one step on press, then repeats after a pause until release. The timer finds the
@@ -516,7 +496,11 @@ static void number_repeat(rd_ctx* ctx, void* data) {
     rd_ctx_clear_timer(ctx, s->self);
     return;
   }
-  number_to(ctx, c, (double)c->value + s->dir * (double)number_step(c), false);
+  if (disabled(ctx, c)) {  // disabled while held: the release won't arrive
+    number_stop(ctx, c);
+    return;
+  }
+  number_to(ctx, c, number_steps(c, s->dir), false);
 }
 
 static void number_start_repeat(rd_ctx* ctx, void* data) {
@@ -538,17 +522,15 @@ static void number_stepper(rd_ctx* ctx, rd_event* ev, void* data) {
     if (ev->button != RD_BUTTON_PRIMARY || disabled(ctx, c)) return;
     rd_node_set_pointer_capture(ctx, button);
     c->drag_start = c->value;
-    number_to(ctx, c, (double)c->value + s->dir * (double)number_step(c), false);
+    number_to(ctx, c, number_steps(c, s->dir), false);
     stepping* first = malloc(sizeof *first);
     if (!first) return;
     *first    = *s;
     c->repeat = rd_ctx_set_timer(ctx, 0.4, 0, number_start_repeat, first, free);
     return;
   }
-  if (!rd_node_eq(rd_ctx_pointer_capture(ctx), button)) return;  // POINTER_UP
-  rd_ctx_clear_timer(ctx, c->repeat);
-  c->repeat = (rd_timer){0};
-  if (c->value != c->drag_start) rd_node_dispatch(ctx, c->node, RD_EVENT_CHANGE);
+  if (ev->button != RD_BUTTON_PRIMARY || !rd_node_eq(rd_ctx_pointer_capture(ctx), button)) return;  // POINTER_UP
+  number_stop(ctx, c);
 }
 
 static void add_stepper(rd_ctx* ctx, control* c, rd_node column, int dir, rd_image icon, const rdx_classes* cl) {
@@ -556,7 +538,7 @@ static void add_stepper(rd_ctx* ctx, control* c, rd_node column, int dir, rd_ima
   rd_node_add_class(ctx, b, cl->number_step);
   rd_node_append(ctx, column, b);
   rd_node img = rd_node_create(ctx);
-  rd_node_set_style(ctx, img, &(rd_style){.height = rd_px(12), .pointer_events = RD_POINTER_EVENTS_NONE});
+  rd_node_add_class(ctx, img, cl->number_step_icon);
   rd_node_set_image(ctx, img, icon);
   rd_node_append(ctx, b, img);
   stepping* s = malloc(sizeof *s);

@@ -8,7 +8,8 @@
 | `raydom_extras`   | `raydom::extras`  | `extras/src/*.c`, the file dialog backend; links `raydom`     |
 
 Both are static libraries. `raydom` publicly requires `c_std_23` and `cxx_std_20`, links raylib publicly, and on
-macOS the frameworks raylib needs. Warnings (`-Wall -Wextra`) and sanitizers are private.
+macOS the frameworks raylib needs. Warnings (`-Wall -Wextra`) are private; the sanitizer link flag is
+`BUILD_INTERFACE` only, for the tests and examples, and never part of the installed package.
 
 ## raylib
 

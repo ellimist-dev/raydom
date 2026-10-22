@@ -27,7 +27,6 @@
   components a UI has; controls already use an O(1) index.
 - **Glyph atlas resets when full.** A UI showing many sizes of many glyphs at once could thrash it. Multiple atlas
   pages would fix it.
-- **No CI for tests.** Only docs publishing runs in GitHub Actions.
 - **`rd_ctx` padding.** clang-tidy's opt-in padding check flags 33 bytes; reorder fields when convenient.
 - **nanosvg gradients** with unitless fractional coordinates render as a flat color (upstream bug; use
   percentages).

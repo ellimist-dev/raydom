@@ -15,7 +15,7 @@ extern "C" {
 // use. Give overlay children position: absolute so they don't stack in its flex layout.
 rd_node rd_ctx_overlay(rd_ctx* ctx);
 
-typedef enum rd_side : uint8_t {
+RD_ENUM typedef enum rd_side : uint8_t {
   RD_SIDE_BOTTOM,
   RD_SIDE_TOP,
   RD_SIDE_RIGHT,
@@ -25,14 +25,14 @@ typedef enum rd_side : uint8_t {
 // Places a node next to another node, or at a point, after every layout. Zero is the common case:
 // below the anchor, start-aligned, flipped and shifted to stay inside the root.
 typedef struct rd_anchor {
-  rd_node  node;      // the anchor; null to anchor to (x, y) instead
-  float    x, y;      // root coordinates, used when node is null: a context menu at the pointer
-  rd_side  side;      // which side of the anchor the node goes on
-  rd_align align;     // START, CENTER or END along that side; UNSET is START
-  float    offset;    // gap between the anchor and the node, in pixels
-  bool     no_flip;   // keep side even when the node only fits on the opposite one
-  bool     no_shift;  // don't slide the node along the side to keep it inside the root
-  bool     match_width;  // lay the node out at the anchor's width, for dropdowns
+  rd_node  node RD_DEFAULT({});      // the anchor; null to anchor to (x, y) instead
+  float    x RD_DEFAULT({}), y RD_DEFAULT({});      // root coordinates, used when node is null: a context menu at the pointer
+  rd_side  side RD_DEFAULT({});      // which side of the anchor the node goes on
+  rd_align align RD_DEFAULT({});     // START, CENTER or END along that side; UNSET is START
+  float    offset RD_DEFAULT({});    // gap between the anchor and the node, in pixels
+  bool     no_flip RD_DEFAULT({});   // keep side even when the node only fits on the opposite one
+  bool     no_shift RD_DEFAULT({});  // don't slide the node along the side to keep it inside the root
+  bool     match_width RD_DEFAULT({});  // lay the node out at the anchor's width, for dropdowns
 } rd_anchor;
 
 // Null anchor clears it. Anchored nodes are positioned in tree order, so a submenu anchored to an

@@ -530,12 +530,13 @@ void rdx_graph_set_background(rdx_graph* g, rd_color c) {
   if (g) g->background = c;
 }
 
-void rdx_graph_on(rdx_graph* g, rdx_graph_fn fn, void* data, rd_destroy_fn destroy) {
-  if (!g) return;
+bool rdx_graph_on(rdx_graph* g, rdx_graph_fn fn, void* data, rd_destroy_fn destroy) {
+  if (!g) return false;
   if (g->fn_destroy && g->fn_data != data) g->fn_destroy(g->fn_data);
   g->fn         = fn;
   g->fn_data    = data;
   g->fn_destroy = destroy;
+  return true;
 }
 
 rdx_node rdx_graph_add_node(rdx_graph* g, const rdx_node_desc* d) {

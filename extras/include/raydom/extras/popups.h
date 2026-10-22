@@ -18,9 +18,9 @@ bool rdx_popup_close(rd_ctx* ctx, rd_node node);
 // Menus.
 
 typedef struct rdx_menu_item {
-  const char* label;     // null for a separator
-  const char* shortcut;  // optional hint at the right, such as "Ctrl+C"; it doesn't bind the key
-  bool        disabled;
+  const char* label RD_DEFAULT({});     // null for a separator
+  const char* shortcut RD_DEFAULT({});  // optional hint at the right, such as "Ctrl+C"; it doesn't bind the key
+  bool        disabled RD_DEFAULT({});
 } rdx_menu_item;
 
 // Called with the index into items of the chosen item, after the menu has closed. Not called when
@@ -28,12 +28,12 @@ typedef struct rdx_menu_item {
 typedef void (*rdx_menu_fn)(rd_ctx* ctx, int index, void* data);
 
 typedef struct rdx_menu_desc {
-  const rdx_menu_item* items;  // copied
-  size_t               count;
-  rd_anchor            anchor;  // a node, for a menu button; or a point, for a context menu
-  rdx_menu_fn          fn;
-  void*                data;
-  rd_destroy_fn        destroy;  // optional: destroy(data) when the menu is destroyed
+  const rdx_menu_item* items RD_DEFAULT({});  // copied
+  size_t               count RD_DEFAULT({});
+  rd_anchor            anchor RD_DEFAULT({});  // a node, for a menu button; or a point, for a context menu
+  rdx_menu_fn          fn RD_DEFAULT({});
+  void*                data RD_DEFAULT({});
+  rd_destroy_fn        destroy RD_DEFAULT({});  // optional: destroy(data) when the menu is destroyed; not on failure
 } rdx_menu_desc;
 
 // Opens a menu and focuses it. Up and Down move through the enabled items, Home and End jump, Enter
@@ -41,7 +41,7 @@ typedef struct rdx_menu_desc {
 rd_node rdx_menu_open(rd_ctx* ctx, const rdx_menu_desc* desc);
 
 // Opens the menu at the pointer when target is pressed with the secondary button. The items are
-// copied; destroy(data) runs when target is destroyed.
+// copied; destroy(data) runs when target is destroyed. False, keeping nothing, on failure.
 bool rdx_context_menu_attach(rd_ctx* ctx, rd_node target, const rdx_menu_item* items, size_t count, rdx_menu_fn fn,
                              void* data, rd_destroy_fn destroy);
 
@@ -55,12 +55,12 @@ bool    rdx_select_set(rd_ctx* ctx, rd_node select, int index);  // fires nothin
 // Modal dialog: a card over a dimmed backdrop, centered. Tab stays inside it. Escape, the × button and
 // a press on the backdrop close it, unless persistent.
 typedef struct rdx_modal_desc {
-  const char* title;  // optional
-  float       width;  // 0 means 440px
-  bool        persistent;  // no × button; only rdx_popup_close closes it
-  void (*on_close)(rd_ctx* ctx, void* data);  // optional, before the modal is destroyed
-  void*         data;
-  rd_destroy_fn destroy;  // optional: destroy(data) when the modal is destroyed
+  const char* title RD_DEFAULT({});  // optional
+  float       width RD_DEFAULT({});  // 0 means 440px
+  bool        persistent RD_DEFAULT({});  // no × button; only rdx_popup_close closes it
+  void (*on_close)(rd_ctx* ctx, void* data) RD_DEFAULT({});  // optional, before the modal is destroyed
+  void*         data RD_DEFAULT({});
+  rd_destroy_fn destroy RD_DEFAULT({});  // optional: destroy(data) when the modal is destroyed; not on failure
 } rdx_modal_desc;
 
 // Returns the modal's body, a column to fill with content and buttons. Focus moves to the first

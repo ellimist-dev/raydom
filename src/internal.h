@@ -10,6 +10,7 @@ enum : uint32_t {
   RD_FLAG_SUBTREE_STYLE_DIRTY = 0x4u,
   RD_FLAG_LAYOUT_DIRTY        = 0x8u,
   RD_FLAG_HAS_HOOK            = 0x10u,  // has a node-scoped layout hook to drop when freed
+  RD_FLAG_FORCE_CHILDREN      = 0x20u,  // during style computation: the children must be recomputed
 };
 
 enum { RD_STATE_COUNT        = 7,
@@ -24,7 +25,15 @@ typedef struct rd_slot {
   void*         userdata;
   rd_destroy_fn destroy;
   rd_role       role;
+  struct rd__attachment* attached;  // rd_node_attach entries
 } rd_slot;
+
+typedef struct rd__attachment {
+  const void*            key;
+  void*                  data;
+  rd_destroy_fn          destroy;
+  struct rd__attachment* next;
+} rd__attachment;
 
 typedef struct rd_node_style {
   rd_style  computed;
@@ -134,7 +143,14 @@ typedef struct rd__chain {
 
 struct rd__cmd;
 
+typedef struct rd__chunk rd__chunk;
+typedef struct rd__scratch_mark {
+  rd__chunk* chunk;
+  size_t     used;
+} rd__scratch_mark;
+
 struct rd_ctx {
+  rd__chunk *scratch_first, *scratch_cur;  // scratch.c
   // Parallel arrays indexed by slot index, all sized cap.
   rd_slot*        slots;
   rd_node_style*  styles;
@@ -262,6 +278,11 @@ void     rd__scroll_into_view(rd_ctx* ctx, uint32_t i);
 void     rd__events_slot_free(rd_ctx* ctx, uint32_t i);
 void     rd__events_ctx_free(rd_ctx* ctx);
 bool     rd__chain_push(rd__chain* c, rd_node n);
+// Zeroed scratch memory, valid until the mark taken before it is restored. Restore in reverse order.
+rd__scratch_mark rd__scratch_save(const rd_ctx* ctx);
+void             rd__scratch_restore(rd_ctx* ctx, rd__scratch_mark m);
+void*            rd__scratch_alloc(rd_ctx* ctx, size_t n);
+void             rd__scratch_free(rd_ctx* ctx);
 bool     rd__role_interactive(const rd_ctx* ctx, uint32_t i);
 rd__image* rd__image_get(const rd_ctx* ctx, uint32_t id);
 uint32_t   rd__node_image(const rd_ctx* ctx, uint32_t i);  // 0 unless the node is an image leaf

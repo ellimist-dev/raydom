@@ -191,6 +191,27 @@ public:
     rd_class_set_state(ctx_, handle_, state, &style.get());
     return *this;
   }
+  // Like set and on, but only the properties set in style change: to recolor without restating layout.
+  const Class& merge(const Style& style) const {
+    rd_class_merge(ctx_, handle_, &style.get());
+    return *this;
+  }
+  const Class& merge_on(rd_state state, const Style& style) const {
+    rd_class_merge_state(ctx_, handle_, state, &style.get());
+    return *this;
+  }
+  // The base, or the variant for a state; all unset when there is none.
+  Style base() const {
+    rd_style s;
+    rd_class_get(ctx_, handle_, &s);
+    return s;
+  }
+  Style state(rd_state state) const {
+    rd_style s;
+    rd_class_get_state(ctx_, handle_, state, &s);
+    return s;
+  }
+  bool operator==(const Class& o) const { return ctx_ == o.ctx_ && handle_.id == o.handle_.id; }
 
 private:
   rd_ctx*  ctx_    = nullptr;
@@ -252,40 +273,40 @@ public:
   Node          prev_sibling() const { return wrap(rd_node_prev_sibling(ctx_, handle_)); }
   std::uint32_t child_count() const { return rd_node_child_count(ctx_, handle_); }
 
-  const Node& append(Node child) const {
+  Node append(Node child) const {
     [[maybe_unused]] bool ok = rd_node_append(ctx_, handle_, child.handle_);
     assert(ok);
     return *this;
   }
 
-  const Node& insert_before(Node child, Node ref) const {
+  Node insert_before(Node child, Node ref) const {
     [[maybe_unused]] bool ok = rd_node_insert_before(ctx_, handle_, child.handle_, ref.handle_);
     assert(ok);
     return *this;
   }
 
-  const Node& style(const Style& s) const {
+  Node style(const Style& s) const {
     rd_node_set_style(ctx_, handle_, &s.get());
     return *this;
   }
-  const Node& merge_style(const Style& s) const {
+  Node merge_style(const Style& s) const {
     rd_node_merge_style(ctx_, handle_, &s.get());
     return *this;
   }
-  const Node& clear_style() const {
+  Node clear_style() const {
     rd_node_set_style(ctx_, handle_, nullptr);
     return *this;
   }
-  const Node& add_class(Class c) const {
+  Node add_class(Class c) const {
     rd_node_add_class(ctx_, handle_, c.handle());
     return *this;
   }
-  const Node& remove_class(Class c) const {
+  Node remove_class(Class c) const {
     rd_node_remove_class(ctx_, handle_, c.handle());
     return *this;
   }
   bool  has_class(Class c) const { return rd_node_has_class(ctx_, handle_, c.handle()); }
-  const Node& set_state(rd_state s, bool on) const {
+  Node set_state(rd_state s, bool on) const {
     rd_node_set_states(ctx_, handle_, s, on);
     return *this;
   }
@@ -300,17 +321,17 @@ public:
   rd_size content_size() const { return rd_node_content_size(ctx_, handle_); }
   float   baseline() const { return rd_node_baseline(ctx_, handle_); }
   rd_vec2 scroll() const { return rd_node_scroll(ctx_, handle_); }
-  const Node&   scroll_to(float x, float y) const {
+  Node          scroll_to(float x, float y) const {
     rd_node_set_scroll(ctx_, handle_, x, y);
     return *this;
   }
 
-  const Node& text(std::string_view s) const {
+  Node text(std::string_view s) const {
     rd_node_set_text(ctx_, handle_, s.data(), s.size());
     return *this;
   }
   // Ranges are byte offsets into the text; an empty list clears them.
-  const Node& highlights(const std::vector<rd_highlight>& ranges) const {
+  Node highlights(const std::vector<rd_highlight>& ranges) const {
     rd_node_set_highlights(ctx_, handle_, ranges.data(), ranges.size());
     return *this;
   }
@@ -324,32 +345,32 @@ public:
 
   // f(float width, rd_measure_mode, float height, rd_measure_mode) -> rd_size
   template <class F>
-  const Node& measure(F&& f) const {
+  Node measure(F&& f) const {
     using Fn = std::decay_t<F>;
     Fn* p    = new (std::nothrow) Fn(std::forward<F>(f));
     if (!p) return *this;
-    rd_measure_fn call = [](void* d, float w, rd_measure_mode wm, float h, rd_measure_mode hm) -> rd_size {
+    rd_measure_fn call = [](void* d, float w, rd_measure_mode wm, float h, rd_measure_mode hm) noexcept -> rd_size {
       return (*static_cast<Fn*>(d))(w, wm, h, hm);
     };
-    if (!rd_node_set_measure(ctx_, handle_, call, p, [](void* d) { delete static_cast<Fn*>(d); })) delete p;
+    if (!rd_node_set_measure(ctx_, handle_, call, p, [](void* d) noexcept { delete static_cast<Fn*>(d); })) delete p;
     return *this;
   }
-  const Node& clear_measure() const {
+  Node clear_measure() const {
     rd_node_set_measure(ctx_, handle_, nullptr, nullptr, nullptr);
     return *this;
   }
   // f(const rd_paint_info&), called during draw. See rd_node_set_paint.
   template <class F>
-  const Node& paint(F&& f) const {
+  Node paint(F&& f) const {
     using Fn = std::decay_t<F>;
     Fn* p    = new (std::nothrow) Fn(std::forward<F>(f));
     if (!p) return *this;
-    rd_paint_fn call = [](rd_ctx*, const rd_paint_info* info, void* d) { (*static_cast<Fn*>(d))(*info); };
-    if (!rd_node_set_paint(ctx_, handle_, call, p, [](void* d) { delete static_cast<Fn*>(d); })) delete p;
+    rd_paint_fn call = [](rd_ctx*, const rd_paint_info* info, void* d) noexcept { (*static_cast<Fn*>(d))(*info); };
+    if (!rd_node_set_paint(ctx_, handle_, call, p, [](void* d) noexcept { delete static_cast<Fn*>(d); })) delete p;
     return *this;
   }
 
-  const Node& mark_layout_dirty() const {
+  Node mark_layout_dirty() const {
     rd_node_mark_layout_dirty(ctx_, handle_);
     return *this;
   }
@@ -360,7 +381,7 @@ public:
     using Fn = std::decay_t<F>;
     Fn* p    = new (std::nothrow) Fn(std::forward<F>(f));
     if (!p) return {};
-    rd_event_fn call = [](rd_ctx* c, rd_event* e, void* d) {
+    rd_event_fn call = [](rd_ctx* c, rd_event* e, void* d) noexcept {
       auto& fn = *static_cast<Fn*>(d);
       if constexpr (std::is_invocable_v<Fn&, Event&>) {
         Event ev(c, e);
@@ -369,45 +390,45 @@ public:
         fn();
       }
     };
-    rd_listener l = rd_node_on(ctx_, handle_, type, call, p, [](void* d) { delete static_cast<Fn*>(d); }, capture ? RD_LISTEN_CAPTURE : 0);
+    rd_listener l = rd_node_on(ctx_, handle_, type, call, p, [](void* d) noexcept { delete static_cast<Fn*>(d); }, capture ? RD_LISTEN_CAPTURE : 0);
     if (!l.id) delete p;
     return l;
   }
   template <class F>
-  const Node& on_click(F&& f) const {
+  Node on_click(F&& f) const {
     on(RD_EVENT_CLICK, std::forward<F>(f));
     return *this;
   }
   bool off(rd_listener l) const { return rd_node_off(ctx_, l); }
 
-  const Node& capture_pointer() const {
+  Node capture_pointer() const {
     rd_node_set_pointer_capture(ctx_, handle_);
     return *this;
   }
-  const Node& release_pointer() const {
+  Node release_pointer() const {
     rd_node_release_pointer_capture(ctx_, handle_);
     return *this;
   }
 
-  const Node& make_input(bool multiline = false) const {
+  Node make_input(bool multiline = false) const {
     rd_node_make_input(ctx_, handle_, multiline ? RD_INPUT_MULTILINE : 0);
     return *this;
   }
   bool  is_input() const { return rd_node_is_input(ctx_, handle_); }
-  const Node& placeholder(std::string_view s) const {
+  Node placeholder(std::string_view s) const {
     rd_node_set_placeholder(ctx_, handle_, s.data(), s.size());
     return *this;
   }
-  const Node& select(std::size_t anchor, std::size_t caret) const {
+  Node select(std::size_t anchor, std::size_t caret) const {
     rd_input_select(ctx_, handle_, anchor, caret);
     return *this;
   }
   // Null clears it. See rd_node_set_anchor.
-  const Node& anchor(const rd_anchor& a) const {
+  Node anchor(const rd_anchor& a) const {
     rd_node_set_anchor(ctx_, handle_, &a);
     return *this;
   }
-  const Node& clear_anchor() const {
+  Node clear_anchor() const {
     rd_node_set_anchor(ctx_, handle_, nullptr);
     return *this;
   }
@@ -420,14 +441,14 @@ public:
   }
 
   // Null image clears it.
-  const Node& image(rd_image img) const {
+  Node image(rd_image img) const {
     rd_node_set_image(ctx_, handle_, img);
     return *this;
   }
   rd_image image() const { return rd_node_image(ctx_, handle_); }
 
   // Class variants also apply for the parent's states. See rd_node_set_share_states.
-  const Node& share_states(bool share = true) const {
+  Node share_states(bool share = true) const {
     rd_node_set_share_states(ctx_, handle_, share);
     return *this;
   }
@@ -436,21 +457,21 @@ public:
 
   // Animates to `to` over seconds; see rd_node_animate. done(), if given, runs afterward and is owned
   // by the timer.
-  const Node& animate(const Style& to, double seconds, rd_easing easing = RD_EASING_EASE) const {
+  Node animate(const Style& to, double seconds, rd_easing easing = RD_EASING_EASE) const {
     rd_node_animate(ctx_, handle_, nullptr, &to.get(), seconds, easing, nullptr, nullptr);
     return *this;
   }
-  const Node& animate(const Style& from, const Style& to, double seconds, rd_easing easing = RD_EASING_EASE) const {
+  Node animate(const Style& from, const Style& to, double seconds, rd_easing easing = RD_EASING_EASE) const {
     rd_node_animate(ctx_, handle_, &from.get(), &to.get(), seconds, easing, nullptr, nullptr);
     return *this;
   }
   template <class F>
-  const Node& animate(const Style& to, double seconds, rd_easing easing, F&& done) const {
+  Node animate(const Style& to, double seconds, rd_easing easing, F&& done) const {
     using Fn = std::decay_t<F>;
     Fn* p    = new (std::nothrow) Fn(std::forward<F>(done));
     if (!p) return animate(to, seconds, easing);
-    rd_timer_fn call = [](rd_ctx*, void* d) { (*static_cast<Fn*>(d))(); };
-    rd_destroy_fn del = [](void* d) { delete static_cast<Fn*>(d); };
+    rd_timer_fn call = [](rd_ctx*, void* d) noexcept { (*static_cast<Fn*>(d))(); };
+    rd_destroy_fn del = [](void* d) noexcept { delete static_cast<Fn*>(d); };
     rd_node_animate(ctx_, handle_, nullptr, &to.get(), seconds, easing, nullptr, nullptr);
     if (!rd_ctx_set_timer(ctx_, seconds, 0, call, p, del).index) delete p;
     return *this;
@@ -458,16 +479,16 @@ public:
 
   // f() after every layout while this node lives; see rd_node_on_layout. The callable is owned by the hook.
   template <class F>
-  const Node& on_layout(F&& f) const {
+  Node on_layout(F&& f) const {
     using Fn = std::decay_t<F>;
     Fn* p    = new (std::nothrow) Fn(std::forward<F>(f));
     if (!p) return *this;
-    rd_layout_hook call = [](rd_ctx*, void* d) { (*static_cast<Fn*>(d))(); };
-    if (!rd_node_on_layout(ctx_, handle_, call, p, [](void* d) { delete static_cast<Fn*>(d); })) delete p;
+    rd_layout_hook call = [](rd_ctx*, void* d) noexcept { (*static_cast<Fn*>(d))(); };
+    if (!rd_node_on_layout(ctx_, handle_, call, p, [](void* d) noexcept { delete static_cast<Fn*>(d); })) delete p;
     return *this;
   }
 
-  const Node& role(rd_role r) const {
+  Node role(rd_role r) const {
     rd_node_set_role(ctx_, handle_, r);
     return *this;
   }
@@ -484,7 +505,7 @@ public:
   template <class T, class... Args>
   T* emplace_userdata(Args&&... args) const {
     T* p = new (std::nothrow) T(std::forward<Args>(args)...);
-    if (p && !rd_node_set_userdata(ctx_, handle_, p, [](void* d) { delete static_cast<T*>(d); })) {
+    if (p && !rd_node_set_userdata(ctx_, handle_, p, [](void* d) noexcept { delete static_cast<T*>(d); })) {
       delete p;
       return nullptr;
     }
@@ -680,8 +701,8 @@ private:
     Fn* p    = new (std::nothrow) Fn(std::forward<F>(f));
     if (!p) return {};
     rd_timer t = rd_ctx_set_timer(
-        ctx_, delay, flags, [](rd_ctx*, void* d) { (*static_cast<Fn*>(d))(); }, p,
-        [](void* d) { delete static_cast<Fn*>(d); });
+        ctx_, delay, flags, [](rd_ctx*, void* d) noexcept { (*static_cast<Fn*>(d))(); }, p,
+        [](void* d) noexcept { delete static_cast<Fn*>(d); });
     if (!t.index) delete p;
     return t;
   }
@@ -696,3 +717,16 @@ private:
 };
 
 }  // namespace rd
+
+// Handles as keys in unordered containers. <string_view> declares std::hash.
+template <>
+struct std::hash<rd::Node> {
+  std::size_t operator()(const rd::Node& n) const noexcept {
+    std::uint64_t h = (std::uint64_t(n.handle().gen) << 32) | n.handle().index;  // 64 bits on wasm32 too
+    return std::hash<const void*>{}(n.ctx()) ^ std::hash<std::uint64_t>{}(h);
+  }
+};
+template <>
+struct std::hash<rd::Class> {
+  std::size_t operator()(const rd::Class& c) const noexcept { return std::hash<std::uint32_t>{}(c.handle().id); }
+};

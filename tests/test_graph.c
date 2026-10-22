@@ -153,7 +153,30 @@ static void test_lifetime(void) {
   rd_ctx_destroy(f.ctx);
 }
 
+static void test_setters(void) {
+  fixture f;
+  setup(&f);
+  CHECK(rdx_graph_ctx(f.g) == f.ctx && rd_node_eq(rdx_graph_host(f.g), f.host) && rdx_graph_label_class(f.g).id);
+  rdx_node a = rdx_graph_add_node(f.g, &(rdx_node_desc){.position = {0, 0}, .label = "a"});
+  rdx_node b = rdx_graph_add_node(f.g, &(rdx_node_desc){.position = {50, 0}});
+  CHECK(rdx_graph_set_position(f.g, a, (rd_vec2){-20, 10}));
+  rd_vec2 p = rdx_graph_position(f.g, a);
+  CHECK(near(p.x, -20) && near(p.y, 10));
+  CHECK(rdx_graph_set_radius(f.g, a, 40) && rdx_graph_set_color(f.g, a, rd_hex(0xff0000)));
+  rdx_graph_set_selected(f.g, a);
+  rdx_graph_set_background(f.g, rd_hex(0x101010));
+  rdx_edge e = rdx_graph_connect(f.g, a, b, NULL);
+  CHECK(e.gen && rdx_graph_set_edge_label(f.g, e, "hi") && rdx_graph_set_edge_color(f.g, e, rd_hex(0x00ff00)));
+  CHECK(rdx_graph_remove_edge(f.g, e) && !rdx_graph_remove_edge(f.g, e) && !rdx_graph_set_edge_label(f.g, e, "x"));
+  // A radius of 40 at (-20, 10): the node is hit 35 to the right of its center.
+  rd_ctx_layout(f.ctx, 800, 600);
+  CHECK(same(rdx_graph_node_at(f.g, 300 - 20 + 35, 200 + 10), a));
+  CHECK(rdx_graph_remove_node(f.g, a) && !rdx_graph_set_radius(f.g, a, 5) && !rdx_graph_node_alive(f.g, a));
+  rd_ctx_destroy(f.ctx);
+}
+
 int main(void) {
+  test_setters();
   test_nodes_edges_and_labels();
   test_pan_click_and_hover();
   test_zoom_and_fit();

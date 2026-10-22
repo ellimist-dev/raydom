@@ -1,0 +1,64 @@
+# Builds and tests with sanitizers on Linux (GCC) and macOS (Apple Clang), checks that a downstream
+# project can consume raydom through FetchContent and as an installed package, that the README matches
+# the version, and that both books build. Runs on pull requests, and from docs.yml before publishing.
+name: ci
+
+on:
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+env:
+  MDBOOK_VERSION: v0.5.4
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y just libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+            libgl1-mesa-dev libgl1-mesa-dri libdbus-1-dev xvfb
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: brew install just
+
+      # The graphics test draws into a real window: a virtual X display on Linux.
+      - name: Build
+        run: cmake -S . -B build -DRAYDOM_SANITIZE=ON -DRAYDOM_TEST_GRAPHICS=ON && cmake --build build -j 4
+
+      - name: Test
+        run: ${{ runner.os == 'Linux' && 'xvfb-run -a' || '' }} ctest --test-dir build --output-on-failure
+
+      - name: Consume as a dependency
+        run: just consumer
+
+      - name: Check versions
+        run: just check-version
+
+  books:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mdbook
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          curl -sSL "https://github.com/rust-lang/mdBook/releases/download/${MDBOOK_VERSION}/mdbook-${MDBOOK_VERSION}-x86_64-unknown-linux-gnu.tar.gz" \
+            | tar -xz -C "$HOME/.local/bin"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build
+        run: |
+          mdbook build docs
+          python3 docs/tools/llms.py
+          mdbook build devdocs
