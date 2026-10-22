@@ -36,7 +36,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-21f1d3f6.js";
+            window.path_to_searchindex_js = "../searchindex-46055788.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-c393df87.js"></script>
@@ -197,7 +197,15 @@ are reported the same way as in C: null handles and <code>false</code>.</p>
 </div>
 <p><code>get()</code> and <code>handle()</code> return the C values, so C and C++ calls can be mixed freely on one context.</p>
 <p><code>rd::Node</code> and <code>rd::Class</code> are handles, so their setters are <code>const</code>, as with <code>std::span</code>: they change the node in
-the context, not the handle. A node captured by value in a lambda, or a <code>const rd::Node</code>, can be changed directly.</p>
+the context, not the handle. A node captured by value in a lambda, or a <code>const rd::Node</code>, can be changed directly.
+Setters return the node by value, so a chain like <code>auto n = ctx.create().style(s).add_class(c);</code> is safe to keep.
+Both hash (<code>std::hash</code>), for use as keys in unordered containers.</p>
+<p>The C structs meant for designated initializers, such as <code>rdx_slider_desc</code>, give every field a default in C++, so
+<code>rdx::slider(ctx, {.max = 10})</code> compiles without missing-initializer warnings from GCC or Clang.</p>
+<p><code>raydom::extras</code> components are typed handles: <code>rdx::slider</code> returns an <code>rdx::Slider</code>, an <code>rd::Node</code> with the
+slider’s operations as members (<code>value()</code>, <code>set_value()</code>, <code>set_range()</code>); likewise <code>Toggle</code>, <code>RadioGroup</code>, <code>Number</code>,
+<code>Select</code>, <code>Tabs</code>, <code>Split</code>, <code>List</code>, <code>Table</code> and <code>Tree</code>. They convert to <code>rd::Node</code>, and the free functions taking an
+<code>rd::Node</code> (<code>rdx::slider_value(node)</code>) work on any handle.</p>
 <h2 id="styles"><a class="header" href="#styles">Styles</a></h2>
 <p><code>rd::Style</code> has one chainable setter per property, named as in the <a href="../reference/properties.html">reference</a>, plus
 overloads for common shapes:</p>
@@ -217,7 +225,8 @@ rd::Style()
 <h2 id="callbacks"><a class="header" href="#callbacks">Callbacks</a></h2>
 <p><code>node.on(type, f, capture)</code>, <code>node.on_click(f)</code>, <code>node.paint(f)</code> and <code>node.measure(f)</code> take any callable. The
 callable is moved into a heap allocation owned by raydom and deleted when the listener is removed or the node is
-destroyed. Captured references must outlive the node, or the listener must be removed first.</p>
+destroyed. Captured references must outlive the node, or the listener must be removed first. Callbacks run from C,
+so they are <code>noexcept</code>: an exception escaping one terminates the program rather than unwinding through C frames.</p>
 <p><code>node.emplace_userdata&lt;T&gt;(args...)</code> constructs a <code>T</code> owned by the node; <code>node.userdata&lt;T&gt;()</code> returns it.</p>
 <h2 id="the-quickstart-annotated"><a class="header" href="#the-quickstart-annotated">The quickstart, annotated</a></h2>
 <pre><code class="language-cpp">#include &lt;raydom/raydom.hh&gt;

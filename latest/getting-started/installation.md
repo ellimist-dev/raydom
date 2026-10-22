@@ -3,7 +3,8 @@
 ## Requirements
 
 - CMake 3.25 or newer.
-- A C23 compiler for C code that includes raydom (clang 18+, GCC 13+). A C++20 compiler for the C++ layer.
+- A C23 compiler to build raydom (clang 18+, GCC 13+). Your own code needs C11 to include the C headers, with GCC or
+  Clang, which take their fixed-type enums as an extension; or C++20 for the C++ layer.
 - raylib 6.0. raydom downloads it when the project doesn't provide one.
 
 ## FetchContent
@@ -12,7 +13,7 @@
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.4)
+    GIT_TAG        v0.2.5)
 FetchContent_MakeAvailable(raydom)
 
 target_link_libraries(your_app PRIVATE raydom::raydom)

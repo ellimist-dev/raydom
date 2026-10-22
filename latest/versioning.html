@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-21f1d3f6.js";
+            window.path_to_searchindex_js = "searchindex-46055788.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c393df87.js"></script>
@@ -181,6 +181,9 @@
                         <h1 id="versioning"><a class="header" href="#versioning">Versioning</a></h1>
 <p>raydom follows <a href="https://semver.org/">semantic versioning</a>. Before 1.0, a minor release may break the API; a patch
 release doesn’t. From 1.0, only a major release may break it.</p>
+<p>Compatibility is at the source level, not binary: raydom is a static library built with your program, and public
+structs such as <code>rd_style</code> grow when properties are added, so code compiled against one version must not be linked
+against another. Rebuild against each release; FetchContent and the installed package both do.</p>
 <h2 id="documentation-versions"><a class="header" href="#documentation-versions">Documentation versions</a></h2>
 <p>Every release tag publishes its own copy of this book, built from the sources at that tag, under <code>/&lt;tag&gt;/</code>. A
 published copy is never rebuilt by later releases, so it keeps describing the version it was built from. The

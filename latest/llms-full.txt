@@ -39,7 +39,8 @@ Agents and tools can read the book as plain Markdown; see [For AI agents](agents
 ## Requirements
 
 - CMake 3.25 or newer.
-- A C23 compiler for C code that includes raydom (clang 18+, GCC 13+). A C++20 compiler for the C++ layer.
+- A C23 compiler to build raydom (clang 18+, GCC 13+). Your own code needs C11 to include the C headers, with GCC or
+  Clang, which take their fixed-type enums as an extension; or C++20 for the C++ layer.
 - raylib 6.0. raydom downloads it when the project doesn't provide one.
 
 ## FetchContent
@@ -48,7 +49,7 @@ Agents and tools can read the book as plain Markdown; see [For AI agents](agents
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.4)
+    GIT_TAG        v0.2.5)
 FetchContent_MakeAvailable(raydom)
 
 target_link_libraries(your_app PRIVATE raydom::raydom)
@@ -213,7 +214,7 @@ project(hello LANGUAGES C CXX)
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.4)
+    GIT_TAG        v0.2.5)
 FetchContent_MakeAvailable(raydom)
 
 add_executable(hello main.cc)
@@ -467,7 +468,10 @@ Colors: `rd_hex(0xRRGGBB)`, `rd_rgb`, `rd_rgba`. Box sides: `rd_edges_all`, `rd_
 ## Classes
 
 A class is a reusable style with optional variants per state. Classes live until the context is destroyed;
-`rd_class_set` replaces a class's base style and restyles every node that uses it.
+`rd_class_set` replaces a class's base style and restyles every node that uses it. `rd_class_merge` (and
+`rd_class_merge_state` for a variant) changes only the properties set in its style, as `rd_node_merge_style` does for
+a node: recolor a class without restating its layout. `rd_class_get` and `rd_class_get_state` copy a class's styles
+out. In C++: `cls.merge(style)`, `cls.merge_on(state, style)`, `cls.base()` and `cls.state(state)`.
 
 ```c
 rd_class button_style = rd_class_create(ctx, &(rd_style){.padding    = rd_edges_vh(rd_px(6), rd_px(14)),
@@ -1562,6 +1566,16 @@ are reported the same way as in C: null handles and `false`.
 
 `rd::Node` and `rd::Class` are handles, so their setters are `const`, as with `std::span`: they change the node in
 the context, not the handle. A node captured by value in a lambda, or a `const rd::Node`, can be changed directly.
+Setters return the node by value, so a chain like `auto n = ctx.create().style(s).add_class(c);` is safe to keep.
+Both hash (`std::hash`), for use as keys in unordered containers.
+
+The C structs meant for designated initializers, such as `rdx_slider_desc`, give every field a default in C++, so
+`rdx::slider(ctx, {.max = 10})` compiles without missing-initializer warnings from GCC or Clang.
+
+`raydom::extras` components are typed handles: `rdx::slider` returns an `rdx::Slider`, an `rd::Node` with the
+slider's operations as members (`value()`, `set_value()`, `set_range()`); likewise `Toggle`, `RadioGroup`, `Number`,
+`Select`, `Tabs`, `Split`, `List`, `Table` and `Tree`. They convert to `rd::Node`, and the free functions taking an
+`rd::Node` (`rdx::slider_value(node)`) work on any handle.
 
 ## Styles
 
@@ -1588,7 +1602,8 @@ Literals: `_px`, `_pct`, `_fr`. Functions: `rd::px`, `rd::pct`, `rd::num`, `rd::
 
 `node.on(type, f, capture)`, `node.on_click(f)`, `node.paint(f)` and `node.measure(f)` take any callable. The
 callable is moved into a heap allocation owned by raydom and deleted when the listener is removed or the node is
-destroyed. Captured references must outlive the node, or the listener must be removed first.
+destroyed. Captured references must outlive the node, or the listener must be removed first. Callbacks run from C,
+so they are `noexcept`: an exception escaping one terminates the program rather than unwinding through C frames.
 
 `node.emplace_userdata<T>(args...)` constructs a `T` owned by the node; `node.userdata<T>()` returns it.
 
@@ -1764,12 +1779,21 @@ Toast timers need the clock to advance; with raylib's event waiting, use
 
 ## Restyling
 
-Every part of every control and toast has a class in `rdx_theme(ctx)`. They start with a dark look; restyle them
-for the whole context with `rd_class_set` and `rd_class_set_state`, or add your own classes to individual nodes:
+Every part of every control and toast has a class in `rdx_theme(ctx)`, built from a palette of colors. They start
+with a dark look. To recolor everything, set the palette with `rdx_theme_set_palette`: the classes are redefined from
+it and controls already created update; colors left unset keep theirs, so changing only `accent` works. Set the
+palette first, since it redefines the classes. To change one class, merge into it with `rd_class_merge` or
+`rd_class_merge_state` (C++: `merge` and `merge_on`), which keeps the layout properties you don't mention; or add your
+own classes to individual nodes:
 
 ```cpp
+// Every control at once: the accent, and anything else the palette names.
+rdx_palette palette{};
+palette.accent = rd_hex(0xf92672);
+rdx_theme_set_palette(ctx.get(), &palette);
+// One class: merge changes only the properties given, keeping the theme's layout.
 const rdx_classes* theme = rdx_theme(ctx.get());
-rd::Class(ctx.get(), theme->check_box).on(RD_STATE_CHECKED, rd::Style().background(rd::hex(0x4cc38a)));  // green
+rd::Class(ctx.get(), theme->check_box).merge_on(RD_STATE_CHECKED, rd::Style().background(rd::hex(0x4cc38a)));  // green
 ```
 
 | Classes                                              | Parts                                    |
@@ -2521,7 +2545,7 @@ Every published version of this book has, next to its HTML:
 | `<page>.md`       | Each page as Markdown, at the HTML page's path with `.md`      |
 
 Use the copy under the version that matches the project's `GIT_TAG` or `find_package` version, for example
-`/v0.2.4/llms-full.txt`. `/latest/` follows the newest release; `/dev/` follows the main branch and may
+`/v0.2.5/llms-full.txt`. `/latest/` follows the newest release; `/dev/` follows the main branch and may
 describe unreleased API.
 
 The headers are the ground truth. `include/raydom/*.h` documents every function in a comment above it, and
@@ -2611,6 +2635,10 @@ programs of this kind for each chapter.
 
 raydom follows [semantic versioning](https://semver.org/). Before 1.0, a minor release may break the API; a patch
 release doesn't. From 1.0, only a major release may break it.
+
+Compatibility is at the source level, not binary: raydom is a static library built with your program, and public
+structs such as `rd_style` grow when properties are added, so code compiled against one version must not be linked
+against another. Rebuild against each release; FetchContent and the installed package both do.
 
 ## Documentation versions
 
