@@ -15,6 +15,16 @@ are reported the same way as in C: null handles and `false`.
 
 `rd::Node` and `rd::Class` are handles, so their setters are `const`, as with `std::span`: they change the node in
 the context, not the handle. A node captured by value in a lambda, or a `const rd::Node`, can be changed directly.
+Setters return the node by value, so a chain like `auto n = ctx.create().style(s).add_class(c);` is safe to keep.
+Both hash (`std::hash`), for use as keys in unordered containers.
+
+The C structs meant for designated initializers, such as `rdx_slider_desc`, give every field a default in C++, so
+`rdx::slider(ctx, {.max = 10})` compiles without missing-initializer warnings from GCC or Clang.
+
+`raydom::extras` components are typed handles: `rdx::slider` returns an `rdx::Slider`, an `rd::Node` with the
+slider's operations as members (`value()`, `set_value()`, `set_range()`); likewise `Toggle`, `RadioGroup`, `Number`,
+`Select`, `Tabs`, `Split`, `List`, `Table` and `Tree`. They convert to `rd::Node`, and the free functions taking an
+`rd::Node` (`rdx::slider_value(node)`) work on any handle.
 
 ## Styles
 
@@ -41,7 +51,8 @@ Literals: `_px`, `_pct`, `_fr`. Functions: `rd::px`, `rd::pct`, `rd::num`, `rd::
 
 `node.on(type, f, capture)`, `node.on_click(f)`, `node.paint(f)` and `node.measure(f)` take any callable. The
 callable is moved into a heap allocation owned by raydom and deleted when the listener is removed or the node is
-destroyed. Captured references must outlive the node, or the listener must be removed first.
+destroyed. Captured references must outlive the node, or the listener must be removed first. Callbacks run from C,
+so they are `noexcept`: an exception escaping one terminates the program rather than unwinding through C frames.
 
 `node.emplace_userdata<T>(args...)` constructs a `T` owned by the node; `node.userdata<T>()` returns it.
 

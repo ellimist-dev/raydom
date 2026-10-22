@@ -36,7 +36,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-21f1d3f6.js";
+            window.path_to_searchindex_js = "../searchindex-46055788.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-c393df87.js"></script>
@@ -266,10 +266,19 @@ you can append your own content, such as an Undo button.</p>
 <p>Toast timers need the clock to advance; with raylib’s event waiting, use
 <a href="../getting-started/frame-loop.html#event-waiting"><code>rd_set_event_waiting</code></a>.</p>
 <h2 id="restyling"><a class="header" href="#restyling">Restyling</a></h2>
-<p>Every part of every control and toast has a class in <code>rdx_theme(ctx)</code>. They start with a dark look; restyle them
-for the whole context with <code>rd_class_set</code> and <code>rd_class_set_state</code>, or add your own classes to individual nodes:</p>
-<pre><code class="language-cpp">const rdx_classes* theme = rdx_theme(ctx.get());
-rd::Class(ctx.get(), theme-&gt;check_box).on(RD_STATE_CHECKED, rd::Style().background(rd::hex(0x4cc38a)));  // green
+<p>Every part of every control and toast has a class in <code>rdx_theme(ctx)</code>, built from a palette of colors. They start
+with a dark look. To recolor everything, set the palette with <code>rdx_theme_set_palette</code>: the classes are redefined from
+it and controls already created update; colors left unset keep theirs, so changing only <code>accent</code> works. Set the
+palette first, since it redefines the classes. To change one class, merge into it with <code>rd_class_merge</code> or
+<code>rd_class_merge_state</code> (C++: <code>merge</code> and <code>merge_on</code>), which keeps the layout properties you don’t mention; or add your
+own classes to individual nodes:</p>
+<pre><code class="language-cpp">// Every control at once: the accent, and anything else the palette names.
+rdx_palette palette{};
+palette.accent = rd_hex(0xf92672);
+rdx_theme_set_palette(ctx.get(), &amp;palette);
+// One class: merge changes only the properties given, keeping the theme's layout.
+const rdx_classes* theme = rdx_theme(ctx.get());
+rd::Class(ctx.get(), theme-&gt;check_box).merge_on(RD_STATE_CHECKED, rd::Style().background(rd::hex(0x4cc38a)));  // green
 </code></pre>
 <div class="table-wrapper">
 <table>

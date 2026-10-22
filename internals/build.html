@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-0d8881a8.js";
+            window.path_to_searchindex_js = "searchindex-bd9e8e22.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-0c2227d3.js"></script>
@@ -191,7 +191,8 @@
 </table>
 </div>
 <p>Both are static libraries. <code>raydom</code> publicly requires <code>c_std_23</code> and <code>cxx_std_20</code>, links raylib publicly, and on
-macOS the frameworks raylib needs. Warnings (<code>-Wall -Wextra</code>) and sanitizers are private.</p>
+macOS the frameworks raylib needs. Warnings (<code>-Wall -Wextra</code>) are private; the sanitizer link flag is
+<code>BUILD_INTERFACE</code> only, for the tests and examples, and never part of the installed package.</p>
 <h2 id="raylib"><a class="header" href="#raylib">raylib</a></h2>
 <p><code>cmake/fetch_raylib.cmake</code> provides a <code>raylib</code> target, in order: an existing target in the parent project, an
 installed raylib 6.0 from <code>find_package</code>, then a download with FetchContent (unless <code>RAYDOM_FETCH_RAYLIB=OFF</code>).

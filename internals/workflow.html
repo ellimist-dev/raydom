@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-0d8881a8.js";
+            window.path_to_searchindex_js = "searchindex-bd9e8e22.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-0c2227d3.js"></script>
@@ -188,7 +188,7 @@
 <tr><td><code>just build</code></td><td>Configures with <code>RAYDOM_SANITIZE=ON</code> and builds library, tests, examples</td></tr>
 <tr><td><code>just test</code></td><td><code>build</code>, then <code>ctest --output-on-failure</code></td></tr>
 <tr><td><code>just showcase</code></td><td>Runs the showcase</td></tr>
-<tr><td><code>just lint</code></td><td>clang-tidy over <code>src/</code> and <code>tests/</code> with the repo’s <code>.clang-tidy</code></td></tr>
+<tr><td><code>just lint</code></td><td>clang-tidy over <code>src/</code>, <code>extras/src/</code> and <code>tests/</code> with the repo’s <code>.clang-tidy</code></td></tr>
 <tr><td><code>just consumer</code></td><td>Builds <code>tests/consumer</code> against raydom via FetchContent and via an installed package</td></tr>
 <tr><td><code>just docs</code></td><td>Serves the user book with live reload</td></tr>
 <tr><td><code>just docs-build</code></td><td>Builds the user book as published, with <code>llms.txt</code></td></tr>
@@ -204,7 +204,8 @@ examples (<code>anonymous_pro_bold.ttf</code>), which is why they need a downloa
 <h2 id="sanitizers-are-on-by-default"><a class="header" href="#sanitizers-are-on-by-default">Sanitizers are on by default</a></h2>
 <p><code>just build</code> compiles the library, tests and examples with AddressSanitizer and UBSan. Most memory bugs in this
 codebase have surfaced as a sanitizer report in an ordinary test run, so leave them on while developing. Release
-builds and installs don’t use them; the flags are private to raydom’s targets.</p>
+builds and installs don’t use them: the sanitizer link flag reaches only this tree’s programs, never an installed
+package.</p>
 <h2 id="before-sending-a-change"><a class="header" href="#before-sending-a-change">Before sending a change</a></h2>
 <ol>
 <li><code>just test</code>: every test, including the documentation examples, passes.</li>
@@ -214,7 +215,13 @@ builds and installs don’t use them; the flags are private to raydom’s target
 property reference regenerates from the source, but its description lives in <code>docs/tools/preprocess.py</code>.</li>
 <li>Look at the showcase for anything visual. Screenshots help in review; see below.</li>
 </ol>
-<p>There is no CI for tests yet; the workflow in <code>.github/</code> only publishes documentation. Run the suite locally.</p>
+<p>CI (<code>.github/workflows/ci.yml</code>) runs the tests with sanitizers on Linux (GCC) and macOS (Apple Clang), <code>just consumer</code>,
+<code>just check-version</code> and both book builds, on pull requests and before every docs publish (<code>docs.yml</code> calls it).
+To reproduce the Linux job locally, run the same steps in an <code>ubuntu:24.04</code> container.</p>
+<p><code>-DRAYDOM_TEST_GRAPHICS=ON</code> adds <code>test_render_gl</code>, which opens a window, draws, and checks pixels read back from
+the screen: the only test of <code>rd_update</code> and <code>rd_draw</code>. It’s off by default because it needs a display; CI turns it
+on, under <code>xvfb-run</code> on Linux. Without a display or OpenGL, as on GitHub’s macOS runners, it reports itself
+skipped.</p>
 <h2 id="screenshots"><a class="header" href="#screenshots">Screenshots</a></h2>
 <p>The showcase has a scripted mode for screenshots, used during development to check visual changes without clicking:</p>
 <pre><code class="language-sh">RAYDOM_SCREENSHOT=out.png RAYDOM_TAB=1 RAYDOM_CLICK="745,748" RAYDOM_TYPE="hello|" RAYDOM_FRAME=60 ./build/examples/showcase

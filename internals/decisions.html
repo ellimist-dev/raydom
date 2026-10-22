@@ -35,7 +35,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-0d8881a8.js";
+            window.path_to_searchindex_js = "searchindex-bd9e8e22.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-0c2227d3.js"></script>
@@ -228,8 +228,15 @@ its invalidation bugs. <strong>Cost:</strong> a full tree walk per frame even wh
 not yet used to skip it. <strong>Revisit:</strong> for very large trees, by skipping unchanged frames first.</p>
 <h2 id="an-sdf-shader-for-boxes"><a class="header" href="#an-sdf-shader-for-boxes">An SDF shader for boxes</a></h2>
 <p>Rounded corners, borders and shadows come from one fragment shader computing distance to a rounded rectangle, not
-from tessellated meshes. Antialiasing is exact and per-corner radii and per-side borders are cheap. <strong>Cost:</strong> a
-batch flush per rounded box; square boxes avoid it. <strong>Revisit:</strong> if batch flushes dominate frame time.</p>
+from tessellated meshes. Antialiasing is exact and per-corner radii and per-side borders are cheap.</p>
+<p>Everything raydom draws goes through this one shader, so draws batch. A quad’s vertex normal carries what varies
+per box: (width, height, radius), or (0, 0, 0) for a plain textured quad such as a glyph or a square rectangle; the
+fill is the vertex color. Borders, stroke color, blur, uneven radii and image placement are uniforms, uploaded (with a
+flush) only when they differ from the last box’s, which they usually don’t for boxes styled by the same class.
+Before this, every rounded box flushed the batch and uploaded its uniforms: about 600 ms a frame for 1,500 bordered,
+labeled boxes on an M-series Mac, against about 7 ms after. <strong>Cost:</strong> boxes whose borders, stroke or uneven radii
+differ still flush between each other. <strong>Revisit:</strong> if those dominate, move more per-box data into vertex attributes
+with a custom vertex buffer.</p>
 <h2 id="stb_truetype-no-shaping"><a class="header" href="#stb_truetype-no-shaping">stb_truetype, no shaping</a></h2>
 <p>Fonts and text use stb_truetype: small, static, no dependencies, which fits single-binary apps. <strong>Cost:</strong> no
 ligatures, contextual forms or bidirectional text; Arabic and Indic scripts render incorrectly. <strong>Revisit:</strong> when

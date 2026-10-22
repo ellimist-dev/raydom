@@ -37,7 +37,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-21f1d3f6.js";
+            window.path_to_searchindex_js = "searchindex-46055788.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-c393df87.js"></script>
@@ -208,14 +208,15 @@ behave as described for this version.</p>
 <h2 id="requirements"><a class="header" href="#requirements">Requirements</a></h2>
 <ul>
 <li>CMake 3.25 or newer.</li>
-<li>A C23 compiler for C code that includes raydom (clang 18+, GCC 13+). A C++20 compiler for the C++ layer.</li>
+<li>A C23 compiler to build raydom (clang 18+, GCC 13+). Your own code needs C11 to include the C headers, with GCC or
+Clang, which take their fixed-type enums as an extension; or C++20 for the C++ layer.</li>
 <li>raylib 6.0. raydom downloads it when the project doesn’t provide one.</li>
 </ul>
 <h2 id="fetchcontent"><a class="header" href="#fetchcontent">FetchContent</a></h2>
 <pre><code class="language-cmake">include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.4)
+    GIT_TAG        v0.2.5)
 FetchContent_MakeAvailable(raydom)
 
 target_link_libraries(your_app PRIVATE raydom::raydom)
@@ -368,7 +369,7 @@ project(hello LANGUAGES C CXX)
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.4)
+    GIT_TAG        v0.2.5)
 FetchContent_MakeAvailable(raydom)
 
 add_executable(hello main.cc)
@@ -547,7 +548,10 @@ Colors: <code>rd_hex(0xRRGGBB)</code>, <code>rd_rgb</code>, <code>rd_rgba</code>
 <code>.padding.left</code>. See <a href="#values-and-units">Values and units</a>.</p>
 <h2 id="classes"><a class="header" href="#classes">Classes</a></h2>
 <p>A class is a reusable style with optional variants per state. Classes live until the context is destroyed;
-<code>rd_class_set</code> replaces a class’s base style and restyles every node that uses it.</p>
+<code>rd_class_set</code> replaces a class’s base style and restyles every node that uses it. <code>rd_class_merge</code> (and
+<code>rd_class_merge_state</code> for a variant) changes only the properties set in its style, as <code>rd_node_merge_style</code> does for
+a node: recolor a class without restating its layout. <code>rd_class_get</code> and <code>rd_class_get_state</code> copy a class’s styles
+out. In C++: <code>cls.merge(style)</code>, <code>cls.merge_on(state, style)</code>, <code>cls.base()</code> and <code>cls.state(state)</code>.</p>
 <pre><code class="language-c">rd_class button_style = rd_class_create(ctx, &amp;(rd_style){.padding    = rd_edges_vh(rd_px(6), rd_px(14)),
                                                         .background = rd_hex(0x1d2230)});
 rd_class primary      = rd_class_create(ctx, &amp;(rd_style){.background = rd_hex(0x5b8cff)});
@@ -1432,7 +1436,15 @@ are reported the same way as in C: null handles and <code>false</code>.</p>
 </div>
 <p><code>get()</code> and <code>handle()</code> return the C values, so C and C++ calls can be mixed freely on one context.</p>
 <p><code>rd::Node</code> and <code>rd::Class</code> are handles, so their setters are <code>const</code>, as with <code>std::span</code>: they change the node in
-the context, not the handle. A node captured by value in a lambda, or a <code>const rd::Node</code>, can be changed directly.</p>
+the context, not the handle. A node captured by value in a lambda, or a <code>const rd::Node</code>, can be changed directly.
+Setters return the node by value, so a chain like <code>auto n = ctx.create().style(s).add_class(c);</code> is safe to keep.
+Both hash (<code>std::hash</code>), for use as keys in unordered containers.</p>
+<p>The C structs meant for designated initializers, such as <code>rdx_slider_desc</code>, give every field a default in C++, so
+<code>rdx::slider(ctx, {.max = 10})</code> compiles without missing-initializer warnings from GCC or Clang.</p>
+<p><code>raydom::extras</code> components are typed handles: <code>rdx::slider</code> returns an <code>rdx::Slider</code>, an <code>rd::Node</code> with the
+slider’s operations as members (<code>value()</code>, <code>set_value()</code>, <code>set_range()</code>); likewise <code>Toggle</code>, <code>RadioGroup</code>, <code>Number</code>,
+<code>Select</code>, <code>Tabs</code>, <code>Split</code>, <code>List</code>, <code>Table</code> and <code>Tree</code>. They convert to <code>rd::Node</code>, and the free functions taking an
+<code>rd::Node</code> (<code>rdx::slider_value(node)</code>) work on any handle.</p>
 <h2 id="styles"><a class="header" href="#styles">Styles</a></h2>
 <p><code>rd::Style</code> has one chainable setter per property, named as in the <a href="#style-properties">reference</a>, plus
 overloads for common shapes:</p>
@@ -1452,7 +1464,8 @@ rd::Style()
 <h2 id="callbacks"><a class="header" href="#callbacks">Callbacks</a></h2>
 <p><code>node.on(type, f, capture)</code>, <code>node.on_click(f)</code>, <code>node.paint(f)</code> and <code>node.measure(f)</code> take any callable. The
 callable is moved into a heap allocation owned by raydom and deleted when the listener is removed or the node is
-destroyed. Captured references must outlive the node, or the listener must be removed first.</p>
+destroyed. Captured references must outlive the node, or the listener must be removed first. Callbacks run from C,
+so they are <code>noexcept</code>: an exception escaping one terminates the program rather than unwinding through C frames.</p>
 <p><code>node.emplace_userdata&lt;T&gt;(args...)</code> constructs a <code>T</code> owned by the node; <code>node.userdata&lt;T&gt;()</code> returns it.</p>
 <h2 id="the-quickstart-annotated"><a class="header" href="#the-quickstart-annotated">The quickstart, annotated</a></h2>
 <pre><code class="language-cpp">#include &lt;raydom/raydom.hh&gt;
@@ -1594,10 +1607,19 @@ you can append your own content, such as an Undo button.</p>
 <p>Toast timers need the clock to advance; with raylib’s event waiting, use
 <a href="#event-waiting"><code>rd_set_event_waiting</code></a>.</p>
 <h2 id="restyling"><a class="header" href="#restyling">Restyling</a></h2>
-<p>Every part of every control and toast has a class in <code>rdx_theme(ctx)</code>. They start with a dark look; restyle them
-for the whole context with <code>rd_class_set</code> and <code>rd_class_set_state</code>, or add your own classes to individual nodes:</p>
-<pre><code class="language-cpp">const rdx_classes* theme = rdx_theme(ctx.get());
-rd::Class(ctx.get(), theme-&gt;check_box).on(RD_STATE_CHECKED, rd::Style().background(rd::hex(0x4cc38a)));  // green
+<p>Every part of every control and toast has a class in <code>rdx_theme(ctx)</code>, built from a palette of colors. They start
+with a dark look. To recolor everything, set the palette with <code>rdx_theme_set_palette</code>: the classes are redefined from
+it and controls already created update; colors left unset keep theirs, so changing only <code>accent</code> works. Set the
+palette first, since it redefines the classes. To change one class, merge into it with <code>rd_class_merge</code> or
+<code>rd_class_merge_state</code> (C++: <code>merge</code> and <code>merge_on</code>), which keeps the layout properties you don’t mention; or add your
+own classes to individual nodes:</p>
+<pre><code class="language-cpp">// Every control at once: the accent, and anything else the palette names.
+rdx_palette palette{};
+palette.accent = rd_hex(0xf92672);
+rdx_theme_set_palette(ctx.get(), &amp;palette);
+// One class: merge changes only the properties given, keeping the theme's layout.
+const rdx_classes* theme = rdx_theme(ctx.get());
+rd::Class(ctx.get(), theme-&gt;check_box).merge_on(RD_STATE_CHECKED, rd::Style().background(rd::hex(0x4cc38a)));  // green
 </code></pre>
 <div class="table-wrapper">
 <table>
@@ -2269,7 +2291,7 @@ raydom code, in a form that is cheap to retrieve.</p>
 </table>
 </div>
 <p>Use the copy under the version that matches the project’s <code>GIT_TAG</code> or <code>find_package</code> version, for example
-<code>/v0.2.4/llms-full.txt</code>. <code>/latest/</code> follows the newest release; <code>/dev/</code> follows the main branch and may
+<code>/v0.2.5/llms-full.txt</code>. <code>/latest/</code> follows the newest release; <code>/dev/</code> follows the main branch and may
 describe unreleased API.</p>
 <p>The headers are the ground truth. <code>include/raydom/*.h</code> documents every function in a comment above it, and
 <code>include/raydom/style.h</code> defines every style property in the <code>RD_STYLE_PROPS</code> X-macro.</p>
@@ -2349,6 +2371,9 @@ programs of this kind for each chapter.</p>
 <h1 id="versioning"><a class="header" href="#versioning">Versioning</a></h1>
 <p>raydom follows <a href="https://semver.org/">semantic versioning</a>. Before 1.0, a minor release may break the API; a patch
 release doesn’t. From 1.0, only a major release may break it.</p>
+<p>Compatibility is at the source level, not binary: raydom is a static library built with your program, and public
+structs such as <code>rd_style</code> grow when properties are added, so code compiled against one version must not be linked
+against another. Rebuild against each release; FetchContent and the installed package both do.</p>
 <h2 id="documentation-versions"><a class="header" href="#documentation-versions">Documentation versions</a></h2>
 <p>Every release tag publishes its own copy of this book, built from the sources at that tag, under <code>/&lt;tag&gt;/</code>. A
 published copy is never rebuilt by later releases, so it keeps describing the version it was built from. The

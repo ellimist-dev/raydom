@@ -3,6 +3,10 @@
 raydom follows [semantic versioning](https://semver.org/). Before 1.0, a minor release may break the API; a patch
 release doesn't. From 1.0, only a major release may break it.
 
+Compatibility is at the source level, not binary: raydom is a static library built with your program, and public
+structs such as `rd_style` grow when properties are added, so code compiled against one version must not be linked
+against another. Rebuild against each release; FetchContent and the installed package both do.
+
 ## Documentation versions
 
 Every release tag publishes its own copy of this book, built from the sources at that tag, under `/<tag>/`. A
