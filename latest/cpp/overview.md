@@ -56,6 +56,24 @@ so they are `noexcept`: an exception escaping one terminates the program rather 
 
 `node.emplace_userdata<T>(args...)` constructs a `T` owned by the node; `node.userdata<T>()` returns it.
 
+`node.clear_paint()` and `node.clear_measure()` remove a callable. `ctx.on_layout(f)` runs `f()` after every
+layout for the context's lifetime; `node.on_layout(f)` for the node's. `node.animate(to, seconds, easing, done)`
+returns false, without scheduling `done`, when the animation can't start.
+
+## Context
+
+Besides creating nodes, the context wraps the rest of the C API that takes an `rd_ctx`:
+
+| C++                                                     | C                                            |
+| ------------------------------------------------------- | -------------------------------------------- |
+| `ctx.select(anchor, offset, focus, offset)`             | `rd_ctx_select`                              |
+| `ctx.clear_selection()`                                 | `rd_ctx_clear_selection`                     |
+| `ctx.selection()`: a `std::optional<Context::Selection>` | `rd_ctx_selection`                           |
+| `ctx.selection_text()`: a `std::string`                 | `rd_ctx_selection_text`                      |
+| `ctx.set_focus_scope(node)`, `ctx.focus_scope()`        | `rd_ctx_set_focus_scope`, `rd_ctx_focus_scope` |
+| `ctx.set_event_waiting(on)`                             | `rd_set_event_waiting`                       |
+| `ctx.paint_text(info, size, x, baseline, text, color, font)` | `rd_paint_text`, font last and optional |
+
 ## The quickstart, annotated
 
 ```cpp

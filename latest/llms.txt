@@ -37,9 +37,13 @@ Each page below is Markdown. `llms-full.txt` is the whole book in one file. Read
 
 - [Controls and toasts](extras/controls.md): Checkbox, switch, radio group, slider and toast components; their events, keys and theme classes.
 - [Menus, selects, modals and tooltips](extras/popups.md): Menus, context menus, selects, modal dialogs and tooltips; dismissal and focus rules.
-- [Tabs, splitters, lists, tables and trees](extras/views.md): Tabs, splitters, virtualized lists, tables and tree views; selection, keys, fill callbacks.
+- [Tabs, splitters, lists, tables, trees and breadcrumbs](extras/views.md): Tabs, splitters, virtualized lists, tables, tree views and breadcrumbs; selection, keys, fill callbacks.
 - [Network view](extras/graph.md): rdx_graph network view: nodes, edges, messages, pan/zoom, graph events.
 - [File dialogs](extras/dialog.md): Native open, save and folder dialogs: rdx_dialog_* in C, rdx::open_file and friends in C++.
+
+## Router
+
+- [Router](router/router.md): raydom::router: path patterns, history, nested routers, links, page lifetime, transitions, trails.
 
 ## Reference
 

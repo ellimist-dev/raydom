@@ -16,7 +16,8 @@ rd_node_set_anchor(ctx, menu, &(rd_anchor){.node = button, .offset = 4});  // be
 `rd_ctx_overlay` returns the overlay node, creating it on first use. It is a child of the root with special rules:
 
 - **Always last.** It stays the root's last child: appending to the root inserts before it. So it draws after,
-  and is hit-tested before, everything else.
+  and is hit-tested before, everything else. If code moves it out of the root, or away from the end, appends to
+  the root go to the end as usual until the next `rd_ctx_overlay` call, which puts it back as the last child.
 - **Never clipped.** It always covers the root, and no other node is its ancestor, so overflow containers don't
   clip what's inside it. Its position, inset, margin and size can't be changed by styles; padding, background and
   layout properties can.
@@ -57,8 +58,9 @@ rd_side side = rd_node_anchor_side(ctx, menu);  // RD_SIDE_TOP: no room below, s
 
 `rd_node_anchor_side` reports the side actually used, for drawing an arrow that points at the anchor.
 
-The anchor is followed every layout, including when it scrolls. Anchored nodes are placed in the order they were
-anchored, so a submenu anchored to an item of an anchored menu lands next to the item's final position. If the
+The anchor is followed every layout, including when it scrolls. Anchored nodes are placed in tree order, whatever
+order they were anchored in, so a submenu anchored to an item of an anchored menu lands next to the item's final
+position when the submenu comes after the menu in the tree. If the
 anchor is destroyed or detached, the node stays where it was last placed.
 
 ## Opening and closing

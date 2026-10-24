@@ -69,25 +69,33 @@ toast = rd_node_create(ctx);
 rd_node_append(ctx, rd_ctx_root(ctx), toast);
 // In: from transparent and 24px lower, to its place.
 rd_node_animate(ctx, toast, &(rd_style){.opacity = rd_num(0), .margin.top = rd_px(24)},
-                &(rd_style){.opacity = rd_num(1), .margin.top = rd_px(0)}, 0.2, RD_EASING_EASE_OUT, NULL, NULL);
-// ... later, out: fade, then remove it when the animation ends.
-rd_node_animate(ctx, toast, NULL, &(rd_style){.opacity = rd_num(0)}, 0.15, RD_EASING_EASE_IN, remove_node, &toast);
+                &(rd_style){.opacity = rd_num(1), .margin.top = rd_px(0)}, 0.2, RD_EASING_EASE_OUT);
+// ... later, out: fade, then remove it when the animation ends, with a timer for the same time.
+rd_node_animate(ctx, toast, NULL, &(rd_style){.opacity = rd_num(0)}, 0.15, RD_EASING_EASE_IN);
+rd_node* doomed = malloc(sizeof *doomed);
+*doomed         = toast;
+rd_ctx_set_timer(ctx, 0.15, 0, remove_node, doomed, free);  // freed when it fires, or if cleared
 ```
 
 `rd_node_animate` merges `to` into the node's inline style and animates the properties it sets, from what the node
 shows, over the given seconds and easing, whatever the node's transition properties say. `from` sets starting values
-for some properties, which is how a node that was just created animates in. `done` runs once the time is up; it's a
-[timer](../getting-started/frame-loop.md#timers), so it may destroy the node.
+for some properties, which is how a node that was just created animates in. Several calls before the next frame add
+up, each property keeping its own duration and easing. To act when the animation ends, for example to destroy a node
+it faded out, set a [timer](../getting-started/frame-loop.md#timers) for the same seconds: it runs on the same
+clock, can be cleared if the node is shown again, and frees its data with its destroy function.
 
-C++: `node.animate(to, 0.2)`, `node.animate(from, to, 0.2)`, and `node.animate(to, 0.15, RD_EASING_EASE_IN, [&] {
-... })`.
+C++: `node.animate(to, 0.2)` and `node.animate(from, to, 0.2)` return false if nothing could start; for the end, `ctx.set_timeout(0.2, [=] { ... })` returns the `rd_timer` to clear.
 
 ## Clock and frames
 
 Animations advance in `rd_ctx_layout`, on the context's clock (`rd_ctx_set_time`, which `rd_update` sets from
-raylib). `rd_ctx_animating` is true while anything moves. With
+raylib); `rd_ctx_time` reads it. `rd_ctx_animating` is true while anything moves. With
 [`rd_set_event_waiting`](../getting-started/frame-loop.md#event-waiting), frames keep running while anything
 animates and wait for input once everything is still.
+
+For motion you compute yourself, such as a canvas drawing an algorithm's state, run a repeating timer while it
+moves and advance by the difference in `rd_ctx_time` between calls. The timer keeps frames coming, and the motion
+stays on the same clock as everything else, so a test can drive it with `rd_ctx_set_time`.
 
 Animating layout costs one layout pass per frame for the animating parts of the tree, which is the same cost as
 resizing the window.

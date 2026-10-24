@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-46055788.js";
+            window.path_to_searchindex_js = "../searchindex-bd641951.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-c393df87.js"></script>
+        <script src="../toc-1e1dc0b8.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -205,7 +205,8 @@ free(rgba);
 <p><code>rd_image_load</code> and <code>rd_image_load_file</code> recognize SVG documents by their content and parse them with a vendored
 copy of nanosvg. An SVG’s natural size comes from its <code>width</code> and <code>height</code>, or its <code>viewBox</code>. It is rasterized when
 drawn, at the size it’s drawn at times the display scale, so it stays sharp at any size; when drawn larger later,
-it’s rasterized again. Smaller uses sample the larger raster.</p>
+it’s rasterized again. The raster’s scale goes up in steps of 1.25, so an SVG growing a little each frame, as in a
+pane being resized, is rasterized every few steps rather than every frame. Smaller uses sample the larger raster.</p>
 <pre><code class="language-c">rd_image icon = rd_image_load(ctx, icon_svg, sizeof icon_svg - 1);
 rd_node  n    = rd_node_create(ctx);
 rd_node_set_image(ctx, n, icon);

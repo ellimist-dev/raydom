@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-46055788.js";
+            window.path_to_searchindex_js = "../searchindex-bd641951.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-c393df87.js"></script>
+        <script src="../toc-1e1dc0b8.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -191,7 +191,8 @@ rd_node_set_anchor(ctx, menu, &amp;(rd_anchor){.node = button, .offset = 4});  /
 <p><code>rd_ctx_overlay</code> returns the overlay node, creating it on first use. It is a child of the root with special rules:</p>
 <ul>
 <li><strong>Always last.</strong> It stays the root’s last child: appending to the root inserts before it. So it draws after,
-and is hit-tested before, everything else.</li>
+and is hit-tested before, everything else. If code moves it out of the root, or away from the end, appends to
+the root go to the end as usual until the next <code>rd_ctx_overlay</code> call, which puts it back as the last child.</li>
 <li><strong>Never clipped.</strong> It always covers the root, and no other node is its ancestor, so overflow containers don’t
 clip what’s inside it. Its position, inset, margin and size can’t be changed by styles; padding, background and
 layout properties can.</li>
@@ -229,8 +230,9 @@ rd_ctx_layout(ctx, 800, 600);
 rd_side side = rd_node_anchor_side(ctx, menu);  // RD_SIDE_TOP: no room below, so it flipped
 </code></pre>
 <p><code>rd_node_anchor_side</code> reports the side actually used, for drawing an arrow that points at the anchor.</p>
-<p>The anchor is followed every layout, including when it scrolls. Anchored nodes are placed in the order they were
-anchored, so a submenu anchored to an item of an anchored menu lands next to the item’s final position. If the
+<p>The anchor is followed every layout, including when it scrolls. Anchored nodes are placed in tree order, whatever
+order they were anchored in, so a submenu anchored to an item of an anchored menu lands next to the item’s final
+position when the submenu comes after the menu in the tree. If the
 anchor is destroyed or detached, the node stays where it was last placed.</p>
 <h2 id="opening-and-closing"><a class="header" href="#opening-and-closing">Opening and closing</a></h2>
 <p>The overlay has no notion of open or closed. Show and hide popups with <code>display</code>, or create and destroy them:</p>

@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-46055788.js";
+            window.path_to_searchindex_js = "../searchindex-bd641951.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-c393df87.js"></script>
+        <script src="../toc-1e1dc0b8.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -207,7 +207,9 @@ Space chooses, and Tab closes the menu. Hovering an item highlights it.</p>
                   [&amp;](int index) { log = "context " + std::to_string(index); });
 </code></pre>
 <p><code>rdx_context_menu_attach</code> opens the menu at the pointer when the node is pressed with the secondary button. The items
-are copied, and the callback lives as long as the node.</p>
+are copied, and the callback lives as long as the node. A menu still open when the node is destroyed stays open, and
+choosing from it does nothing. Likewise a select’s list that outlives its select ignores the choice, and closes at
+the next press, key or pointer move.</p>
 <h2 id="select"><a class="header" href="#select">Select</a></h2>
 <pre><code class="language-cpp">rd::Node theme = rdx::select(ctx, {"System", "Light", "Dark"}, "Theme");
 theme.on(RD_EVENT_CHANGE, [&amp;] { log = "theme " + std::to_string(rdx::selected(theme)); });
