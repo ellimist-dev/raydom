@@ -224,6 +224,13 @@ static void test_no_font(void) {
   rd_ctx_layout(ctx, 800, 600);
   CHECK_SIZE(ctx, a, 0, 0);
   CHECK(isnan(rd_node_baseline(ctx, a)));
+
+  // The first font becomes the default, which relayouts text measured without one.
+  rd_font f = rd_font_load_file(ctx, RAYDOM_TEST_FONT);
+  CHECK(f.id != 0);
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK_SIZE(ctx, a, 5 * rd_font_measure(ctx, f, 16, "a", 1), LH);
+  CHECK(!isnan(rd_node_baseline(ctx, a)));
   rd_ctx_destroy(ctx);
 }
 

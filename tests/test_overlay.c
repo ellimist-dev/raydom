@@ -243,10 +243,33 @@ static void hooks(void) {
   rd_ctx_destroy(ctx);
 }
 
+// A submenu whose anchor was set before its menu's is still placed after the menu: tree order.
+static void anchor_order(void) {
+  rd_ctx* ctx  = rd_ctx_create();
+  rd_node btn  = add(ctx, rd_ctx_root(ctx), (rd_style){.position = RD_POSITION_ABSOLUTE,
+                                                       .inset    = {.top = rd_px(100), .left = rd_px(200)},
+                                                       .width    = rd_px(80),
+                                                       .height   = rd_px(20)});
+  rd_node menu = popup(ctx, 100, 100);
+  rd_node item = add(ctx, menu, (rd_style){.height = rd_px(20)});
+  rd_node sub  = popup(ctx, 60, 60);
+  rd_node_set_anchor(ctx, sub, &(rd_anchor){.node = item, .side = RD_SIDE_RIGHT});
+  rd_node_set_anchor(ctx, menu, &(rd_anchor){.node = btn});
+  rd_ctx_layout(ctx, 800, 600);
+  rd_rect m = rd_node_bounds(ctx, menu), s = rd_node_bounds(ctx, sub);
+  CHECK(near(m.x, 200) && near(m.y, 120) && near(s.x, 300) && near(s.y, 120));
+  rd_node_merge_style(ctx, btn, &(rd_style){.inset = {.top = rd_px(300), .left = rd_px(400)}});
+  rd_ctx_layout(ctx, 800, 600);
+  m = rd_node_bounds(ctx, menu), s = rd_node_bounds(ctx, sub);
+  CHECK(near(m.x, 400) && near(m.y, 320) && near(s.x, 500) && near(s.y, 320));
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   layering();
   hooks();
   node_hooks();
   anchoring();
+  anchor_order();
   return TEST_RESULT();
 }

@@ -1,6 +1,7 @@
 #include <math.h>
 #include <stdlib.h>
 
+#include "events_internal.h"
 #include "layout_internal.h"
 
 typedef struct rd__anchor {
@@ -10,7 +11,11 @@ typedef struct rd__anchor {
 
 rd_node rd_ctx_overlay(rd_ctx* ctx) {
   if (!ctx) return (rd_node){0};
-  if (rd__slot(ctx, ctx->overlay)) return ctx->overlay;
+  if (rd__slot(ctx, ctx->overlay)) {
+    rd_slot* s = &ctx->slots[ctx->overlay.index];
+    if (s->parent != ctx->root || s->next_sibling) rd_node_append(ctx, rd_ctx_root(ctx), ctx->overlay);  // moved away
+    return ctx->overlay;
+  }
   rd_node n = rd_node_create(ctx);
   if (rd_node_is_null(n)) return n;
   rd_node_append(ctx, rd_ctx_root(ctx), n);
@@ -133,9 +138,21 @@ void rd__place_anchored(rd_ctx* ctx) {
   uint32_t   kept = 0;
   for (uint32_t j = 0; j < c->len; j++) {
     rd_node n = c->nodes[j];
-    if (!rd__slot(ctx, n) || !ctx->layouts[n.index].anchor) continue;  // destroyed or cleared: drop it
-    c->nodes[kept++] = n;
-    if (attached(ctx, n.index) && !hidden(ctx, n.index)) place(ctx, n.index, ctx->layouts[n.index].anchor, view);
+    if (rd__slot(ctx, n) && ctx->layouts[n.index].anchor) c->nodes[kept++] = n;  // else destroyed or cleared: drop it
   }
   c->len = kept;
+  // Tree order, so a node anchored inside another anchored node is placed after it.
+  if (c->len > 1) {
+    rd__tree_number(ctx);
+    for (uint32_t j = 1; j < c->len; j++) {
+      rd_node  n = c->nodes[j];
+      uint32_t o = ctx->layouts[n.index].order, k = j;
+      for (; k && ctx->layouts[c->nodes[k - 1].index].order > o; k--) c->nodes[k] = c->nodes[k - 1];
+      c->nodes[k] = n;
+    }
+  }
+  for (uint32_t j = 0; j < c->len; j++) {
+    uint32_t i = c->nodes[j].index;
+    if (attached(ctx, i) && !hidden(ctx, i)) place(ctx, i, ctx->layouts[i].anchor, view);
+  }
 }

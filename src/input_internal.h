@@ -19,6 +19,10 @@ bool rd__input_take_dirty(rd_ctx* ctx, uint32_t i);
 // Default actions; rd__input_key reports whether it handled the key.
 bool rd__input_key(rd_ctx* ctx, uint32_t i, const rd_event* ev);
 void rd__input_text(rd_ctx* ctx, uint32_t i, uint32_t codepoint);
+// Ends the typing run, so the next typed text starts its own undo step. For blur.
+void rd__input_end_typing(rd_ctx* ctx, uint32_t i);
+// rd_node_set_text calls it before replacing an input's value: a programmatic value is an undo step.
+void rd__input_before_set(rd_text* t, const char* utf8, size_t len);
 void rd__input_pointer(rd_ctx* ctx, uint32_t i, float x, float y, bool extend);
 // Keeps a single-line input's caret in view; returns the horizontal scroll.
 float rd__input_sync_scroll(rd_ctx* ctx, uint32_t i, const rd__text_layout* tl, float width);

@@ -411,6 +411,71 @@ static void test_reentrancy(void) {
   rd_ctx_destroy(ctx);
 }
 
+// A kept page whose parameters change while it shows stays shown, and keeps focus.
+static void test_kept_params(void) {
+  for (int fade = 0; fade < 2; fade++) {
+    rd_node r;
+    rd_ctx* ctx = setup(&r, &(rdr_router_desc){.transition = fade ? RDR_TRANSITION_FADE : RDR_TRANSITION_NONE});
+    rd_ctx_set_time(ctx, 1);
+    CHECK(add(ctx, r, "kept/:id", RDR_ROUTE_KEEP_ALIVE) && add(ctx, r, "other", 0));
+    rdr_router_go(ctx, r, "/other");
+    rdr_router_go(ctx, r, "/kept/1");
+    rd_ctx_set_time(ctx, 2);
+    rd_ctx_layout(ctx, 800, 600);
+    CHECK(!rdr_router_transitioning(ctx, r));
+    rd_node slot = rdr_router_page(ctx, r), kept = shown(ctx, r);
+    rd_node_set_style(ctx, kept, &(rd_style){.height = rd_px(20), .focusable = RD_FOCUSABLE_TAB});
+    CHECK(rd_node_focus(ctx, kept) && rd_node_eq(rd_ctx_focused(ctx), kept));
+    CHECK(rdr_router_go(ctx, r, "/kept/2") && streq(rdr_param(ctx, kept, "id"), "2") && c.builds == 2);
+    CHECK(rd_node_eq(rdr_router_page(ctx, r), slot) && !rdr_router_transitioning(ctx, r));
+    CHECK(rd_node_eq(rd_ctx_focused(ctx), kept) && !(rd_node_states(ctx, slot) & RD_STATE_DISABLED));
+    rd_ctx_layout(ctx, 800, 600);
+    CHECK(rd_node_rect(ctx, slot).height == 300);
+    rd_ctx_destroy(ctx);
+  }
+}
+
+// No limit on the number of segments in a path or a pattern.
+static void test_long_paths(void) {
+  rd_node r;
+  rd_ctx* ctx = setup(&r, NULL);
+  char    path[512] = "/files", pattern[512] = "";
+  for (int k = 0; k < 99; k++) strcat(path, "/s");
+  for (int k = 0; k < 100; k++) strcat(pattern, k ? "/p" : "p");
+  CHECK(add(ctx, r, "*", 0));
+  CHECK(rdr_router_go(ctx, r, path) && streq(rdr_router_route(ctx, r), "*"));
+  CHECK(add(ctx, r, "files/*rest", 0) && rdr_router_go(ctx, r, path + 6) && rdr_router_go(ctx, r, path));
+  CHECK(streq(rdr_router_route(ctx, r), "files/*rest") && strlen(rdr_param(ctx, r, "rest")) == 99 * 2 - 1);
+  CHECK(add(ctx, r, pattern, 0));
+  char p_path[512] = "";
+  for (int k = 0; k < 100; k++) strcat(p_path, "/p");
+  CHECK(rdr_router_go(ctx, r, p_path) && streq(rdr_router_route(ctx, r), pattern));
+  rd_ctx_destroy(ctx);
+}
+
+// Links created by a page's build are marked once the navigation resolves.
+static rd_node links_page(rd_ctx* ctx, rd_node router, void* data) {
+  (void)router, (void)data;
+  rd_node box = rd_node_create(ctx);
+  rd_node_append(ctx, box, rdr_link_create(ctx, "Here", (rd_node){0}, "/users", 0));
+  rd_node_append(ctx, box, rdr_link_create(ctx, "There", (rd_node){0}, "/", 0));
+  return box;
+}
+
+static void test_links_in_build(void) {
+  rd_node r;
+  rd_ctx* ctx = setup(&r, NULL);
+  add(ctx, r, "/", 0);
+  rdr_router_add(ctx, r, &(rdr_route_desc){.pattern = "users/:id?", .build = links_page});
+  CHECK(rdr_router_go(ctx, r, "/users/5"));
+  rd_node box = shown(ctx, r), here = rd_node_first_child(ctx, box), there = rd_node_next_sibling(ctx, here);
+  CHECK((rd_node_states(ctx, here) & RD_STATE_CHECKED) && !(rd_node_states(ctx, there) & RD_STATE_CHECKED));
+  // Outside a navigation, a new link is marked at once.
+  rd_node late = rdr_link_create(ctx, "Late", r, "/users/5", RDR_LINK_EXACT);
+  CHECK(rd_node_states(ctx, late) & RD_STATE_CHECKED);
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   test_matching();
   test_no_match();
@@ -422,5 +487,8 @@ int main(void) {
   test_input();
   test_links();
   test_reentrancy();
+  test_kept_params();
+  test_long_paths();
+  test_links_in_build();
   return TEST_RESULT();
 }

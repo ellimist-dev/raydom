@@ -174,6 +174,25 @@ static void test_extensions(void) {
   CHECK(destroyed == 2);
 }
 
+// An overlay moved out of the root no longer redirects appends to the root; rd_ctx_overlay puts it back last.
+static void test_overlay_moved_out(void) {
+  rd_ctx* ctx  = rd_ctx_create();
+  rd_node root = rd_ctx_root(ctx);
+  rd_node ov   = rd_ctx_overlay(ctx);
+  rd_node_detach(ctx, ov);
+  rd_node a = rd_node_create(ctx);
+  CHECK(rd_node_append(ctx, root, a) && rd_node_eq(rd_node_last_child(ctx, root), a));
+  rd_node b = rd_node_create(ctx);
+  rd_node_append(ctx, a, ov);
+  CHECK(rd_node_append(ctx, root, b) && rd_node_eq(rd_node_last_child(ctx, root), b));
+  CHECK(rd_node_eq(rd_ctx_overlay(ctx), ov) && rd_node_eq(rd_node_last_child(ctx, root), ov));
+  rd_node c = rd_node_create(ctx);
+  CHECK(rd_node_append(ctx, root, c) && rd_node_eq(rd_node_last_child(ctx, root), ov));
+  rd_node_insert_before(ctx, root, ov, a);
+  CHECK(rd_node_eq(rd_ctx_overlay(ctx), ov) && rd_node_eq(rd_node_last_child(ctx, root), ov));
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   test_extensions();
   test_attach();
@@ -183,5 +202,6 @@ int main(void) {
   test_destroy_subtree();
   test_userdata_replace_and_ctx_destroy();
   test_growth();
+  test_overlay_moved_out();
   return TEST_RESULT();
 }

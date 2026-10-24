@@ -25,8 +25,10 @@ struct rd__input {
   char*     placeholder;
   size_t    placeholder_len;
   snapshots undo, redo;
-  bool      dirty;   // edited since the last change event
-  bool      typing;  // the last edit was typed text, so the next one joins its undo step
+  bool      dirty;    // edited since the last change event
+  bool      typing;   // the last edit was typed text, so the next one joins its undo step
+  bool      editing;  // inside an edit's own rd_node_set_text
+  uint32_t  high;     // a UTF-16 high surrogate waiting for its low half
 };
 
 #ifdef __APPLE__
@@ -111,6 +113,7 @@ bool rd_input_select(rd_ctx* ctx, rd_node node, size_t anchor, size_t caret) {
   t->input->anchor   = snap_byte(t, anchor);
   t->input->caret    = snap_byte(t, caret);
   t->input->has_goal = false;
+  t->input->typing   = false;
   ctx->paint_dirty   = true;
   return true;
 }
@@ -160,6 +163,21 @@ static bool snapshot_push(snapshots* s, const rd_text* t, const rd__input* in) {
   return true;
 }
 
+void rd__input_end_typing(rd_ctx* ctx, uint32_t i) {
+  rd__input* in = input_of(ctx, i);
+  if (in) in->typing = false;
+}
+
+void rd__input_before_set(rd_text* t, const char* utf8, size_t len) {
+  rd__input* in = t->input;
+  if (in->editing) return;
+  in->typing = false;
+  in->high   = 0;
+  if (len == t->len && !memcmp(utf8, t->utf8, len)) return;
+  snapshot_push(&in->undo, t, in);
+  snapshots_clear(&in->redo);
+}
+
 static rd_node node_of(const rd_text* t) { return rd__handle(t->ctx, t->node); }
 
 static void changed(rd_text* t) {
@@ -181,8 +199,10 @@ static bool replace(rd_text* t, size_t from, size_t to, const char* ins, size_t 
   memcpy(buf, t->utf8, from);
   memcpy(buf + from, ins, ins_len);
   memcpy(buf + from + ins_len, t->utf8 + to, t->len - to);
-  buf[len] = 0;
-  bool ok  = rd_node_set_text(t->ctx, node_of(t), buf, len);
+  buf[len]    = 0;
+  in->editing = true;
+  bool ok     = rd_node_set_text(t->ctx, node_of(t), buf, len);
+  in->editing = false;
   free(buf);
   if (!ok) return false;
   in->anchor = in->caret = from + ins_len;
@@ -194,8 +214,10 @@ static void restore(rd_text* t, snapshots* from, snapshots* to) {
   rd__input* in = t->input;
   if (!from->len) return;
   snapshot_push(to, t, in);
-  snapshot s = from->items[--from->len];
+  snapshot s  = from->items[--from->len];
+  in->editing = true;
   rd_node_set_text(t->ctx, node_of(t), s.text, s.len);
+  in->editing = false;
   free(s.text);
   in->anchor = snap_byte(t, s.anchor);
   in->caret  = snap_byte(t, s.caret);
@@ -278,17 +300,43 @@ static void copy_selection(rd_text* t, size_t lo, size_t hi) {
   free(s);
 }
 
+static size_t encode(uint32_t cp, char* buf) {
+  if (cp < 0x80) {
+    buf[0] = (char)cp;
+    return 1;
+  }
+  if (cp < 0x800) {
+    buf[0] = (char)(0xC0 | (cp >> 6));
+    buf[1] = (char)(0x80 | (cp & 0x3F));
+    return 2;
+  }
+  if (cp < 0x10000) {
+    buf[0] = (char)(0xE0 | (cp >> 12));
+    buf[1] = (char)(0x80 | ((cp >> 6) & 0x3F));
+    buf[2] = (char)(0x80 | (cp & 0x3F));
+    return 3;
+  }
+  buf[0] = (char)(0xF0 | (cp >> 18));
+  buf[1] = (char)(0x80 | ((cp >> 12) & 0x3F));
+  buf[2] = (char)(0x80 | ((cp >> 6) & 0x3F));
+  buf[3] = (char)(0x80 | (cp & 0x3F));
+  return 4;
+}
+
+// Pasted text keeps tabs and, in a multi-line input, newlines; other controls go, and invalid UTF-8
+// becomes U+FFFD (up to three bytes for each bad byte).
 static void paste(rd_text* t, size_t lo, size_t hi) {
   const char* clip = rd__clipboard_get(t->ctx);
   if (!clip || !*clip) return;
   size_t n   = strlen(clip);
-  char*  buf = malloc(n + 1);
+  char*  buf = n < SIZE_MAX / 3 ? malloc(3 * n + 1) : NULL;
   if (!buf) return;
   size_t m = 0;
-  for (size_t j = 0; j < n; j++) {
-    char c = clip[j];
-    if (c == '\r') continue;
-    buf[m++] = c == '\n' && !rd__input_multiline(t->input) ? ' ' : c;
+  for (size_t j = 0; j < n;) {
+    uint32_t c = rd__utf8_decode(clip, n, &j);
+    if (c == '\n' && !rd__input_multiline(t->input)) c = ' ';
+    if ((c < 0x20 && c != '\n' && c != '\t') || c == 0x7F) continue;
+    m += encode(c, buf + m);
   }
   replace(t, lo, hi, buf, m, false);
   free(buf);
@@ -392,33 +440,26 @@ bool rd__input_key(rd_ctx* ctx, uint32_t i, const rd_event* ev) {
   }
 }
 
+// Hosts that deliver UTF-16 send a pair as two code points: join them, and drop lone halves.
 void rd__input_text(rd_ctx* ctx, uint32_t i, uint32_t cp) {
   rd_text* t = rd__text_get(ctx, i);
-  if (!t || !t->input || cp < 0x20 || cp == 0x7F || cp > 0x10FFFF) return;
-  char   buf[4];
-  size_t n;
-  if (cp < 0x80) {
-    buf[0] = (char)cp;
-    n      = 1;
-  } else if (cp < 0x800) {
-    buf[0] = (char)(0xC0 | (cp >> 6));
-    buf[1] = (char)(0x80 | (cp & 0x3F));
-    n      = 2;
-  } else if (cp < 0x10000) {
-    buf[0] = (char)(0xE0 | (cp >> 12));
-    buf[1] = (char)(0x80 | ((cp >> 6) & 0x3F));
-    buf[2] = (char)(0x80 | (cp & 0x3F));
-    n      = 3;
-  } else {
-    buf[0] = (char)(0xF0 | (cp >> 18));
-    buf[1] = (char)(0x80 | ((cp >> 12) & 0x3F));
-    buf[2] = (char)(0x80 | ((cp >> 6) & 0x3F));
-    buf[3] = (char)(0x80 | (cp & 0x3F));
-    n      = 4;
+  if (!t || !t->input) return;
+  rd__input* in   = t->input;
+  uint32_t   high = in->high;
+  in->high        = 0;
+  if (cp >= 0xD800 && cp <= 0xDBFF) {
+    in->high = cp;
+    return;
   }
-  rd__input* in = t->input;
-  size_t     lo = in->anchor < in->caret ? in->anchor : in->caret;
-  size_t     hi = in->anchor < in->caret ? in->caret : in->anchor;
+  if (cp >= 0xDC00 && cp <= 0xDFFF) {
+    if (!high) return;
+    cp = 0x10000 + ((high - 0xD800) << 10) + (cp - 0xDC00);
+  }
+  if (cp < 0x20 || cp == 0x7F || cp > 0x10FFFF) return;
+  char   buf[4];
+  size_t n  = encode(cp, buf);
+  size_t lo = in->anchor < in->caret ? in->anchor : in->caret;
+  size_t hi = in->anchor < in->caret ? in->caret : in->anchor;
   replace(t, lo, hi, buf, n, cp != ' ');
 }
 

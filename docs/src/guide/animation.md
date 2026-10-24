@@ -59,11 +59,12 @@ jumps.
 
 `rd_node_animate` merges `to` into the node's inline style and animates the properties it sets, from what the node
 shows, over the given seconds and easing, whatever the node's transition properties say. `from` sets starting values
-for some properties, which is how a node that was just created animates in. `done` runs once the time is up; it's a
-[timer](../getting-started/frame-loop.md#timers), so it may destroy the node.
+for some properties, which is how a node that was just created animates in. Several calls before the next frame add
+up, each property keeping its own duration and easing. To act when the animation ends, for example to destroy a node
+it faded out, set a [timer](../getting-started/frame-loop.md#timers) for the same seconds: it runs on the same
+clock, can be cleared if the node is shown again, and frees its data with its destroy function.
 
-C++: `node.animate(to, 0.2)`, `node.animate(from, to, 0.2)`, and `node.animate(to, 0.15, RD_EASING_EASE_IN, [&] {
-... })`.
+C++: `node.animate(to, 0.2)` and `node.animate(from, to, 0.2)` return false if nothing could start; for the end, `ctx.set_timeout(0.2, [=] { ... })` returns the `rd_timer` to clear.
 
 ## Clock and frames
 

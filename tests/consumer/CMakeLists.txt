@@ -9,7 +9,7 @@ if (CONSUMER_FIND_PACKAGE)
     # The version of the source tree this test sits in: the installed package must accept it.
     file(STRINGS ${CMAKE_CURRENT_LIST_DIR}/../../CMakeLists.txt line REGEX "^project\\(raydom VERSION")
     string(REGEX MATCH "[0-9]+\\.[0-9]+" want "${line}")
-    find_package(raydom ${want} CONFIG REQUIRED)
+    find_package(raydom ${want} CONFIG REQUIRED COMPONENTS extras router)
 else ()
     include(FetchContent)
     FetchContent_Declare(raydom SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/../..)

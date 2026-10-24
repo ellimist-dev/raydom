@@ -272,7 +272,9 @@ static void slider_pointer(rd_ctx* ctx, rd_event* ev, void* data) {
     rd_node_set_pointer_capture(ctx, c->node);
     c->drag_start = c->value;
   } else if (ev->type == RD_EVENT_POINTER_UP) {
-    if (ev->button == RD_BUTTON_PRIMARY && c->value != c->drag_start) rd_node_dispatch(ctx, c->node, RD_EVENT_CHANGE);
+    // Only the release of a press this slider took: a press that began elsewhere has nothing to commit.
+    if (ev->button == RD_BUTTON_PRIMARY && rd_node_eq(rd_ctx_pointer_capture(ctx), c->node) && c->value != c->drag_start)
+      rd_node_dispatch(ctx, c->node, RD_EVENT_CHANGE);
     return;
   } else if (!(ev->buttons & RD_BUTTON_PRIMARY) || !rd_node_eq(rd_ctx_pointer_capture(ctx), c->node)) {
     return;

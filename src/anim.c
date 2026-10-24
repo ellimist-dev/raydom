@@ -64,13 +64,14 @@ typedef struct rd__anim {
   bool     active[P_COUNT];
   bool     to_auto[P_COUNT];  // height animating to auto: the end is re-measured every frame
   uint32_t count;             // active properties
-  // rd_node_animate, applied at the node's next style computation.
+  // rd_node_animate, applied at the node's next style computation. Timing is per property, so
+  // several calls before that computation each keep their own.
   bool     pending, pending_from_set;
   rd_style pending_from;
   bool     pending_mask[P_COUNT];
-  float    pending_duration;
-  double   pending_start;  // when rd_node_animate was called, so `done` lines up with the end
-  uint8_t  pending_easing;
+  float    pending_duration[P_COUNT];
+  double   pending_start[P_COUNT];  // when rd_node_animate was called, so the end lines up with timers set then
+  uint8_t  pending_easing[P_COUNT];
 } rd__anim;
 
 // Values.
@@ -291,9 +292,9 @@ void rd__transition(rd_ctx* ctx, uint32_t i, rd_style* next) {
   for (int p = 0; p < P_COUNT; p++) {
     if (PROPS[p].kind == K_OTHER) continue;
     bool    exp    = ex && a->pending_mask[p];
-    float   d      = exp ? a->pending_duration : (GROUP[p] & mask) ? dur : 0;
-    double  start  = exp ? a->pending_start : ctx->now + delay;
-    uint8_t e      = exp ? a->pending_easing : next->transition_easing;
+    float   d      = exp ? a->pending_duration[p] : (GROUP[p] & mask) ? dur : 0;
+    double  start  = exp ? a->pending_start[p] : ctx->now + delay;
+    uint8_t e      = exp ? a->pending_easing[p] : next->transition_easing;
     void*   target = field(next, p);
 
     // A transition already heading to this value carries on.
@@ -384,22 +385,25 @@ void rd__anim_tick(rd_ctx* ctx) {
 }
 
 bool rd_node_animate(rd_ctx* ctx, rd_node node, const rd_style* from, const rd_style* to, double seconds,
-                     rd_easing easing, rd_timer_fn done, void* data) {
+                     rd_easing easing) {
   if (!rd__slot(ctx, node) || !to) return false;
+  // Allocate everything before changing anything, so a failure leaves the node as it was.
   rd__anim* a = anim_get(ctx, node.index);
-  if (!a) return false;
-  // Several calls before the next style computation add up.
-  a->pending          = true;
-  a->pending_duration = (float)fmax(0, seconds);
-  a->pending_start    = ctx->now;
-  a->pending_easing   = easing ? easing : RD_EASING_EASE;
-  for (int p = 0; p < P_COUNT; p++) a->pending_mask[p] |= sets(p, to);
+  if (!a || !rd_node_merge_style(ctx, node, to)) return false;
+  float   d = (float)fmax(0, seconds);
+  uint8_t e = easing ? easing : RD_EASING_EASE;
+  a->pending = true;
+  for (int p = 0; p < P_COUNT; p++) {
+    if (!sets(p, to)) continue;
+    a->pending_mask[p]     = true;
+    a->pending_duration[p] = d;
+    a->pending_start[p]    = ctx->now;
+    a->pending_easing[p]   = e;
+  }
   if (from) {
     if (!a->pending_from_set) a->pending_from = (rd_style){0};
     rd_style_merge(&a->pending_from, from);
     a->pending_from_set = true;
   }
-  rd_node_merge_style(ctx, node, to);
-  if (done && !rd_ctx_set_timer(ctx, seconds, 0, done, data, NULL).index) return false;
   return true;
 }

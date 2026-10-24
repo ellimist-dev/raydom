@@ -14,7 +14,7 @@ enum : uint32_t {
 };
 
 enum { RD_STATE_COUNT        = 7,
-       RD_MEASURE_CACHE_SIZE = 4 };
+       RD_MEASURE_CACHE_SIZE = 8 };
 
 typedef struct rd_slot {
   uint32_t gen;
@@ -161,6 +161,7 @@ struct rd_ctx {
   uint32_t        free_head;
   uint32_t        live;
   uint32_t        root;
+  uint32_t        layout_epoch;  // bumped by every full layout of a node; see rd__layout_node
   struct rd__extension* extensions;
   uint32_t              extension_count;
   rd__timer*      timers;
@@ -226,6 +227,7 @@ struct rd_ctx {
   rd_node   press_target, capture;
 
   rd_node             focused;
+  uint32_t            focus_gen;  // bumped by every focus change; one that sees it move was superseded
   rd__chain           focus_chain;
   bool                keyboard_modality;
   uint8_t             mods;

@@ -82,7 +82,7 @@ static void dismiss(rd_ctx* ctx, toast* t) {
   rd_ctx_clear_timer(ctx, t->timer);
   rd_node_animate(ctx, t->node, NULL,
                   &(rd_style){.opacity = rd_num(0), .height = rd_px(0), .padding = rd_edges_all(rd_px(0))}, EXIT,
-                  RD_EASING_EASE_IN, NULL, NULL);
+                  RD_EASING_EASE_IN);
   t->timer = rd_ctx_set_timer(ctx, EXIT, 0, destroy_now, t, NULL);
 }
 
@@ -184,7 +184,7 @@ rd_node rdx_toast_show(rd_ctx* ctx, const rdx_toast_desc* desc) {
       to.margin.bottom   = rd_px(0);
       break;
   }
-  rd_node_animate(ctx, card, &from, &to, ENTER, RD_EASING_EASE_OUT, NULL, NULL);
+  rd_node_animate(ctx, card, &from, &to, ENTER, RD_EASING_EASE_OUT);
   start(t);
   return card;
 }

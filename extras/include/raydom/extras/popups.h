@@ -41,7 +41,8 @@ typedef struct rdx_menu_desc {
 rd_node rdx_menu_open(rd_ctx* ctx, const rdx_menu_desc* desc);
 
 // Opens the menu at the pointer when target is pressed with the secondary button. The items are
-// copied; destroy(data) runs when target is destroyed. False, keeping nothing, on failure.
+// copied; destroy(data) runs when target is destroyed. A menu still open then stays open, and
+// choosing from it doesn't call fn. False, keeping nothing, on failure.
 bool rdx_context_menu_attach(rd_ctx* ctx, rd_node target, const rdx_menu_item* items, size_t count, rdx_menu_fn fn,
                              void* data, rd_destroy_fn destroy);
 

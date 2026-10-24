@@ -24,10 +24,12 @@
   hold counted references.
 - **Class changes scan every node.** `invalidate_class` is O(nodes). Fine at startup; a per-class node list would
   fix it if classes start changing at runtime.
-- **Linear registries.** `rdx__lookup` and the popup and toast lists are linear scans. Fine for the numbers of
-  components a UI has; controls already use an O(1) index.
-- **Glyph atlas resets when full.** A UI showing many sizes of many glyphs at once could thrash it. Multiple atlas
-  pages would fix it.
+- **Linear registries.** The popup and toast lists are linear scans. Fine for the numbers of popups a UI has open.
+- **Glyph atlas cap.** When a frame overflows the 2048² atlas it is emptied once, then grown to 4096² (64 MB as
+  RGBA). Glyphs that still don't fit are skipped, and an empty atlas is retried every 60 frames. Pages, or a
+  single-channel atlas, would lift the cap and quarter the memory.
+- **Shader after rd_draw.** rlgl keeps the active shader private, so `rd_draw` can't restore an app's shader and
+  exits with raylib's default. Blend state is read from GL and restored.
 - **`rd_ctx` padding.** clang-tidy's opt-in padding check flags 33 bytes; reorder fields when convenient.
 - **nanosvg gradients** with unitless fractional coordinates render as a flat color (upstream bug; use
   percentages).

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "events_internal.h"
 #include "layout_internal.h"
 #include "text_internal.h"
 
@@ -12,7 +13,7 @@ static bool key_eq(const rd_layout_key* a, const rd_layout_key* b) {
          feq(a->cbh, b->cbh);
 }
 
-static rd_size layout_leaf(rd_ctx* ctx, uint32_t i, const rd_layout_key* k) {
+static RD__NOINLINE rd_size layout_leaf(rd_ctx* ctx, uint32_t i, const rd_layout_key* k) {
   rd_node_layout* L  = &ctx->layouts[i];
   const rd_style* st = &ctx->styles[i].computed;
   float           pb[2], mn[2], mx[2];
@@ -34,8 +35,8 @@ static rd_size layout_leaf(rd_ctx* ctx, uint32_t i, const rd_layout_key* k) {
   }
   rd_size m = L->measure_fn(L->measure_data, inner[0], mode[0], inner[1], mode[1]);
   return (rd_size){
-      finalize_axis(m.width + pb[0], k->wm, k->aw, mn[0], mx[0]),
-      finalize_axis(m.height + pb[1], k->hm, k->ah, mn[1], mx[1]),
+      finalize_axis(finite_len(m.width) + pb[0], k->wm, k->aw, mn[0], mx[0]),
+      finalize_axis(finite_len(m.height) + pb[1], k->hm, k->ah, mn[1], mx[1]),
   };
 }
 
@@ -97,7 +98,10 @@ static rd_layout_key axis_key(int ma, float main, rd_measure_mode mm, float cros
   return k;
 }
 
-// CSS Flexbox §9.7.
+// CSS Flexbox §9.7. Shrinking is weighted by the scaled flex shrink factor, flex_shrink times the
+// inner (content-box) base size.
+static float scaled_shrink(const flex_item* it, int ma) { return it->shrink * fmaxf(0, it->base - it->pb[ma]); }
+
 static void resolve_flexible(flex_item* items, const flex_line* line, int ma, float main_inner, float gap) {
   uint32_t n    = line->end - line->start;
   float    gaps = n > 1 ? gap * (float)(n - 1) : 0;
@@ -117,7 +121,8 @@ static void resolve_flexible(flex_item* items, const flex_line* line, int ma, fl
   for (uint32_t j = line->start; j < line->end; j++)
     initial_free -= outer_main(&items[j], ma, items[j].frozen ? items[j].target : items[j].base);
 
-  for (;;) {
+  // Each pass freezes at least one item, so this ends after n passes at most.
+  for (uint32_t pass = 0; pass <= n; pass++) {
     float used = gaps, sum_f = 0, sum_scaled = 0;
     bool  any = false;
     for (uint32_t j = line->start; j < line->end; j++) {
@@ -128,7 +133,7 @@ static void resolve_flexible(flex_item* items, const flex_line* line, int ma, fl
         any = true;
         used += outer_main(it, ma, it->base);
         sum_f += growing ? it->grow : it->shrink;
-        sum_scaled += it->shrink * it->base;
+        sum_scaled += scaled_shrink(it, ma);
       }
     }
     if (!any) break;
@@ -145,20 +150,22 @@ static void resolve_flexible(flex_item* items, const flex_line* line, int ma, fl
       if (it->frozen) continue;
       float t = it->base;
       if (growing && sum_f > 0)
-        t += free * it->grow / sum_f;
+        t += free * (it->grow / sum_f);
       else if (!growing && sum_scaled > 0)
-        t += free * it->shrink * it->base / sum_scaled;
+        t += free * (scaled_shrink(it, ma) / sum_scaled);
       float c       = clampf(t, it->min[ma], it->max[ma]);
       it->violation = c - t;
       it->target    = c;
       total += it->violation;
     }
 
+    bool froze = false;
     for (uint32_t j = line->start; j < line->end; j++) {
       flex_item* it = &items[j];
       if (it->frozen) continue;
-      if (total == 0 || (total > 0 && it->violation > 0) || (total < 0 && it->violation < 0)) it->frozen = true;
+      if (total == 0 || (total > 0 && it->violation > 0) || (total < 0 && it->violation < 0)) it->frozen = froze = true;
     }
+    if (!froze) break;  // only when the arithmetic isn't finite
   }
 }
 
@@ -225,7 +232,8 @@ void rd__layout_absolute(rd_ctx* ctx, uint32_t c, const rd_node_layout* P, const
   style_pb(st, cb[0], pb);
   size_bounds(st, pb, cb[0], cb[1], mn, mx);
 
-  float sz[2] = {resolve(st->width, cb[0]), resolve(st->height, cb[1])};
+  float sz[2]    = {resolve(st->width, cb[0]), resolve(st->height, cb[1])};
+  bool  sized[2] = {!isnan(sz[0]), !isnan(sz[1])};
   for (int a = 0; a < 2; a++) {
     int s = AX_START[a], e = AX_END[a];
     if (isnan(sz[a]) && !isnan(in[s]) && !isnan(in[e])) sz[a] = cb[a] - in[s] - in[e] - m[s] - m[e];
@@ -249,6 +257,23 @@ void rd__layout_absolute(rd_ctx* ctx, uint32_t c, const rd_node_layout* P, const
   }
   rd__layout_node(ctx, c, (rd_layout_key){sz[0], sz[1], cb[0], cb[1], RD_MEASURE_EXACTLY, RD_MEASURE_EXACTLY}, true);
 
+  // CSS 2 §10.3.7 and §10.6.4: with both insets and the size given, auto margins take the space
+  // left over, split evenly when both are auto. Horizontally an even split never goes negative: the
+  // start margin stays 0 and the end margin absorbs it. Otherwise auto margins are 0.
+  for (int a = 0; a < 2; a++) {
+    int s = AX_START[a], e = AX_END[a];
+    if (!sized[a] || isnan(in[s]) || isnan(in[e]) || !(am[s] || am[e])) continue;
+    float free = cb[a] - in[s] - in[e] - sz[a] - m[s] - m[e];
+    if (am[s] && am[e]) {
+      m[s] = a == 0 && free < 0 ? 0 : free / 2;
+      m[e] = free - m[s];
+    } else if (am[s]) {
+      m[s] = free;
+    } else {
+      m[e] = free;
+    }
+  }
+
   float pos[2];
   for (int a = 0; a < 2; a++) {
     int   s = AX_START[a], e = AX_END[a];
@@ -265,7 +290,7 @@ void rd__layout_absolute(rd_ctx* ctx, uint32_t c, const rd_node_layout* P, const
   memcpy(L->margin, m, sizeof m);
 }
 
-static rd_size layout_flex(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, bool perform) {
+static RD__NOINLINE rd_size layout_flex(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, bool perform) {
   rd_slot*        s  = &ctx->slots[i];
   rd_node_layout* L  = &ctx->layouts[i];
   const rd_style* st = &ctx->styles[i].computed;
@@ -329,8 +354,8 @@ static rd_size layout_flex(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, bool
     size_bounds(cs, it->pb, inner[0], inner[1], it->min, it->max);
     it->size_def[0] = resolve(cs->width, inner[0]);
     it->size_def[1] = resolve(cs->height, inner[1]);
-    it->grow        = cs->flex_grow.unit == RD_UNIT_NUM ? fmaxf(0, cs->flex_grow.value) : 0;
-    it->shrink      = cs->flex_shrink.unit == RD_UNIT_NUM ? fmaxf(0, cs->flex_shrink.value) : 0;
+    it->grow        = resolve_factor(cs->flex_grow);
+    it->shrink      = resolve_factor(cs->flex_shrink);
     it->align       = item_align(cs->align_self, st->align_items);
     if ((cs->align_self == RD_ALIGN_AUTO ? st->align_items : cs->align_self) == RD_ALIGN_BASELINE && row && !wrap_rev)
       it->align = RD_ALIGN_BASELINE;
@@ -594,12 +619,17 @@ rd_size rd__layout_node(rd_ctx* ctx, uint32_t i, rd_layout_key k, bool perform) 
       if (L->measure[j].valid && key_eq(&L->measure[j].key, &k)) return L->measure[j].size;
   }
 
-  rd_size r = compute(ctx, i, &k, perform);
+  uint32_t epoch = ctx->layout_epoch;
+  rd_size  r     = compute(ctx, i, &k, perform);
   if (perform) {
+    ctx->layout_epoch++;
     L->layout      = (rd_layout_cache){k, r, true};
     L->rect.width  = r.width;
     L->rect.height = r.height;
   } else {
+    // A measure that fully laid out a descendant (a baseline item) left it at this measure's
+    // geometry, so the node's own full layout can't be reused as is.
+    if (ctx->layout_epoch != epoch) L->layout.valid = false;
     L->measure[L->measure_next] = (rd_layout_cache){k, r, true};
     L->measure_next             = (uint8_t)((L->measure_next + 1) % RD_MEASURE_CACHE_SIZE);
   }
@@ -652,6 +682,7 @@ void rd_ctx_layout(rd_ctx* ctx, float width, float height) {
   }
   ctx->hooks_running = false;
   sweep_hooks(ctx);
+  rd__focus_fixup(ctx);  // with this frame's styles: a focused node hidden or disabled loses focus now
   if (tree_dirty(ctx)) layout_pass(ctx, width, height);
 }
 

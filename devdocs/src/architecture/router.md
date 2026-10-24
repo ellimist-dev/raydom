@@ -14,8 +14,13 @@ Nested routers find their parent by handle, not pointer, and the parent prunes d
 page that holds a nested router needs no unregistration.
 
 A context-wide registry is attached to the root node. It holds the router used last and the link handles, and
-installs the two root listeners: `KEY_DOWN` for Cmd+[ / Cmd+] (Alt+Left / Alt+Right outside macOS) and
-`POINTER_DOWN` for the side buttons.
+installs the two root listeners: `KEY_DOWN` for Cmd+[ / Cmd+] (Alt+Left / Alt+Right outside Apple platforms) and
+`POINTER_DOWN` for the side buttons. `alt_arrows` decides the Alt case: at compile time natively, and under
+Emscripten from the browser's platform, read once and also passed to the JavaScript keydown filter.
+
+`link_router` picks a link's router (its own, else the one around it, else the one used last) for both clicks
+and marking. `apply` marks every link after a navigation; `rdr_link_attach` marks only the new link, and not
+at all while its root is navigating, since `apply` will.
 
 ## Navigation
 
@@ -25,7 +30,8 @@ drained at most 16 times, which bounds redirect loops.
 
 `apply` normalizes the path, checks that the root matches it, updates history, and calls `resolve` on the root.
 Then it rebuilds the trail, marks links, and fires `CHANGE`. `resolve` matches one router against its segments.
-It keeps the page if the route and parameters are unchanged, and otherwise swaps pages through `change_pages`.
+It keeps the page if the route and parameters are unchanged, or if the route is kept alive and its wrapper is
+the one showing (only the parameters change then), and otherwise swaps pages through `change_pages`.
 Then it recurses into the nested routers inside the current page with the segments the route's wildcard left.
 After each builder it re-finds its state, because a builder may destroy the router.
 
@@ -34,6 +40,8 @@ After each builder it re-finds its state, because a builder may destroy the rout
 A pattern is parsed into segments: literal, parameter, or wildcard, each possibly optional. `bind` tries every
 choice of optional segments, at most 2^16, earlier ones included first. It ranks each binding by a per-path-segment
 array (literal 3, parameter 2, wildcard 1), compared lexicographically. A binding without a wildcard wins ties.
+A binding's arrays are heap-allocated, sized for the router's longest pattern and the path, so neither has a
+segment limit; `best_route` and `router_crumbs` allocate them once per call and `bind` reuses a scratch one.
 Across routes, ties go to the route added first.
 
 ## Trail

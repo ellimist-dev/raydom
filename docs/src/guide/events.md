@@ -39,7 +39,7 @@ Stopping at the target doesn't undo capture listeners that already ran on ancest
 
 | Type                         | Target                     | Bubbles | Default action                     |
 | ---------------------------- | -------------------------- | ------- | ---------------------------------- |
-| `POINTER_DOWN`, `_UP`, `_MOVE` | Node under the pointer, or the capturing node | Yes | Down: focus, start selection |
+| `POINTER_DOWN`, `_UP`, `_MOVE` | Node under the pointer, or the capturing node; back and forward over a disabled node: the root | Yes | Down: focus, start selection |
 | `POINTER_ENTER`, `_LEAVE`    | Each node entered or left  | No      |                                    |
 | `CLICK`                      | Common ancestor of the press and release targets | Yes | |
 | `WHEEL`                      | Node under the pointer     | Yes     | Scroll the nearest scroll container |
@@ -56,10 +56,14 @@ Event fields: `x`, `y` in root coordinates; `local_x`, `local_y` relative to `cu
 `codepoint` for text; `related` for focus events.
 
 Buttons are `RD_BUTTON_PRIMARY`, `SECONDARY`, `MIDDLE`, and a mouse's side buttons `RD_BUTTON_BACK` and
-`RD_BUTTON_FORWARD`; [the router](../router/router.md) takes the side buttons for history. In the browser,
+`RD_BUTTON_FORWARD`; [the router](../router/router.md) takes the side buttons for history. A disabled node gets no
+pointer events, but the side buttons over one, or over nothing, go to the root instead, so a router there still hears
+them. In the browser,
 Emscripten's GLFW reports every button past the middle one as the right button. So `rd_update` reads the right and
 side buttons from the canvas's own events there. `CLICK` fires for the
-primary button only. `ev->clicks` counts rapid clicks on the same node: 1, then 2 for a double
+primary button only. If a listener destroys or detaches the pressed node before the release, the press counts as
+being on its nearest ancestor that is still in the tree, as in browsers, so rebuilding a button's content on press
+doesn't lose the click. `ev->clicks` counts rapid clicks on the same node: 1, then 2 for a double
 click and 3 for a triple, when each follows the last within half a second and four pixels. Keyboard activation
 (Enter or Space) is always 1.
 

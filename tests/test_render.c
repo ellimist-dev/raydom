@@ -1,5 +1,6 @@
 #include <math.h>
 #include <raydom/raydom.h>
+#include <stdio.h>
 
 #include "check.h"
 #include "render_internal.h"
@@ -192,12 +193,42 @@ static void test_pixel_ratio(void) {
   rd_set_pixel_ratio(ctx, NAN);
   CHECK(rd_pixel_ratio(ctx) == 2);
   CHECK(rd_pixel_ratio(NULL) == 1);
-  rd_paint_restore(&(rd_paint_info){.ratio = 1});  // no-op without a ratio
+  rd_paint_restore(&(rd_paint_info){.ratio = 1});  // no-op outside rd_draw
+  rd_ctx_destroy(ctx);
+}
+
+// A long text in a scroller: its command carries the clip, and a selection over all of it fills only
+// the lines in view.
+static void test_text_cull(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_font_load_file(ctx, RAYDOM_TEST_FONT);
+  rd_node     view = add(ctx, rd_ctx_root(ctx),
+                         (rd_style){.width = rd_px(200), .height = rd_px(100), .overflow_y = RD_OVERFLOW_SCROLL, .font_size = rd_px(10)});
+  static char text[2000 * 6];
+  size_t      o = 0;
+  for (int j = 0; j < 2000; j++) o += (size_t)snprintf(text + o, sizeof text - o, "l%04d ", j);  // wraps: 300+ lines
+  rd_node t = rd_node_create_text(ctx, text, o);
+  rd_node_set_style(ctx, t, &(rd_style){.flex_shrink = rd_num(0)});
+  rd_node_append(ctx, view, t);
+  rd_ctx_layout(ctx, 400, 300);
+  rd_node_set_scroll(ctx, view, 0, 2000);
+  CHECK(rd_ctx_select(ctx, t, 0, t, o));
+
+  uint32_t       n;
+  const rd__cmd* cmds = rd__display_list(ctx, &n);
+  const rd__cmd* c    = find(cmds, n, RD_CMD_TEXT, t);
+  CHECK(c && near(c->clip.y, 0) && near(c->clip.height, 100) && near(c->rect.y, -2000));
+  uint32_t fills = count_kind(cmds, n, RD_CMD_FILL);
+  float    lh    = 100.0f / 8;  // generous: lines are at least this tall at 10px
+  CHECK(fills > 0 && fills <= (uint32_t)(100 / lh) + 2);
+  for (uint32_t j = 0; j < n; j++)  // each fill meets the view
+    if (cmds[j].kind == RD_CMD_FILL) CHECK(cmds[j].rect.y < 100 && cmds[j].rect.y + cmds[j].rect.height > 0);
   rd_ctx_destroy(ctx);
 }
 
 int main(void) {
   test_pixel_ratio();
+  test_text_cull();
   test_display_list();
   test_clip_and_cull();
   test_hit_and_pointer();

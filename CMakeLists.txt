@@ -79,6 +79,15 @@ if (RAYDOM_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif ()
 
+# Under Emscripten, one smoke test for Node with overflow checks and half the default 64 KB stack (just
+# web-smoke): raydom's deepest calls must leave the other half to the application.
+if (RAYDOM_BUILD_TESTS AND EMSCRIPTEN AND TARGET raydom_extras AND TARGET raydom_router)
+    add_executable(web_smoke tests/web_smoke.c)
+    target_link_libraries(web_smoke raydom_extras raydom_router)
+    target_compile_features(web_smoke PRIVATE c_std_23)
+    target_link_options(web_smoke PRIVATE -sENVIRONMENT=node -sSTACK_SIZE=32768 -sSTACK_OVERFLOW_CHECK=2 -sASSERTIONS=1)
+endif ()
+
 if (RAYDOM_BUILD_TESTS AND NOT EMSCRIPTEN)
     # The tests' font is raylib's Anonymous Pro: from raylib's sources when downloaded, else fetched alone.
     set(font "${raylib_SOURCE_DIR}/examples/text/resources/anonymous_pro_bold.ttf")
@@ -99,7 +108,7 @@ if (RAYDOM_BUILD_TESTS AND NOT EMSCRIPTEN)
         enable_testing()
         foreach (t test_tree test_tree_cpp test_style test_style_cpp test_layout test_layout_cpp test_grid
                    test_grid_cpp test_text test_text_cpp test_render test_events test_events_cpp test_input
-                   test_input_cpp test_selection test_role test_cursor test_overlay test_scrollbar test_image test_timer test_anim test_graph test_dialog test_controls test_popups test_views test_extras_cpp test_router test_router_cpp)
+                   test_input_cpp test_selection test_role test_cursor test_overlay test_scrollbar test_image test_timer test_anim test_graph test_dialog test_controls test_popups test_views test_extras_cpp test_router test_router_cpp test_layout_fuzz)
             file(GLOB src tests/${t}.c tests/${t}.cc)
             if (t MATCHES "^test_router" AND NOT TARGET raydom_router)
                 continue()

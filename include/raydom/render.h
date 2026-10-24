@@ -30,29 +30,34 @@ typedef struct rd_paint_info {
 // before its children, with raylib's batch flushed and no scissor or shader active, and the
 // transform scaled by the pixel ratio so that drawing is in logical coordinates. Blending is raydom's:
 // colors blend as usual and alpha accumulates toward opaque, so translucent drawing doesn't make a web
-// canvas see-through; raydom restores it after the callback. Restore any other raylib state you change. Render-texture passes are safe; with a pixel ratio, size and draw into the
-// texture in device pixels (dpi), and call rd_paint_restore after EndTextureMode.
+// canvas see-through; raydom restores it after the callback. Restore any other raylib state you change.
+// Render-texture passes are safe: size and draw into the texture in device pixels (dpi), and call
+// rd_paint_restore after EndTextureMode. A callback may draw another context with rd_draw, which then
+// clips and rasterizes for the transform it's drawn under.
 typedef void (*rd_paint_fn)(rd_ctx* ctx, const rd_paint_info* info, void* data);
 
-// Null fn clears it.
+// Null fn clears it. From inside the node's own callback, replacing or clearing it, or destroying the
+// node, defers the old destroy until the callback returns, so the callback may go on using its data.
 bool rd_node_set_paint(rd_ctx* ctx, rd_node node, rd_paint_fn fn, void* data, rd_destroy_fn destroy);
 // Clips raylib drawing to the content box within the clip. Ended by raydom after the callback.
 void rd_paint_scissor(const rd_paint_info* info);
 // Restores the transform the callback started with, after raylib calls that reset it: EndTextureMode,
-// EndMode2D, EndMode3D. Nothing to do with a pixel ratio of 1.
+// EndMode2D, EndMode3D. Needed at any pixel ratio when rd_draw ran under a transform of the app's.
 void rd_paint_restore(const rd_paint_info* info);
 // Draws a line of text from a paint callback, with raydom's fonts: rasterized for the display's
 // density, like the rest of the UI. x is the left edge and baseline the baseline, in logical
 // coordinates; rd_font_measure and rd_font_get_metrics give the width and the ascent for placing it.
 // A null font ({0}) is the default font; len may be RD_TEXT_NUL. No wrapping. Draws on top of what
-// the callback drew before it.
+// the callback drew before it, with the shader the callback has active, and changes no raylib state.
 void rd_paint_text(rd_ctx* ctx, const rd_paint_info* info, rd_font font, float size, float x, float baseline,
                    const char* utf8, size_t len, rd_color color);
 
 // raylib integration. rd_update reads raylib's mouse state and lays the tree out at the screen
 // size; rd_draw draws it between BeginDrawing and EndDrawing. Both do nothing without a raylib window
 // (IsWindowReady), for instance when InitWindow failed. Destroy the context before
-// CloseWindow so its textures and shader are released.
+// CloseWindow so its textures and shader are released. rd_draw leaves GL's blending, and rlgl's blend
+// mode and custom factors, as it found them, and raylib's default shader active: rlgl doesn't expose
+// the active one to restore.
 void rd_update(rd_ctx* ctx);
 // Lets raydom manage raylib's event waiting: idle frames wait for input (EnableEventWaiting), except
 // while a timer is pending, when frames keep running so it fires on time. Use instead of calling

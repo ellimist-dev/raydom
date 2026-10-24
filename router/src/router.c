@@ -204,14 +204,45 @@ static bool parse_pattern(const char* pattern, route* rt) {
 }
 
 // Matching. A binding gives, for each pattern segment, the path segment it took (-1 if skipped);
-// a wildcard takes from its index to the end.
+// a wildcard takes from its index to the end. Its arrays are sized for the longest pattern and the
+// path, so neither has a length limit.
 
 typedef struct binding {
-  int     at[64];
-  uint8_t rank[64];  // per path segment: 3 literal, 2 parameter, 1 wildcard
-  bool    wildcard;
-  bool    found;
+  int*     at;    // per pattern segment
+  uint8_t* rank;  // per path segment: 3 literal, 2 parameter, 1 wildcard
+  bool     wildcard;
+  bool     found;
 } binding;
+
+static bool binding_init(binding* b, int segs, int path_segs) {
+  *b      = (binding){0};
+  b->at   = malloc(sizeof *b->at * (size_t)(segs ? segs : 1));
+  b->rank = malloc((size_t)(path_segs ? path_segs : 1));
+  if (b->at && b->rank) return true;
+  free(b->at);
+  free(b->rank);
+  *b = (binding){0};
+  return false;
+}
+
+static void binding_free(binding* b) {
+  free(b->at);
+  free(b->rank);
+  *b = (binding){0};
+}
+
+static void binding_copy(binding* to, const binding* from, int segs, int path_segs) {
+  memcpy(to->at, from->at, sizeof *to->at * (size_t)segs);
+  memcpy(to->rank, from->rank, (size_t)path_segs);
+  to->wildcard = from->wildcard;
+  to->found    = from->found;
+}
+
+static int max_segs(const router* r) {
+  int n = 0;
+  for (int k = 0; k < r->route_count; k++) n = r->routes[k].count > n ? r->routes[k].count : n;
+  return n;
+}
 
 static bool better(const binding* a, const binding* b, int n) {
   if (!b->found) return true;
@@ -221,45 +252,51 @@ static bool better(const binding* a, const binding* b, int n) {
 }
 
 // The route's best binding to the path, trying each choice of optional segments, earlier ones
-// included first.
-static bool bind(const route* rt, const path* p, binding* out) {
+// included first. out and the scratch binding b are sized for the route and the path.
+static bool bind(const route* rt, const path* p, binding* out, binding* b) {
   out->found = false;
-  if (rt->count > 64 || p->count > 64) return false;
   for (int mask = (1 << rt->optionals) - 1; mask >= 0; mask--) {
-    binding b   = {.found = true};
-    int     at  = 0, opt = 0;
-    bool    ok  = true;
+    b->found    = true;
+    b->wildcard = false;
+    int  at = 0, opt = 0;
+    bool ok = true;
     for (int k = 0; ok && k < rt->count; k++) {
       const seg* g = &rt->segs[k];
-      b.at[k]      = -1;
+      b->at[k]     = -1;
       if (g->optional && !(mask >> (rt->optionals - 1 - opt++) & 1)) continue;
       if (g->kind == SEG_WILDCARD) {
-        b.at[k]    = at;
-        b.wildcard = true;
-        for (; at < p->count; at++) b.rank[at] = 1;
+        b->at[k]    = at;
+        b->wildcard = true;
+        for (; at < p->count; at++) b->rank[at] = 1;
         break;
       }
       ok = at < p->count && (g->kind == SEG_PARAM || !strcmp(g->text, p->segs[at]));
       if (ok) {
-        b.rank[at] = g->kind == SEG_PARAM ? 2 : 3;
-        b.at[k]    = at++;
+        b->rank[at] = g->kind == SEG_PARAM ? 2 : 3;
+        b->at[k]    = at++;
       }
     }
-    if (ok && at == p->count && better(&b, out, p->count)) *out = b;
+    if (ok && at == p->count && better(b, out, p->count)) binding_copy(out, b, rt->count, p->count);
   }
   return out->found;
 }
 
+// The best route for the path, with its binding in out, which the caller frees. -1 if none matches or
+// out of memory.
 static int best_route(const router* r, const path* p, binding* out) {
-  int best   = -1;
-  out->found = false;
-  for (int k = 0; k < r->route_count; k++) {
-    binding b;
-    if (bind(&r->routes[k], p, &b) && better(&b, out, p->count)) {
-      *out = b;
+  int     best = -1, segs = max_segs(r);
+  binding b, scratch;
+  bool    ok = binding_init(out, segs, p->count);
+  ok         = binding_init(&b, segs, p->count) && ok;
+  ok         = binding_init(&scratch, segs, p->count) && ok;
+  for (int k = 0; ok && k < r->route_count; k++) {
+    if (bind(&r->routes[k], p, &b, &scratch) && better(&b, out, p->count)) {
+      binding_copy(out, &b, r->routes[k].count, p->count);
       best = k;
     }
   }
+  binding_free(&b);
+  binding_free(&scratch);
   return best;
 }
 
@@ -398,15 +435,32 @@ static router* router_for(const rd_ctx* ctx, rd_node target) {
 
 static bool travel(rd_ctx* ctx, router* root, int delta);
 
+// Alt+Left and Alt+Right navigate, except on Apple platforms, where Option+Left moves by word. A
+// browser build can't tell at compile time, so it asks the browser once.
+static bool alt_arrows(void) {
+#if defined(__EMSCRIPTEN__)
+  static int apple = -1;
+  if (apple < 0) apple = EM_ASM_INT({
+      const n = typeof navigator === 'undefined' ? {} : navigator;  // none outside a page in older runtimes
+      const p = (n.userAgentData && n.userAgentData.platform) || n.platform || "";
+      return /Mac|iPhone|iPad|iPod/.test(p) ? 1 : 0;
+    });
+  return !apple;
+#elif defined(__APPLE__)
+  return false;
+#else
+  return true;
+#endif
+}
+
 static void nav_keys(rd_ctx* ctx, rd_event* ev, void* data) {
   (void)data;
   if (ev->default_prevented || ev->repeat) return;
   int dir = 0;
   if (ev->mods == RD_MOD_SUPER && (ev->key == RD_KEY_LEFT_BRACKET || ev->key == RD_KEY_RIGHT_BRACKET))
     dir = ev->key == RD_KEY_LEFT_BRACKET ? -1 : 1;
-#ifndef __APPLE__
-  if (ev->mods == RD_MOD_ALT && (ev->key == RD_KEY_LEFT || ev->key == RD_KEY_RIGHT)) dir = ev->key == RD_KEY_LEFT ? -1 : 1;
-#endif
+  if (ev->mods == RD_MOD_ALT && (ev->key == RD_KEY_LEFT || ev->key == RD_KEY_RIGHT) && alt_arrows())
+    dir = ev->key == RD_KEY_LEFT ? -1 : 1;
   router* r = dir ? router_for(ctx, ev->target) : NULL;
   if (r && travel(ctx, r, dir)) rd_event_prevent_default(ev);
 }
@@ -425,7 +479,7 @@ static void nav_buttons(rd_ctx* ctx, rd_event* ev, void* data) {
 static void claim_browser_navigation(void) {
 #ifdef __EMSCRIPTEN__
   EM_ASM({
-    if (globalThis.__raydomRouterInput) return;
+    if (globalThis.__raydomRouterInput || typeof window === 'undefined') return;  // not in a page: nothing to claim
     globalThis.__raydomRouterInput = true;
     const onCanvas = (e) => e.target === Module['canvas'];
     // Not pointerdown: cancelling it would also suppress the mousedown that raylib reads.
@@ -433,11 +487,11 @@ static void claim_browser_navigation(void) {
       window.addEventListener(type, (e) => { if ((e.button === 3 || e.button === 4) && onCanvas(e)) e.preventDefault(); }, true);
     window.addEventListener('keydown', (e) => {
       const free = !document.activeElement || document.activeElement === document.body || document.activeElement === Module['canvas'];
-      const alt = e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.code === 'ArrowLeft' || e.code === 'ArrowRight');
+      const alt = $0 && e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && (e.code === 'ArrowLeft' || e.code === 'ArrowRight');
       const cmd = e.metaKey && !e.ctrlKey && !e.altKey && !e.shiftKey && (e.code === 'BracketLeft' || e.code === 'BracketRight');
       if (free && (alt || cmd)) e.preventDefault();
     }, true);
-  });
+  }, alt_arrows());
 #endif
 }
 
@@ -536,13 +590,13 @@ static void change_pages(rd_ctx* ctx, router* r, rd_node old, bool old_kept, rd_
     rd_style from = {.inset = s.inset, .opacity = rd_num(1)};
     rd_style to   = fade ? (rd_style){.opacity = rd_num(0)}
                          : (rd_style){.inset = {.top = rd_px(0), .right = rd_pct(d), .bottom = rd_px(0), .left = rd_pct(-d)}};
-    rd_node_animate(ctx, old, &from, &to, sec, RD_EASING_EASE_IN_OUT, NULL, NULL);
+    rd_node_animate(ctx, old, &from, &to, sec, RD_EASING_EASE_IN_OUT);
   }
   if (rd_node_alive(ctx, slot)) {
     rd_style from = fade ? (rd_style){.display = RD_DISPLAY_FLEX, .opacity = rd_num(0)}
                          : (rd_style){.display = RD_DISPLAY_FLEX, .inset = {.left = rd_pct(d)}};
     rd_style to   = fade ? (rd_style){.opacity = rd_num(1)} : (rd_style){.inset = {.left = rd_pct(0)}};
-    rd_node_animate(ctx, slot, &from, &to, sec, RD_EASING_EASE_IN_OUT, NULL, NULL);
+    rd_node_animate(ctx, slot, &from, &to, sec, RD_EASING_EASE_IN_OUT);
   }
   r->leaving      = rd_node_alive(ctx, old) ? old : (rd_node){0};
   r->leaving_kept = old_kept;
@@ -565,6 +619,7 @@ static void resolve(rd_ctx* ctx, rd_node node, const char* base, const path* p, 
   param*  params   = NULL;
   int     count    = 0, consumed = sub.count;
   if (index >= 0 && !bind_params(&r->routes[index], &b, &sub, &params, &count, &consumed)) index = -1;
+  binding_free(&b);
 
   char* nb = dup(base), *nc = join(base, &sub, 0, consumed), *ns = join("", &sub, 0, sub.count);
   if (nb && nc && ns) {
@@ -582,6 +637,9 @@ static void resolve(rd_ctx* ctx, rd_node node, const char* base, const path* p, 
   r->consumed_count = index >= 0 ? consumed : 0;
 
   bool same = index == r->current && params_eq(params, count, r->params, r->param_count);
+  // A kept page showing already stays when its parameters change, and reads the new ones.
+  if (!same && index >= 0 && index == r->current && (r->routes[index].flags & RDR_ROUTE_KEEP_ALIVE))
+    same = rd_node_eq(r->routes[index].kept, r->slot) && rd_node_alive(ctx, r->slot);
   params_free(r->params, r->param_count);
   r->params      = params;
   r->param_count = count;
@@ -711,20 +769,23 @@ static bool add_crumb(rd_ctx* ctx, router* root, route* rt, const rdr_match* m) 
 static bool router_crumbs(rd_ctx* ctx, router* root, router* r, bool nested) {
   path q;
   if (!r->sub || !split(r->sub, &q)) return false;
-  bool ok  = true;
-  int  end = nested ? r->consumed_count : q.count;
+  int     segs = max_segs(r);
+  binding best, b, scratch;
+  bool    ok = binding_init(&best, segs, q.count);
+  ok         = binding_init(&b, segs, q.count) && ok;
+  ok         = binding_init(&scratch, segs, q.count) && ok;
+  int     end = nested ? r->consumed_count : q.count;
   for (int len = 0; ok && len < end && len <= q.count; len++) {
-    path    prefix = {q.buf, q.segs, len};
-    binding best   = {0};
-    int     index  = -1;
+    path prefix = {q.buf, q.segs, len};
+    int  index  = -1;
+    best.found  = false;
     for (int k = 0; k < r->route_count; k++) {
       const route* rt = &r->routes[k];
-      binding      b;
-      if (k == r->current || (rt->count && rt->segs[0].kind == SEG_WILDCARD) || !bind(rt, &prefix, &b)) continue;
+      if (k == r->current || (rt->count && rt->segs[0].kind == SEG_WILDCARD) || !bind(rt, &prefix, &b, &scratch)) continue;
       bool captures = false;
       for (int j = 0; j < len; j++) captures |= b.rank[j] == 1;
       if (!captures && better(&b, &best, len)) {
-        best  = b;
+        binding_copy(&best, &b, rt->count, len);
         index = k;
       }
     }
@@ -750,6 +811,9 @@ static bool router_crumbs(rd_ctx* ctx, router* root, router* r, bool nested) {
   }
   free(full);
   path_free(&q);
+  binding_free(&best);
+  binding_free(&b);
+  binding_free(&scratch);
   return ok && (nested || full);
 }
 
@@ -768,6 +832,30 @@ static void build_trail(rd_ctx* ctx, router* root) {
   }
 }
 
+// The router a link navigates: its own, else the one around it, else the one used last.
+static router* link_router(const rd_ctx* ctx, const link* l, rd_node node) {
+  router* r = find(ctx, l->router);
+  if (!r) r = router_above(ctx, node);
+  if (!r) {
+    registry* g = registry_find(ctx);
+    r           = g ? find(ctx, g->last) : NULL;
+  }
+  return r;
+}
+
+// Sets a link's CHECKED state, if it navigates root's tree.
+static void mark_link(rd_ctx* ctx, rd_node node, const link* l, const router* root) {
+  router* r = link_router(ctx, l, node);
+  if (!r || root_of(ctx, r) != root || !root->path) return;
+  char* target = resolve_path(base_of(r), l->path);
+  if (!target) return;
+  size_t len = strlen(target);
+  bool   on  = !strcmp(target, root->path) ||
+            (!(l->flags & RDR_LINK_EXACT) && len > 1 && !strncmp(target, root->path, len) && root->path[len] == '/');
+  rd_node_set_states(ctx, node, RD_STATE_CHECKED, on);
+  free(target);
+}
+
 static void mark_links(rd_ctx* ctx, router* root) {
   registry* g = registry_find(ctx);
   if (!g) return;
@@ -777,17 +865,7 @@ static void mark_links(rd_ctx* ctx, router* root) {
     link*   l    = rd_node_attached(ctx, node, &link_key);
     if (!l) continue;
     g->links[n++] = node;
-    router* r     = find(ctx, l->router);
-    if (!r) r = router_above(ctx, node);
-    if (!r) r = find(ctx, g->last);
-    if (!r || root_of(ctx, r) != root || !root->path) continue;
-    char* target = resolve_path(base_of(r), l->path);
-    if (!target) continue;
-    size_t len = strlen(target);
-    bool   on  = !strcmp(target, root->path) || (!(l->flags & RDR_LINK_EXACT) && len > 1 &&
-                                                 !strncmp(target, root->path, len) && root->path[len] == '/');
-    rd_node_set_states(ctx, node, RD_STATE_CHECKED, on);
-    free(target);
+    mark_link(ctx, node, l, root);
   }
   g->link_count = n;
 }
@@ -810,7 +888,9 @@ static bool apply(rd_ctx* ctx, rd_node root_node, char* target, kind how, size_t
     free(target);
     return false;
   }
-  if (best_route(root, &p, &b) < 0) {
+  bool    matched = best_route(root, &p, &b) >= 0;
+  binding_free(&b);
+  if (!matched) {
     path_free(&p);
     free(target);
     return false;
@@ -1046,12 +1126,7 @@ static void link_click(rd_ctx* ctx, rd_event* ev, void* data) {
   (void)data;
   link* l = rd_node_attached(ctx, ev->current, &link_key);
   if (!l) return;
-  router* r = find(ctx, l->router);
-  if (!r) r = router_above(ctx, ev->current);
-  if (!r) {
-    registry* g = registry_find(ctx);
-    r           = g ? find(ctx, g->last) : NULL;
-  }
+  router* r = link_router(ctx, l, ev->current);
   if (!r) return;
   char* path = dup(l->path);  // the navigation may destroy the link
   if (path) rdr_router_go(ctx, r->self, path);
@@ -1084,9 +1159,9 @@ bool rdr_link_attach(rd_ctx* ctx, rd_node node, rd_node router_node, const char*
     return false;
   }
   g->links[g->link_count++] = node;
-  router* r                 = find(ctx, router_node);
-  if (!r) r = find(ctx, g->last);
-  if (r) mark_links(ctx, root_of(ctx, r));
+  // A navigation running marks every link once it has resolved.
+  router* r = link_router(ctx, l, node);
+  if (r && !(r = root_of(ctx, r))->navigating) mark_link(ctx, node, l, r);
   return true;
 }
 

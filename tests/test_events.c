@@ -434,6 +434,61 @@ static void test_dispatch_and_release(void) {
   rd_ctx_destroy(ctx);
 }
 
+// The pressed node is replaced between press and release: the click goes to its nearest ancestor
+// still in the tree, as in browsers.
+typedef struct swap {
+  rd_node label;
+  bool    destroy;
+} swap;
+
+static void swap_label(rd_ctx* ctx, rd_event* ev, void* data) {
+  swap* w = data;
+  if (w->destroy)
+    rd_node_destroy(ctx, w->label);
+  else
+    rd_node_detach(ctx, w->label);
+  w->label = add(ctx, ev->current, (rd_style){.width = rd_px(80), .height = rd_px(20)});
+}
+
+static void test_click_after_press_target_removed(void) {
+  for (int destroy = 0; destroy < 2; destroy++) {
+    fixture f   = setup();
+    swap    w   = {add(f.ctx, f.inner, (rd_style){.width = rd_px(80), .height = rd_px(20)}), destroy};
+    rd_node old = w.label;
+    rd_node_on(f.ctx, f.inner, RD_EVENT_POINTER_DOWN, swap_label, &w, NULL, 0);
+    listen(f.ctx, f.inner, RD_EVENT_CLICK, 1, 0);
+    rd_ctx_layout(f.ctx, 400, 300);
+    rd_ctx_pointer(f.ctx, 20, 20, RD_BUTTON_PRIMARY, 0, 0);
+    rd_ctx_layout(f.ctx, 400, 300);
+    rd_ctx_pointer(f.ctx, 20, 20, 0, 0, 0);
+    CHECK(count_type(RD_EVENT_CLICK) == 1 && rd_node_eq(log_[0].target, f.inner));
+    if (!destroy) rd_node_destroy(f.ctx, old);
+    rd_ctx_destroy(f.ctx);
+  }
+}
+
+// Back and forward over a disabled node still reach the root, for a router there; other buttons don't.
+static void test_history_buttons_over_disabled(void) {
+  fixture f = setup();
+  rd_node_set_states(f.ctx, f.inner, RD_STATE_DISABLED, true);
+  listen(f.ctx, f.root, RD_EVENT_POINTER_DOWN, 1, 0);
+  listen(f.ctx, f.root, RD_EVENT_POINTER_UP, 2, 0);
+  listen(f.ctx, f.inner, RD_EVENT_POINTER_DOWN, 3, 0);
+  rd_ctx_pointer(f.ctx, 20, 20, RD_BUTTON_BACK, 0, 0);
+  rd_ctx_pointer(f.ctx, 20, 20, 0, 0, 0);
+  CHECK(log_len == 2 && log_[0].type == RD_EVENT_POINTER_DOWN && log_[0].button == RD_BUTTON_BACK);
+  CHECK(rd_node_eq(log_[0].target, f.root) && log_[1].type == RD_EVENT_POINTER_UP && rd_node_eq(log_[1].target, f.root));
+  reset();
+  rd_ctx_pointer(f.ctx, 20, 20, RD_BUTTON_FORWARD, 0, 0);
+  CHECK(log_len == 1 && log_[0].button == RD_BUTTON_FORWARD && rd_node_eq(log_[0].target, f.root));
+  rd_ctx_pointer(f.ctx, 20, 20, 0, 0, 0);
+  reset();
+  rd_ctx_pointer(f.ctx, 20, 20, RD_BUTTON_SECONDARY, 0, 0);
+  rd_ctx_pointer(f.ctx, 20, 20, 0, 0, 0);
+  CHECK(log_len == 0);
+  rd_ctx_destroy(f.ctx);
+}
+
 int main(void) {
   test_dispatch_and_release();
   test_propagation_order();
@@ -448,5 +503,7 @@ int main(void) {
   test_pointer_capture();
   test_pointer_events_none_and_disabled();
   test_handler_drives_layout();
+  test_click_after_press_target_removed();
+  test_history_buttons_over_disabled();
   return TEST_RESULT();
 }

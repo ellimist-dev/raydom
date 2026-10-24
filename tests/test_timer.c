@@ -39,6 +39,19 @@ static void chain(rd_ctx* ctx, void* data) {
   rd_ctx_set_timer(ctx, 0, 0, note, &next, NULL);
 }
 
+static bool clear_result;
+static void clear_self_once(rd_ctx* ctx, void* data) {
+  tag* t = data;
+  note(ctx, data);
+  clear_result = rd_ctx_clear_timer(ctx, t->log->self);
+}
+
+// Updates the clock from inside a callback, as a callback that calls rd_update would.
+static void tick_inside(rd_ctx* ctx, void* data) {
+  note(ctx, data);
+  rd_ctx_set_time(ctx, rd_ctx_time(ctx) + 1);
+}
+
 int main(void) {
   rd_ctx* ctx = rd_ctx_create();
   journal lg  = {0};
@@ -94,6 +107,32 @@ int main(void) {
   CHECK(lg.len == 1 && lg.order[0] == 'c' && rd_ctx_timer_wait(ctx) == 0);
   rd_ctx_set_time(ctx, 60);
   CHECK(lg.len == 2 && lg.order[1] == 'n');
+
+  // A one-shot clearing itself from its callback: it has fired, so false, and it's destroyed once.
+  lg      = (journal){0};
+  lg.self = rd_ctx_set_timer(ctx, 0, 0, clear_self_once, &x, destroyed);
+  rd_ctx_set_time(ctx, 60);
+  CHECK(lg.len == 1 && !clear_result && lg.destroyed == 1);
+  // A repeating one clearing itself: true, and it stops.
+  lg      = (journal){0};
+  lg.self = rd_ctx_set_timer(ctx, 1, RD_TIMER_REPEAT, clear_self_once, &x, destroyed);
+  rd_ctx_set_time(ctx, 61);
+  CHECK(lg.len == 1 && clear_result && lg.destroyed == 1);
+  rd_ctx_set_time(ctx, 70);
+  CHECK(lg.len == 1);
+
+  // A callback updating the clock doesn't fire itself again; timers due by then fire after it returns.
+  lg = (journal){0};
+  rd_ctx_set_timer(ctx, 0, 0, tick_inside, &a, destroyed);
+  rd_ctx_set_timer(ctx, 0.5, 0, note, &b, destroyed);
+  rd_ctx_set_time(ctx, 70);
+  CHECK(lg.len == 2 && memcmp(lg.order, "ab", 2) == 0 && lg.destroyed == 2 && rd_ctx_time(ctx) == 71);
+  lg = (journal){0};
+  rd_timer rt = rd_ctx_set_timer(ctx, 1, RD_TIMER_REPEAT, tick_inside, &r, destroyed);
+  rd_ctx_set_time(ctx, 72);
+  CHECK(lg.len == 1 && rd_ctx_time(ctx) == 73);
+  CHECK(rd_ctx_clear_timer(ctx, rt) && lg.destroyed == 1);
+  rd_ctx_set_time(ctx, 73);
 
   // Handles: stale after reuse; null and bad input.
   CHECK(!rd_ctx_clear_timer(ctx, gone) && !rd_ctx_clear_timer(ctx, (rd_timer){0}));

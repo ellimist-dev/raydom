@@ -75,9 +75,17 @@ static int find_open(const rd_ctx* ctx, const manager* m, rd_node n) {
 
 // Dismissal, from listeners on the root that run before anything else sees the input.
 
+// Tooltips and select lists whose node went away close at the next input that reaches the root.
+static void close_orphans(rd_ctx* ctx, manager* m) {
+  prune(ctx, m);
+  for (int j = (int)m->open_len - 1; j >= 0; j--)
+    if ((m->open[j].kind == P_TOOLTIP || m->open[j].kind == P_LIST) && !rd_node_alive(ctx, m->open[j].anchor))
+      close_at(ctx, m, (uint32_t)j);
+}
+
 static void on_press(rd_ctx* ctx, rd_event* ev, void* data) {
   manager* m = data;
-  prune(ctx, m);
+  close_orphans(ctx, m);
   for (int j = (int)m->open_len - 1; j >= 0; j--) {
     popup* p = &m->open[j];
     if (p->kind == P_TOOLTIP) {
@@ -101,8 +109,8 @@ static void on_wheel(rd_ctx* ctx, rd_event* ev, void* data) {
 
 static void on_key(rd_ctx* ctx, rd_event* ev, void* data) {
   manager* m = data;
+  close_orphans(ctx, m);
   if (ev->key != RD_KEY_ESCAPE) return;
-  prune(ctx, m);
   if (!m->open_len) return;
   popup* top = &m->open[m->open_len - 1];
   if (top->kind == P_MODAL && top->persistent) return;
@@ -111,13 +119,9 @@ static void on_key(rd_ctx* ctx, rd_event* ev, void* data) {
   rd_event_prevent_default(ev);
 }
 
-// Tooltips whose node went away close at the next pointer move.
 static void on_move(rd_ctx* ctx, rd_event* ev, void* data) {
   (void)ev;
-  manager* m = data;
-  prune(ctx, m);
-  for (int j = (int)m->open_len - 1; j >= 0; j--)
-    if (m->open[j].kind == P_TOOLTIP && !rd_node_alive(ctx, m->open[j].anchor)) close_at(ctx, m, (uint32_t)j);
+  close_orphans(ctx, data);
 }
 
 static manager* manager_get(rd_ctx* ctx) {
@@ -165,7 +169,7 @@ bool rdx_popup_close(rd_ctx* ctx, rd_node node) {
 // Popups appear with a short fade; anchoring places them, so only opacity animates.
 static void fade_in(rd_ctx* ctx, rd_node n, double seconds) {
   rd_node_animate(ctx, n, &(rd_style){.opacity = rd_num(0)}, &(rd_style){.opacity = rd_num(1)}, seconds,
-                  RD_EASING_EASE_OUT, NULL, NULL);
+                  RD_EASING_EASE_OUT);
 }
 
 // Menus and select lists.
@@ -184,8 +188,10 @@ typedef struct menu_state {
   rdx_menu_fn   fn;
   void*         data;
   rd_destroy_fn destroy;
-  select_state* select;  // a select's list
+  rd_node       select;  // a select's list: the select, which may be destroyed while the list is open
 } menu_state;
+
+static select_state* select_find(const rd_ctx* ctx, rd_node n);
 
 static void menu_state_free(void* p) {
   menu_state* st = p;
@@ -219,13 +225,15 @@ static void show_selection(rd_ctx* ctx, select_state* s) {
 }
 
 static void choose(rd_ctx* ctx, rd_event* ev, void* data) {
-  menu_state*   st    = data;
-  int           index = item_index(ctx, ev->current);
-  rdx_menu_fn   fn    = st->fn;
-  void*         fdata = st->data;
-  select_state* sel   = st->select;
+  menu_state* st    = data;
+  int         index = item_index(ctx, ev->current);
+  rdx_menu_fn fn    = st->fn;
+  void*       fdata = st->data;
+  rd_node     owner = st->select;
   rdx_popup_close(ctx, ev->current);  // the state stays valid until this dispatch ends
-  if (sel && rd_node_alive(ctx, sel->node)) {
+  if (!rd_node_is_null(owner)) {
+    select_state* sel = select_find(ctx, owner);  // null once the select is gone
+    if (!sel) return;
     bool changed  = sel->selected != index;
     sel->selected = index;
     show_selection(ctx, sel);
@@ -283,10 +291,11 @@ static rd_node build_menu(rd_ctx* ctx, manager* m, pkind kind, const rdx_menu_it
   rdx__theme* t  = rdx__theme_get(ctx);
   menu_state* st = t ? malloc(sizeof *st) : NULL;
   if (!st) return (rd_node){0};  // init.data stays the caller's
-  *st                   = init;
-  st->m                 = m;
-  const rdx_classes* cl = &t->classes;
-  rd_node            menu = rd_node_create(ctx);
+  *st                      = init;
+  st->m                    = m;
+  const rdx_classes*  cl   = &t->classes;
+  const select_state* sel  = select_find(ctx, st->select);
+  rd_node             menu = rd_node_create(ctx);
   if (!rd_node_on(ctx, menu, RD_EVENT_KEY_DOWN, menu_keys, st, menu_state_free, 0).id) {
     st->destroy = NULL;
     menu_state_free(st);
@@ -310,7 +319,7 @@ static rd_node build_menu(rd_ctx* ctx, manager* m, pkind kind, const rdx_menu_it
       rdx__part(ctx, check, cl->menu_check);
       rd_node_set_image(ctx, check, t->check);
       rd_node_append(ctx, item, check);
-      if (st->select && (int)i == st->select->selected) rd_node_set_states(ctx, item, RD_STATE_CHECKED, true);
+      if (sel && (int)i == sel->selected) rd_node_set_states(ctx, item, RD_STATE_CHECKED, true);
     }
     text_part(ctx, item, items[i].label, cl->menu_label);
     if (items[i].shortcut) text_part(ctx, item, items[i].shortcut, cl->menu_shortcut);
@@ -360,11 +369,27 @@ static void context_free(void* p) {
   free(c);
 }
 
+// The open menu holds the target, not c: c and its data go with the target, and the menu can outlive
+// it. c lives exactly as long as the target, since only the target's destruction removes the listener.
+typedef struct context_open {
+  rd_node       target;
+  context_menu* c;
+} context_open;
+
+static void context_choose(rd_ctx* ctx, int index, void* data) {
+  context_open* o = data;
+  if (rd_node_alive(ctx, o->target) && o->c->fn) o->c->fn(ctx, index, o->c->data);
+}
+
 static void context_press(rd_ctx* ctx, rd_event* ev, void* data) {
   context_menu* c = data;
   if (ev->button != RD_BUTTON_SECONDARY) return;
   rd_event_prevent_default(ev);
-  rdx_menu_open(ctx, &(rdx_menu_desc){c->items, c->count, {.x = ev->x, .y = ev->y}, c->fn, c->data, NULL});
+  context_open* o = malloc(sizeof *o);
+  if (!o) return;
+  *o = (context_open){ev->current, c};
+  if (rd_node_is_null(rdx_menu_open(ctx, &(rdx_menu_desc){c->items, c->count, {.x = ev->x, .y = ev->y}, context_choose, o, free})))
+    free(o);
 }
 
 bool rdx_context_menu_attach(rd_ctx* ctx, rd_node target, const rdx_menu_item* items, size_t count, rdx_menu_fn fn,
@@ -424,7 +449,7 @@ static void select_click(rd_ctx* ctx, rd_event* ev, void* data) {
   if (!items) return;
   for (size_t i = 0; i < s->count; i++) items[i].label = s->options[i];
   rd_node list = build_menu(ctx, s->m, P_LIST, items, s->count, (rd_anchor){.node = s->node, .offset = 4, .match_width = true},
-                            (menu_state){.select = s}, s->node);
+                            (menu_state){.select = s->node}, s->node);
   free(items);
   // Focus the chosen option, or the first.
   rd_node focus = list;
@@ -587,7 +612,7 @@ rd_node rdx_modal_open(rd_ctx* ctx, const rdx_modal_desc* desc) {
   rd_node_append(ctx, rd_ctx_overlay(ctx), backdrop);
   fade_in(ctx, backdrop, 0.15);  // the card fades with it, and rises
   rd_node_animate(ctx, card, &(rd_style){.margin.top = rd_px(24)}, &(rd_style){.margin.top = rd_px(0)}, 0.2,
-                  RD_EASING_EASE_OUT, NULL, NULL);
+                  RD_EASING_EASE_OUT);
 
   popup p = {.node       = backdrop,
              .restore    = rd_ctx_focused(ctx),

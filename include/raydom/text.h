@@ -16,7 +16,7 @@ typedef struct rd_font_metrics {
 } rd_font_metrics;
 
 // TrueType or OpenType data. Without copy, data must outlive the context.
-// The first font loaded becomes the default.
+// The first font loaded becomes the default, and text laid out before it is laid out again.
 rd_font rd_font_load(rd_ctx* ctx, const void* data, size_t size, bool copy);
 rd_font rd_font_load_file(rd_ctx* ctx, const char* path);
 void    rd_ctx_set_default_font(rd_ctx* ctx, rd_font font);

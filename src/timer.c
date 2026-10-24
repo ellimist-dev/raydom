@@ -49,9 +49,10 @@ static void finish(rd__timer* tm) {
 
 bool rd_ctx_clear_timer(rd_ctx* ctx, rd_timer t) {
   rd__timer* tm = get(ctx, t);
-  if (!tm) return false;
+  if (!tm || tm->cleared) return false;
   if (tm->firing) {
-    tm->cleared = true;  // destroyed once its callback returns
+    if (tm->period == 0) return false;  // a one-shot in its callback has fired; it's destroyed on return
+    tm->cleared = true;                 // a repeating one stops, destroyed once its callback returns
     return true;
   }
   finish(tm);
@@ -67,6 +68,10 @@ double rd_ctx_timer_wait(const rd_ctx* ctx) {
 }
 
 void rd__timers_run(rd_ctx* ctx) {
+  // A callback that updates the clock leaves the due timers to the run it's in, which looks again after
+  // each callback; a nested run would fire the calling timer again, without end.
+  for (uint32_t i = 0; i < ctx->timer_count; i++)
+    if (ctx->timers[i].firing) return;
   uint32_t epoch = ++ctx->timer_epoch;
   for (;;) {
     // The earliest due timer that existed before this run.

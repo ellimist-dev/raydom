@@ -71,7 +71,7 @@ rd_font rd_font_load(rd_ctx* ctx, const void* data, size_t size, bool copy) {
   f->kern                       = f->info.kern || f->info.gpos;
   f->id                         = ctx->font_count + 1;
   ctx->fonts[ctx->font_count++] = f;
-  if (!ctx->default_font) ctx->default_font = ctx->font_count;
+  if (!ctx->default_font) rd_ctx_set_default_font(ctx, (rd_font){ctx->font_count, true});  // relayouts text
   return (rd_font){ctx->font_count, true};
 }
 

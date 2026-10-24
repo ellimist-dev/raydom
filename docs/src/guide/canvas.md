@@ -16,6 +16,20 @@ draw on top. raydom flushes raylib's batch before the call, with no scissor or s
 blend as usual, and alpha accumulates toward opaque. raylib's default blends alpha like color, so a translucent
 fill over an opaque pixel leaves it translucent; the desktop ignores that, but a browser composites the canvas over
 the page, which would show through. A callback may change the blend mode; raydom sets its own again afterwards.
+raydom sets its blending directly in GL rather than through rlgl, and when `rd_draw` returns, GL's blend factors and
+equations are as the app left them, as are rlgl's mode and custom factors (`rlSetBlendFactorsSeparate`): blending
+set with `BeginBlendMode` before `rd_draw` still applies after it. One consequence inside a callback: rlgl still
+believes the app's mode is current, so `BeginBlendMode` with that same mode does nothing; another mode applies as
+usual. On a GL without these entry points, raydom leaves `BLEND_ALPHA`, as `EndBlendMode` does. rlgl doesn't
+expose the active shader, so `rd_draw` returns with raylib's default shader active; begin a custom shader after it.
+
+A callback may replace or clear its own node's painter (`rd_node_set_paint`), or destroy the node: the old data's
+destroy function runs once the callback returns, so the callback can still use its data. In C++, a lambda can call
+`node.paint(...)` or `node.destroy()` on its own node and keep using its captures.
+
+A context may be drawn from another's paint callback with `rd_draw`. It draws under the transform it finds,
+including the outer context's pixel ratio, and clips and rasterizes for that transform; the same holds under a
+raylib camera (`BeginMode2D`).
 
 `rd_paint_info` has:
 
@@ -29,8 +43,8 @@ the page, which would show through. A callback may change the blend mode; raydom
 `rd_paint_scissor(info)` clips raylib drawing to the content box within `clip`; raydom ends the scissor after the
 callback. Restore any other raylib state you change. Rendering to a texture with `BeginTextureMode` inside the
 callback is safe: size the texture and draw into it in device pixels (`content` times `dpi`), then call
-`rd_paint_restore(info)` after `EndTextureMode`, which resets the transform raydom drew with. raydom restores it
-again after the callback.
+`rd_paint_restore(info)` after `EndTextureMode`, which resets the transform raydom drew with, whatever the pixel
+ratio. raydom restores it again after the callback.
 
 ## Text
 
@@ -47,8 +61,10 @@ rd_paint_text(ctx, info, (rd_font){0}, 18, box.x + (box.width - w) / 2,
               box.y + (box.height + m.ascent - m.descent) / 2, label, RD_TEXT_NUL, rd_hex(0xe4e7ee));
 ```
 
-Text draws over whatever the callback drew before it and under what it draws after. It doesn't wrap. In C++:
-`ctx.paint_text(info, label, x, baseline, size, color)`, with `ctx.measure_text` and `ctx.font_metrics`.
+Text draws over whatever the callback drew before it and under what it draws after, with the shader the callback
+has active, as raylib's `DrawText` does; it changes no state. It doesn't wrap. In C++:
+`ctx.paint_text(info, size, x, baseline, label, color, font)`, in the C function's order with the font last and
+optional, with `ctx.measure_text` and `ctx.font_metrics`.
 
 ## Pixel ratio
 
@@ -71,7 +87,8 @@ Leave out `FLAG_WINDOW_RESIZABLE`, whose resize handler sets the canvas back to 
 desktop, raylib's own `FLAG_WINDOW_HIGHDPI` handles density and the ratio works as a zoom. Pass logical sizes when
 calling `rd_ctx_layout` yourself.
 
-C++: `node.paint([](const rd_paint_info& info) { ... })`, with the callable owned by the node.
+C++: `node.paint([](const rd_paint_info& info) { ... })`, with the callable owned by the node, and
+`node.clear_paint()` to remove it.
 
 Pair a canvas with listeners on the same node for interaction: pointer events carry `local_x` and `local_y`
 relative to the node's border box. Use the paint callback for drawing only; it must not change the tree.

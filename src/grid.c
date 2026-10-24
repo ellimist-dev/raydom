@@ -41,18 +41,19 @@ static void classify(rd_val v, float ref, bool allow_flex, uint8_t* fn, float* o
   *out = 0;
   switch (v.unit) {
     case RD_UNIT_PX:
+      if (isnan(v.value)) break;
       *fn  = FN_FIXED;
-      *out = fmaxf(0, v.value);
+      *out = fmaxf(0, finite_len(v.value));
       return;
     case RD_UNIT_PCT:
-      if (isnan(ref)) break;
+      if (isnan(ref) || isnan(v.value)) break;
       *fn  = FN_FIXED;
-      *out = fmaxf(0, v.value * ref / 100.0f);
+      *out = fmaxf(0, finite_len(v.value * ref / 100.0f));
       return;
     case RD_UNIT_FR:
-      if (!allow_flex) break;
+      if (!allow_flex || isnan(v.value)) break;
       *fn  = FN_FLEX;
-      *out = fmaxf(0, v.value);
+      *out = fmaxf(0, finite_len(v.value));
       return;
     case RD_UNIT_MIN_CONTENT:
       *fn = FN_MIN_CONTENT;
@@ -104,65 +105,81 @@ static void resolve_span(rd_grid_line s, rd_grid_line e, int32_t count, int32_t*
 }
 
 typedef struct occupancy {
-  uint8_t* cells;  // major-major order: cells[major * minor_count + minor]
-  int32_t  minor_count, major_cap;
+  uint8_t* cells;        // major-major order: cells[major * stride + minor]
+  int32_t  minor_count;  // the implicit grid's minor tracks so far
+  int32_t  stride, major_cap;
 } occupancy;
 
 static bool occ_reserve(occupancy* o, int32_t major) {
   if (major <= o->major_cap) return true;
   int32_t cap = o->major_cap ? o->major_cap : 8;
   while (cap < major) cap *= 2;
-  uint8_t* c = realloc(o->cells, (size_t)cap * (size_t)o->minor_count);
+  uint8_t* c = realloc(o->cells, (size_t)cap * (size_t)o->stride);
   if (!c) return false;
-  memset(c + (size_t)o->major_cap * (size_t)o->minor_count, 0, (size_t)(cap - o->major_cap) * (size_t)o->minor_count);
+  memset(c + (size_t)o->major_cap * (size_t)o->stride, 0, (size_t)(cap - o->major_cap) * (size_t)o->stride);
   o->cells     = c;
   o->major_cap = cap;
   return true;
 }
 
-static bool occ_free(const occupancy* o, int32_t maj, int32_t maj_span, int32_t min, int32_t min_span) {
-  if (min + min_span > o->minor_count) return false;
+static bool occ_free(const occupancy* o, int32_t maj, int32_t maj_span, int32_t min, int32_t min_span, int32_t limit) {
+  if (min + min_span > limit) return false;
   if (!o->cells) return true;
   for (int32_t r = maj; r < maj + maj_span && r < o->major_cap; r++)
     for (int32_t c = min; c < min + min_span; c++)
-      if (o->cells[(size_t)r * (size_t)o->minor_count + (size_t)c]) return false;
+      if (o->cells[(size_t)r * (size_t)o->stride + (size_t)c]) return false;
   return true;
 }
 
 static bool occ_mark(occupancy* o, int32_t maj, int32_t maj_span, int32_t min, int32_t min_span) {
   if (!occ_reserve(o, maj + maj_span)) return false;
   for (int32_t r = maj; r < maj + maj_span; r++)
-    for (int32_t c = min; c < min + min_span && c < o->minor_count; c++)
-      o->cells[(size_t)r * (size_t)o->minor_count + (size_t)c] = 1;
+    for (int32_t c = min; c < min + min_span && c < o->stride; c++)
+      o->cells[(size_t)r * (size_t)o->stride + (size_t)c] = 1;
   return true;
 }
 
 // CSS Grid §8.5, sparse packing.
 static bool auto_place(grid_item* items, uint32_t n, int major, const int32_t explicit_count[2]) {
-  int       minor = 1 - major;
-  occupancy o     = {NULL, explicit_count[minor], 0};
+  int       minor       = 1 - major;
+  occupancy o           = {NULL, explicit_count[minor], 0, 0};
+  int32_t   locked_span = 0, locked_rows = 0;  // of items locked to a major track, placed in step 2
   for (uint32_t j = 0; j < n; j++) {
     const grid_item* it  = &items[j];
     int32_t          end = it->definite[minor] ? it->start[minor] + it->span[minor] : it->span[minor];
     if (end > o.minor_count) o.minor_count = end;
+    if (it->definite[major] && !it->definite[minor]) {
+      locked_span += it->span[minor];
+      if (it->start[major] + 1 > locked_rows) locked_rows = it->start[major] + 1;
+    }
   }
   if (o.minor_count == 0) o.minor_count = 1;
+  // Step 2 places each locked item no further out than the spans placed before it, so it fits in this.
+  o.stride = o.minor_count + locked_span;
 
-  bool ok = true;
+  int32_t* cursor = locked_rows ? calloc((size_t)locked_rows, sizeof *cursor) : NULL;
+  bool     ok     = !locked_rows || cursor;
   for (uint32_t j = 0; j < n && ok; j++) {
     grid_item* it = &items[j];
     if (it->definite[0] && it->definite[1]) ok = occ_mark(&o, it->start[major], it->span[major], it->start[minor], it->span[minor]);
   }
+  // Step 2: each item locked to a major track takes the first free minor position past the items this
+  // step already put in that track, adding minor tracks past the end as needed.
+  int32_t minor_count = o.minor_count;
   for (uint32_t j = 0; j < n && ok; j++) {
     grid_item* it = &items[j];
     if (!it->definite[major] || it->definite[minor]) continue;
-    int32_t c = 0;
-    while (c + it->span[minor] <= o.minor_count && !occ_free(&o, it->start[major], it->span[major], c, it->span[minor])) c++;
-    if (c + it->span[minor] > o.minor_count) c = 0;
-    it->start[minor]    = c;
-    it->definite[minor] = true;
-    ok                  = occ_mark(&o, it->start[major], it->span[major], c, it->span[minor]);
+    int32_t c = cursor[it->start[major]];
+    while (!occ_free(&o, it->start[major], it->span[major], c, it->span[minor], o.stride)) c++;
+    it->start[minor]         = c;
+    it->definite[minor]      = true;
+    cursor[it->start[major]] = c + it->span[minor];
+    if (c + it->span[minor] > minor_count) minor_count = c + it->span[minor];
+    ok = occ_mark(&o, it->start[major], it->span[major], c, it->span[minor]);
   }
+  free(cursor);
+  o.minor_count = minor_count;
+
   int32_t cur_maj = 0, cur_min = 0;
   for (uint32_t j = 0; j < n && ok; j++) {
     grid_item* it = &items[j];
@@ -170,14 +187,14 @@ static bool auto_place(grid_item* items, uint32_t n, int major, const int32_t ex
     if (it->definite[minor]) {
       if (it->start[minor] < cur_min) cur_maj++;
       cur_min = it->start[minor];
-      while (!occ_free(&o, cur_maj, it->span[major], cur_min, it->span[minor])) cur_maj++;
+      while (!occ_free(&o, cur_maj, it->span[major], cur_min, it->span[minor], o.stride)) cur_maj++;
     } else {
       for (;;) {
         if (cur_min + it->span[minor] > o.minor_count) {
           cur_maj++;
           cur_min = 0;
         }
-        if (occ_free(&o, cur_maj, it->span[major], cur_min, it->span[minor])) break;
+        if (occ_free(&o, cur_maj, it->span[major], cur_min, it->span[minor], o.minor_count)) break;
         cur_min++;
       }
       it->start[minor] = cur_min;
@@ -341,13 +358,14 @@ static float size_tracks(grid_track* t, uint32_t nt, const grid_item* items, uin
       uint32_t cnt = 0;
       for (uint32_t j = 0; j < nt; j++) cnt += t[j].max_fn != FN_FLEX && t[j].base < t[j].limit - EPS;
       if (!cnt) break;
-      float share = free / (float)cnt;
+      float share = free / (float)cnt, before = free;
       for (uint32_t j = 0; j < nt; j++) {
         if (t[j].max_fn == FN_FLEX || t[j].base >= t[j].limit - EPS) continue;
         float add = fminf(share, t[j].limit - t[j].base);
         t[j].base += add;
         free -= add;
       }
+      if (!(free < before)) break;  // rounding at large sizes
     }
   }
 
@@ -365,26 +383,40 @@ static float size_tracks(grid_track* t, uint32_t nt, const grid_item* items, uin
   return tracks_total(t, nt, gap);
 }
 
+// Per-grid state, kept in scratch memory rather than on the stack: each nested grid's frame sits on
+// the stack of the layout recursion, which is 64 KB under Emscripten.
+typedef struct grid_state {
+  float           pb_start[2], pb[2], mn[2], mx[2], definite[2], gap[2], inner[2];
+  uint32_t        explicit_count[2], nt[2], n;
+  const rd_track* list[2];
+  rd_track        implicit[2];
+  rd_repeat       repeat[2];
+  rd_align        content_align[2];
+  rd_track*       expanded[2];
+  grid_track*     tracks[2];
+  grid_item*      items;
+} grid_state;
+
 // Sizes one axis to its final inner size. An indefinite axis is sized to content first, then
 // clamped and re-run at the clamped size when that differs.
-static float size_axis(grid_track* t, uint32_t nt, const rd_track* list, uint32_t explicit_count, rd_track implicit,
-                       const grid_item* items, uint32_t n, int a, const rd_layout_key* k, const float pb[2],
-                       const float mn[2], const float mx[2], float gap, rd_align content_align) {
+static RD__NOINLINE float size_axis(grid_state* g, int a, const rd_layout_key* k) {
+  grid_track*     t     = g->tracks[a];
+  uint32_t        nt    = g->nt[a];
   float           avail = a ? k->ah : k->aw;
   rd_measure_mode mode  = a ? k->hm : k->wm;
   if (mode == RD_MEASURE_EXACTLY) {
-    float inner = fmaxf(0, avail - pb[a]);
-    init_tracks(t, nt, list, explicit_count, implicit, inner);
-    size_tracks(t, nt, items, n, a, inner, SIZE_DEFINITE, gap, content_align);
+    float inner = fmaxf(0, avail - g->pb[a]);
+    init_tracks(t, nt, g->list[a], g->explicit_count[a], g->implicit[a], inner);
+    size_tracks(t, nt, g->items, g->n, a, inner, SIZE_DEFINITE, g->gap[a], g->content_align[a]);
     return inner;
   }
   sizing s = mode == RD_MEASURE_MIN_CONTENT ? SIZE_MIN_CONTENT : SIZE_MAX_CONTENT;
-  init_tracks(t, nt, list, explicit_count, implicit, NAN);
-  float total = size_tracks(t, nt, items, n, a, NAN, s, gap, content_align);
-  float inner = finalize_axis(total + pb[a], mode, avail, mn[a], mx[a]) - pb[a];
+  init_tracks(t, nt, g->list[a], g->explicit_count[a], g->implicit[a], NAN);
+  float total = size_tracks(t, nt, g->items, g->n, a, NAN, s, g->gap[a], g->content_align[a]);
+  float inner = finalize_axis(total + g->pb[a], mode, avail, g->mn[a], g->mx[a]) - g->pb[a];
   if (fabsf(inner - total) > EPS) {
-    init_tracks(t, nt, list, explicit_count, implicit, inner);
-    size_tracks(t, nt, items, n, a, inner, SIZE_DEFINITE, gap, content_align);
+    init_tracks(t, nt, g->list[a], g->explicit_count[a], g->implicit[a], inner);
+    size_tracks(t, nt, g->items, g->n, a, inner, SIZE_DEFINITE, g->gap[a], g->content_align[a]);
   }
   return inner;
 }
@@ -440,7 +472,7 @@ static rd_layout_key item_key(const grid_item* it, int a, float size, rd_measure
   return k;
 }
 
-static void contributions(rd_ctx* ctx, grid_item* it, int a, const float cb[2]) {
+static RD__NOINLINE void contributions(rd_ctx* ctx, grid_item* it, int a, const float cb[2]) {
   float m = margins(it, a);
   if (!isnan(it->size_def[a])) {
     it->contrib_min = it->contrib_max = clampf(it->size_def[a], it->min[a], it->max[a]) + m;
@@ -452,7 +484,7 @@ static void contributions(rd_ctx* ctx, grid_item* it, int a, const float cb[2]) 
   it->contrib_min = clampf(a ? mn.height : mn.width, it->min[a], it->max[a]) + m;
 }
 
-static void size_item(rd_ctx* ctx, grid_item* it, int a, const float cb[2]) {
+static RD__NOINLINE void size_item(rd_ctx* ctx, grid_item* it, int a, const float cb[2]) {
   float avail = fmaxf(0, it->area[a] - margins(it, a));
   if (!isnan(it->size_def[a])) {
     it->size[a] = clampf(it->size_def[a], it->min[a], it->max[a]);
@@ -521,47 +553,47 @@ static void collapse_empty(rd_ctx* ctx, grid_item* items, uint32_t n, int a, rd_
   *explicit_count = kept;
 }
 
-rd_size rd__layout_grid(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, bool perform) {
-  rd_slot*        s  = &ctx->slots[i];
-  rd_node_layout* L  = &ctx->layouts[i];
-  const rd_style* st = &ctx->styles[i].computed;
+// Resolves the template, places the items and allocates the tracks. False when out of memory.
+static RD__NOINLINE bool grid_setup(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, grid_state* g) {
+  rd_slot*              s  = &ctx->slots[i];
+  const rd_node_layout* L  = &ctx->layouts[i];
+  const rd_style*       st = &ctx->styles[i].computed;
 
-  float pb_start[2] = {L->padding[EDGE_L] + L->border[EDGE_L], L->padding[EDGE_T] + L->border[EDGE_T]};
-  float pb[2]       = {
-      pb_start[0] + L->padding[EDGE_R] + L->border[EDGE_R],
-      pb_start[1] + L->padding[EDGE_B] + L->border[EDGE_B],
-  };
-  float mn[2], mx[2];
-  size_bounds(st, pb, k->cbw, k->cbh, mn, mx);
-  float definite[2] = {
-      k->wm == RD_MEASURE_EXACTLY ? fmaxf(0, k->aw - pb[0]) : NAN,
-      k->hm == RD_MEASURE_EXACTLY ? fmaxf(0, k->ah - pb[1]) : NAN,
-  };
-  float gap[2] = {resolve0(st->column_gap, definite[0]), resolve0(st->row_gap, definite[1])};
+  g->pb_start[0] = L->padding[EDGE_L] + L->border[EDGE_L];
+  g->pb_start[1] = L->padding[EDGE_T] + L->border[EDGE_T];
+  g->pb[0]       = g->pb_start[0] + L->padding[EDGE_R] + L->border[EDGE_R];
+  g->pb[1]       = g->pb_start[1] + L->padding[EDGE_B] + L->border[EDGE_B];
+  size_bounds(st, g->pb, k->cbw, k->cbh, g->mn, g->mx);
+  g->definite[0] = k->wm == RD_MEASURE_EXACTLY ? fmaxf(0, k->aw - g->pb[0]) : NAN;
+  g->definite[1] = k->hm == RD_MEASURE_EXACTLY ? fmaxf(0, k->ah - g->pb[1]) : NAN;
+  g->gap[0]      = resolve0(st->column_gap, g->definite[0]);
+  g->gap[1]      = resolve0(st->row_gap, g->definite[1]);
 
-  uint32_t        explicit_count[2];
-  const rd_track* list[2] = {
-      rd_tracks_get(ctx, st->grid_template_columns, &explicit_count[0]),
-      rd_tracks_get(ctx, st->grid_template_rows, &explicit_count[1]),
-  };
-  rd_track implicit[2] = {st->grid_auto_columns, st->grid_auto_rows};
-  rd_repeat repeat[2]   = {rd__tracks_repeat(ctx, st->grid_template_columns), rd__tracks_repeat(ctx, st->grid_template_rows)};
-  rd__scratch_mark mark        = rd__scratch_save(ctx);
-  rd_track*        expanded[2] = {NULL, NULL};
+  g->list[0]          = rd_tracks_get(ctx, st->grid_template_columns, &g->explicit_count[0]);
+  g->list[1]          = rd_tracks_get(ctx, st->grid_template_rows, &g->explicit_count[1]);
+  g->implicit[0]      = st->grid_auto_columns;
+  g->implicit[1]      = st->grid_auto_rows;
+  g->repeat[0]        = rd__tracks_repeat(ctx, st->grid_template_columns);
+  g->repeat[1]        = rd__tracks_repeat(ctx, st->grid_template_rows);
+  g->content_align[0] = st->justify_content;
+  g->content_align[1] = st->align_content;
   for (int a = 0; a < 2; a++) {
-    if (repeat[a] == RD_REPEAT_NONE || !explicit_count[a]) continue;
-    uint32_t times = repetitions(list[a], explicit_count[a], definite[a], mn[a] - pb[a], mx[a] - pb[a], gap[a]);
-    expanded[a]    = rd__scratch_alloc(ctx, (size_t)times * explicit_count[a] * sizeof(rd_track));
-    if (!expanded[a]) continue;  // falls back to one repetition
-    for (uint32_t r = 0; r < times; r++) memcpy(&expanded[a][(size_t)r * explicit_count[a]], list[a], explicit_count[a] * sizeof(rd_track));
-    list[a] = expanded[a];
-    explicit_count[a] *= times;
+    if (g->repeat[a] == RD_REPEAT_NONE || !g->explicit_count[a]) continue;
+    uint32_t times = repetitions(g->list[a], g->explicit_count[a], g->definite[a], g->mn[a] - g->pb[a],
+                                 g->mx[a] - g->pb[a], g->gap[a]);
+    g->expanded[a] = rd__scratch_alloc(ctx, (size_t)times * g->explicit_count[a] * sizeof(rd_track));
+    if (!g->expanded[a]) continue;  // falls back to one repetition
+    for (uint32_t r = 0; r < times; r++)
+      memcpy(&g->expanded[a][(size_t)r * g->explicit_count[a]], g->list[a], g->explicit_count[a] * sizeof(rd_track));
+    g->list[a] = g->expanded[a];
+    g->explicit_count[a] *= times;
   }
 
   uint32_t n = 0;
   for (uint32_t c = s->first_child; c; c = ctx->slots[c].next_sibling) n += in_flow(&ctx->styles[c].computed);
+  g->n = n;
 
-  grid_item* items = rd__scratch_alloc(ctx, n * sizeof *items);
+  grid_item* items = g->items = rd__scratch_alloc(ctx, n * sizeof *items);
   uint32_t   m     = 0;
   for (uint32_t c = s->first_child; c && items && m < n; c = ctx->slots[c].next_sibling) {
     const rd_style* cs = &ctx->styles[c].computed;
@@ -572,85 +604,104 @@ rd_size rd__layout_grid(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, bool pe
     it->align[0]  = item_align(cs->justify_self, st->justify_items);
     it->align[1]  = item_align(cs->align_self, st->align_items);
     it->size[0] = it->size[1] = NAN;
-    resolve_span(cs->grid_column_start, cs->grid_column_end, (int32_t)explicit_count[0], &it->start[0], &it->span[0],
+    resolve_span(cs->grid_column_start, cs->grid_column_end, (int32_t)g->explicit_count[0], &it->start[0], &it->span[0],
                  &it->definite[0]);
-    resolve_span(cs->grid_row_start, cs->grid_row_end, (int32_t)explicit_count[1], &it->start[1], &it->span[1],
+    resolve_span(cs->grid_row_start, cs->grid_row_end, (int32_t)g->explicit_count[1], &it->start[1], &it->span[1],
                  &it->definite[1]);
     resolve_item(it, NAN, NAN);
   }
 
-  int32_t  ecount[2] = {(int32_t)explicit_count[0], (int32_t)explicit_count[1]};
-  int      major     = st->grid_auto_flow == RD_GRID_FLOW_COLUMN ? 0 : 1;
-  uint32_t nt[2]     = {explicit_count[0], explicit_count[1]};
-  bool     ok        = !n || (items && auto_place(items, n, major, ecount));
-  for (uint32_t j = 0; ok && j < n; j++)
+  int32_t ecount[2] = {(int32_t)g->explicit_count[0], (int32_t)g->explicit_count[1]};
+  int     major     = st->grid_auto_flow == RD_GRID_FLOW_COLUMN ? 0 : 1;
+  g->nt[0]          = g->explicit_count[0];
+  g->nt[1]          = g->explicit_count[1];
+  if (n && (!items || !auto_place(items, n, major, ecount))) return false;
+  for (uint32_t j = 0; j < n; j++)
     for (int a = 0; a < 2; a++)
-      if ((uint32_t)(items[j].start[a] + items[j].span[a]) > nt[a]) nt[a] = (uint32_t)(items[j].start[a] + items[j].span[a]);
-  for (int a = 0; ok && a < 2; a++)
-    if (repeat[a] == RD_REPEAT_AUTO_FIT && expanded[a]) collapse_empty(ctx, items, n, a, expanded[a], &explicit_count[a], &nt[a]);
+      if ((uint32_t)(items[j].start[a] + items[j].span[a]) > g->nt[a])
+        g->nt[a] = (uint32_t)(items[j].start[a] + items[j].span[a]);
+  for (int a = 0; a < 2; a++)
+    if (g->repeat[a] == RD_REPEAT_AUTO_FIT && g->expanded[a])
+      collapse_empty(ctx, items, n, a, g->expanded[a], &g->explicit_count[a], &g->nt[a]);
 
-  grid_track* tracks[2] = {
-      rd__scratch_alloc(ctx, nt[0] * sizeof(grid_track)),
-      rd__scratch_alloc(ctx, nt[1] * sizeof(grid_track)),
-  };
-  if (!ok || (nt[0] && !tracks[0]) || (nt[1] && !tracks[1])) {
-    rd__scratch_restore(ctx, mark);
-    return (rd_size){finalize_axis(pb[0], k->wm, k->aw, mn[0], mx[0]), finalize_axis(pb[1], k->hm, k->ah, mn[1], mx[1])};
-  }
-
-  rd_align content_align[2] = {st->justify_content, st->align_content};
-  float    inner[2];
   for (int a = 0; a < 2; a++) {
-    for (uint32_t j = 0; j < n; j++) {
-      float cb[2] = {a ? items[j].area[0] : NAN, NAN};
-      contributions(ctx, &items[j], a, cb);
+    g->tracks[a] = rd__scratch_alloc(ctx, g->nt[a] * sizeof(grid_track));
+    if (g->nt[a] && !g->tracks[a]) return false;
+  }
+  return true;
+}
+
+// Lays the items out at their final sizes, then the absolute children.
+static RD__NOINLINE void grid_perform(rd_ctx* ctx, uint32_t i, const grid_state* g, rd_size size) {
+  rd_slot*        s      = &ctx->slots[i];
+  rd_node_layout* L      = &ctx->layouts[i];
+  float           ext[2] = {0, 0};
+  for (uint32_t j = 0; j < g->n; j++) {
+    grid_item* it = &g->items[j];
+    rd__layout_node(ctx, it->idx,
+                    (rd_layout_key){it->size[0], it->size[1], it->area[0], it->area[1], RD_MEASURE_EXACTLY,
+                                    RD_MEASURE_EXACTLY},
+                    true);
+    rd_node_layout* CL = &ctx->layouts[it->idx];
+    CL->rect.x         = it->pos[0];
+    CL->rect.y         = it->pos[1];
+    memcpy(CL->margin, it->margin, sizeof it->margin);
+    rd__apply_relative(it->st, CL, it->area);
+    ext[0] = fmaxf(ext[0], it->pos[0] + it->size[0] + it->margin[EDGE_R]);
+    ext[1] = fmaxf(ext[1], it->pos[1] + it->size[1] + it->margin[EDGE_B]);
+  }
+  if (g->n) L->baseline = ctx->layouts[g->items[0].idx].rect.y + ctx->layouts[g->items[0].idx].baseline;
+  float sz[2] = {size.width, size.height};
+  for (uint32_t c = s->first_child; c; c = ctx->slots[c].next_sibling) {
+    const rd_style* cs = &ctx->styles[c].computed;
+    if (cs->display == RD_DISPLAY_NONE)
+      ctx->layouts[c].rect = (rd_rect){0};
+    else if (cs->position == RD_POSITION_ABSOLUTE)
+      rd__layout_absolute(ctx, c, L, sz);
+  }
+  L->content.width  = fmaxf(ext[0] + L->padding[EDGE_R], sz[0] - L->border[EDGE_R]) - L->border[EDGE_L];
+  L->content.height = fmaxf(ext[1] + L->padding[EDGE_B], sz[1] - L->border[EDGE_B]) - L->border[EDGE_T];
+  L->rect.width     = sz[0];
+  L->rect.height    = sz[1];
+  rd__clamp_scroll(L);
+}
+
+// Out of memory: the grid's size with no items.
+static RD__NOINLINE rd_size grid_empty(const rd_ctx* ctx, uint32_t i, const rd_layout_key* k) {
+  const rd_node_layout* L     = &ctx->layouts[i];
+  float                 pb[2] = {L->padding[EDGE_L] + L->border[EDGE_L] + L->padding[EDGE_R] + L->border[EDGE_R],
+                                 L->padding[EDGE_T] + L->border[EDGE_T] + L->padding[EDGE_B] + L->border[EDGE_B]};
+  float                 mn[2], mx[2];
+  size_bounds(&ctx->styles[i].computed, pb, k->cbw, k->cbh, mn, mx);
+  return (rd_size){finalize_axis(pb[0], k->wm, k->aw, mn[0], mx[0]), finalize_axis(pb[1], k->hm, k->ah, mn[1], mx[1])};
+}
+
+rd_size rd__layout_grid(rd_ctx* ctx, uint32_t i, const rd_layout_key* k, bool perform) {
+  rd__scratch_mark mark = rd__scratch_save(ctx);
+  grid_state*      g    = rd__scratch_alloc(ctx, sizeof *g);
+  if (!g || !grid_setup(ctx, i, k, g)) {
+    rd__scratch_restore(ctx, mark);
+    return grid_empty(ctx, i, k);
+  }
+
+  for (int a = 0; a < 2; a++) {
+    for (uint32_t j = 0; j < g->n; j++) {
+      grid_item* it = &g->items[j];
+      contributions(ctx, it, a, (float[2]){a ? it->area[0] : NAN, NAN});
     }
-    inner[a] = size_axis(tracks[a], nt[a], list[a], explicit_count[a], implicit[a], items, n, a, k, pb, mn, mx, gap[a],
-                         content_align[a]);
-    position_tracks(tracks[a], nt[a], inner[a], gap[a], content_align[a], pb_start[a]);
-    for (uint32_t j = 0; j < n; j++) {
-      grid_item* it = &items[j];
-      it->area[a]   = area_size(tracks[a], it, a);
+    g->inner[a] = size_axis(g, a, k);
+    position_tracks(g->tracks[a], g->nt[a], g->inner[a], g->gap[a], g->content_align[a], g->pb_start[a]);
+    for (uint32_t j = 0; j < g->n; j++) {
+      grid_item* it = &g->items[j];
+      it->area[a]   = area_size(g->tracks[a], it, a);
       resolve_item(it, it->area[0], a ? it->area[1] : NAN);
-      float cb[2] = {it->area[0], a ? it->area[1] : NAN};
-      size_item(ctx, it, a, cb);
-      it->pos[a] = tracks[a][it->start[a]].pos + it->margin[AX_START[a]] + item_offset(it, a);
+      size_item(ctx, it, a, (float[2]){it->area[0], a ? it->area[1] : NAN});
+      it->pos[a] = g->tracks[a][it->start[a]].pos + it->margin[AX_START[a]] + item_offset(it, a);
     }
   }
 
-  rd_size size = {inner[0] + pb[0], inner[1] + pb[1]};
-  if (perform) {
-    float ext[2] = {0, 0};
-    for (uint32_t j = 0; j < n; j++) {
-      grid_item* it = &items[j];
-      rd__layout_node(ctx, it->idx,
-                      (rd_layout_key){it->size[0], it->size[1], it->area[0], it->area[1], RD_MEASURE_EXACTLY,
-                                      RD_MEASURE_EXACTLY},
-                      true);
-      rd_node_layout* CL = &ctx->layouts[it->idx];
-      CL->rect.x         = it->pos[0];
-      CL->rect.y         = it->pos[1];
-      memcpy(CL->margin, it->margin, sizeof it->margin);
-      rd__apply_relative(it->st, CL, it->area);
-      ext[0] = fmaxf(ext[0], it->pos[0] + it->size[0] + it->margin[EDGE_R]);
-      ext[1] = fmaxf(ext[1], it->pos[1] + it->size[1] + it->margin[EDGE_B]);
-    }
-    if (n) L->baseline = ctx->layouts[items[0].idx].rect.y + ctx->layouts[items[0].idx].baseline;
-    float sz[2] = {size.width, size.height};
-    for (uint32_t c = s->first_child; c; c = ctx->slots[c].next_sibling) {
-      const rd_style* cs = &ctx->styles[c].computed;
-      if (cs->display == RD_DISPLAY_NONE)
-        ctx->layouts[c].rect = (rd_rect){0};
-      else if (cs->position == RD_POSITION_ABSOLUTE)
-        rd__layout_absolute(ctx, c, L, sz);
-    }
-    L->content.width  = fmaxf(ext[0] + L->padding[EDGE_R], sz[0] - L->border[EDGE_R]) - L->border[EDGE_L];
-    L->content.height = fmaxf(ext[1] + L->padding[EDGE_B], sz[1] - L->border[EDGE_B]) - L->border[EDGE_T];
-    L->rect.width     = sz[0];
-    L->rect.height    = sz[1];
-    rd__clamp_scroll(L);
-  }
-
+  rd_size size = {g->inner[0] + g->pb[0], g->inner[1] + g->pb[1]};
+  if (perform) grid_perform(ctx, i, g, size);
   rd__scratch_restore(ctx, mark);
   return size;
 }

@@ -260,8 +260,64 @@ static void failures(void) {
   rd_ctx_destroy(ctx);
 }
 
+// A select list or context menu whose owner is destroyed while it's open does nothing when chosen from,
+// and the orphaned list closes at the next input.
+static void outlived(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_font_load_file(ctx, RAYDOM_TEST_FONT);
+  const char* const opts[] = {"One", "Two"};
+  rd_node           sel    = rdx_select_create(ctx, opts, 2, "pick");
+  rd_node_append(ctx, rd_ctx_root(ctx), sel);
+  click(ctx, sel);
+  rd_node list = rd_node_last_child(ctx, rd_ctx_overlay(ctx));
+  rd_ctx_layout(ctx, 800, 600);
+  rd_rect item = rd_node_bounds(ctx, nth_item(ctx, list, 1));
+  rd_node_destroy(ctx, sel);
+  CHECK(rd_node_alive(ctx, list));
+  click_at(ctx, item.x + 4, item.y + item.height / 2, RD_BUTTON_PRIMARY);
+  CHECK(!rd_node_alive(ctx, list));
+
+  sel = rdx_select_create(ctx, opts, 2, "pick");
+  rd_node_append(ctx, rd_ctx_root(ctx), sel);
+  click(ctx, sel);
+  list = rd_node_last_child(ctx, rd_ctx_overlay(ctx));
+  rd_node_destroy(ctx, sel);
+  rd_ctx_pointer(ctx, 700, 500, 0, 0, 0);
+  CHECK(!rd_node_alive(ctx, list));
+
+  sel = rdx_select_create(ctx, opts, 2, "pick");
+  rd_node_append(ctx, rd_ctx_root(ctx), sel);
+  click(ctx, sel);
+  list = rd_node_last_child(ctx, rd_ctx_overlay(ctx));
+  click(ctx, nth_item(ctx, list, 1));
+  CHECK(rdx_select_selected(ctx, sel) == 1);
+
+  rd_node row = rd_node_create(ctx);
+  rd_node_set_style(ctx, row, &(rd_style){.width = rd_px(200), .height = rd_px(40)});
+  rd_node_append(ctx, rd_ctx_root(ctx), row);
+  const rdx_menu_item items[] = {{"Delete", NULL, false}};
+  freed                       = 0;
+  CHECK(rdx_context_menu_attach(ctx, row, items, 1, on_choose, NULL, count_free));
+  rd_ctx_layout(ctx, 800, 600);
+  rd_rect r = rd_node_bounds(ctx, row);
+  click_at(ctx, r.x + 10, r.y + 10, RD_BUTTON_SECONDARY);
+  rd_node menu = rd_node_last_child(ctx, rd_ctx_overlay(ctx));
+  chosen       = -2;
+  click(ctx, nth_item(ctx, menu, 0));
+  CHECK(chosen == 0 && !rd_node_alive(ctx, menu));
+  click_at(ctx, r.x + 10, r.y + 10, RD_BUTTON_SECONDARY);
+  menu = rd_node_last_child(ctx, rd_ctx_overlay(ctx));
+  rd_node_destroy(ctx, row);
+  CHECK(freed == 1 && rd_node_alive(ctx, menu));
+  chosen = -2;
+  click(ctx, nth_item(ctx, menu, 0));
+  CHECK(chosen == -2 && !rd_node_alive(ctx, menu));
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   failures();
+  outlived();
   menus();
   selects();
   modals();

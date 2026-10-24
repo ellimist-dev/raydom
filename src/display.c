@@ -81,16 +81,24 @@ static void fill(rd_ctx* ctx, uint32_t i, rd_rect r, rd_color color) {
   c->fill    = color;
 }
 
-// Backgrounds for a byte range across the lines it spans, within the visible lines. A range that
-// continues past a line end extends half a space beyond it.
+// Backgrounds for a byte range across the lines it spans, within the visible lines and the clip. A
+// range that continues past a line end extends half a space beyond it.
 static void fill_range(rd_ctx* ctx, uint32_t i, const rd_style* st, const rd__text_layout* tl, rd_rect content,
-                       const rd_text* t, size_t lo, size_t hi, float dx, rd_color color) {
-  if (lo >= hi || !color.a) return;
+                       rd_rect clip, const rd_text* t, size_t lo, size_t hi, float dx, rd_color color) {
+  if (lo >= hi || !color.a || !tl->line_count) return;
   uint32_t a = rd__text_cp_of_byte(t, lo), b = rd__text_cp_of_byte(t, hi);
   uint32_t la = rd__text_line_of(tl, a), lb = rd__text_line_of(tl, b);
   uint32_t shown = rd__text_visible_lines(st, tl);
   bool     cut   = st->text_overflow == RD_TEXT_OVERFLOW_ELLIPSIS;
-  for (uint32_t l = la; l <= lb && l < shown; l++) {
+  uint32_t first = la, last = lb;  // of those, the lines that meet the clip
+  if (tl->line_height > 0) {
+    float top = floorf((clip.y - content.y) / tl->line_height);
+    float end = ceilf((clip.y + clip.height - content.y) / tl->line_height);
+    if (end <= (float)la || top > (float)lb) return;
+    if (top > (float)la) first = (uint32_t)top;
+    if (end - 1 < (float)lb) last = (uint32_t)(end - 1);
+  }
+  for (uint32_t l = first; l <= last && l < shown; l++) {
     float x0  = l == la ? rd__text_cp_x(tl, l, a) : 0;
     float x1  = l == lb ? rd__text_cp_x(tl, l, b) : rd__text_cp_x(tl, l, tl->lines[l].cp_end) + tl->space_width / 2;
     float off = rd__text_align_offset(st, content.width, tl->lines[l].width);
@@ -102,13 +110,13 @@ static void fill_range(rd_ctx* ctx, uint32_t i, const rd_style* st, const rd__te
 }
 
 // Highlight backgrounds, clamped to the text.
-static void build_highlights(rd_ctx* ctx, uint32_t i, const rd_style* st, rd_rect content, float op) {
+static void build_highlights(rd_ctx* ctx, uint32_t i, const rd_style* st, rd_rect content, rd_rect clip, float op) {
   const rd_text*  t = rd__text_get(ctx, i);
   rd__text_layout tl;
   if (!t || !t->highlight_count || !rd__text_layout_get(ctx, i, content.width, &tl)) return;
   for (size_t j = 0; j < t->highlight_count; j++) {
     const rd_highlight* h = &t->highlights[j];
-    fill_range(ctx, i, st, &tl, content, t, h->start < t->len ? h->start : t->len, h->end < t->len ? h->end : t->len,
+    fill_range(ctx, i, st, &tl, content, clip, t, h->start < t->len ? h->start : t->len, h->end < t->len ? h->end : t->len,
                0, fade(h->background, op));
   }
 }
@@ -128,11 +136,12 @@ static void build_input(rd_ctx* ctx, uint32_t i, const rd_style* st, rd_rect con
   }
 
   size_t lo = v->anchor < v->caret ? v->anchor : v->caret, hi = v->anchor < v->caret ? v->caret : v->anchor;
-  if (focused && lo != hi) fill_range(ctx, i, st, &tl, content, t, lo, hi, -sx, fade(st->selection_color, op));
+  if (focused && lo != hi) fill_range(ctx, i, st, &tl, content, clip, t, lo, hi, -sx, fade(st->selection_color, op));
 
   if (t->len || v->placeholder_len) {
     rd__cmd* c = push(ctx, t->len ? RD_CMD_TEXT : RD_CMD_PLACEHOLDER, i);
     c->rect    = content;
+    c->clip    = clip;
     c->dx      = -sx;
     c->fill    = fade(st->color, t->len ? op : op * 0.45f);
   }
@@ -243,15 +252,16 @@ static void build(rd_ctx* ctx, uint32_t i, float ox, float oy, float opacity, rd
   } else if (visible && rd__input_view_get(ctx, i, &view)) {
     build_input(ctx, i, st, content, clip, op, &view);
   } else if (visible && rd__is_text(ctx, i) && st->color.a) {
-    build_highlights(ctx, i, st, content, op);
+    build_highlights(ctx, i, st, content, clip, op);
     size_t lo, hi;
     if (rd__selection_range(ctx, i, &lo, &hi)) {
       rd__text_layout tl;
       if (rd__text_layout_get(ctx, i, content.width, &tl))
-        fill_range(ctx, i, st, &tl, content, rd__text_get(ctx, i), lo, hi, 0, fade(st->selection_color, op));
+        fill_range(ctx, i, st, &tl, content, clip, rd__text_get(ctx, i), lo, hi, 0, fade(st->selection_color, op));
     }
     rd__cmd* c = push(ctx, RD_CMD_TEXT, i);
     c->rect    = content;
+    c->clip    = clip;
     c->fill    = fade(st->color, op);
   }
   if (L->paint_fn) {

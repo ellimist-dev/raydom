@@ -34,7 +34,9 @@ Space chooses, and Tab closes the menu. Hovering an item highlights it.
 ```
 
 `rdx_context_menu_attach` opens the menu at the pointer when the node is pressed with the secondary button. The items
-are copied, and the callback lives as long as the node.
+are copied, and the callback lives as long as the node. A menu still open when the node is destroyed stays open, and
+choosing from it does nothing. Likewise a select's list that outlives its select ignores the choice, and closes at
+the next press, key or pointer move.
 
 ## Select
 

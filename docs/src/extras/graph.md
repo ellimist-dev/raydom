@@ -19,7 +19,9 @@ target_link_libraries(your_app PRIVATE raydom::extras)
 ```
 
 `rdx_graph_create(ctx, host)` turns `host` into the view. The graph lives until the host node is destroyed; there is
-no separate destroy call. Node labels are text nodes under the host, styled with the class returned by
+no separate destroy call. A host holds one graph: creating a second on the same host returns null and leaves the
+first as it was, so to rebuild the view, destroy the host and create the graph on a new one. Replacing the host's
+paint callback stops the graph drawing but doesn't free it. Node labels are text nodes under the host, styled with the class returned by
 `label_class()`.
 
 ## Nodes and edges

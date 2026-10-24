@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "events_internal.h"
 #include "input_internal.h"
 #include "selection_internal.h"
 
@@ -199,6 +200,22 @@ static rd_node common_ancestor(const rd_ctx* ctx, rd_node a, rd_node b) {
   return (rd_node){0};
 }
 
+static bool in_tree(const rd_ctx* ctx, uint32_t i) {
+  while (ctx->slots[i].parent) i = ctx->slots[i].parent;
+  return i == ctx->root;
+}
+
+// The pressed node, or when a listener destroyed or detached it, its deepest ancestor at the press
+// that is still in the tree, as browsers do. active_chain holds the press target and its ancestors.
+static rd_node pressed(const rd_ctx* ctx) {
+  if (rd__slot(ctx, ctx->press_target) && in_tree(ctx, ctx->press_target.index)) return ctx->press_target;
+  for (uint32_t j = 0; j < ctx->active_chain.len; j++) {
+    rd_node n = ctx->active_chain.nodes[j];
+    if (rd__slot(ctx, n) && in_tree(ctx, n.index)) return n;
+  }
+  return (rd_node){0};
+}
+
 static void build_chain(const rd_ctx* ctx, rd__chain* c, rd_node leaf) {
   c->len = 0;
   if (!rd__slot(ctx, leaf)) return;
@@ -267,15 +284,6 @@ static void set_focus_states(rd_ctx* ctx, bool on, bool visible) {
   rd_node_set_states(ctx, ctx->focused, RD_STATE_FOCUS_VISIBLE, visible);
 }
 
-// Drops focus without events when the focused node was destroyed, detached, hidden or disabled.
-static rd_node focus_valid(rd_ctx* ctx) {
-  if (rd_node_is_null(ctx->focused) || can_focus(ctx, ctx->focused, false)) return ctx->focused;
-  set_focus_states(ctx, false, false);
-  ctx->focused         = (rd_node){0};
-  ctx->focus_chain.len = 0;
-  return ctx->focused;
-}
-
 static void fire_focus(rd_ctx* ctx, rd_event_type type, rd_node target, rd_node related, bool bubbles) {
   if (!rd__slot(ctx, target)) return;
   rd_event ev = make_event(ctx, type, target, 0);
@@ -283,22 +291,42 @@ static void fire_focus(rd_ctx* ctx, rd_event_type type, rd_node target, rd_node 
   dispatch(ctx, &ev, bubbles);
 }
 
+// prev may be dead, detached, hidden or disabled: it still loses its states, and gets the events if alive.
 static void set_focus(rd_ctx* ctx, rd_node next, bool visible) {
-  rd_node prev = focus_valid(ctx);
+  rd_node prev = ctx->focused;
   if (rd_node_eq(prev, next)) {
-    if (!rd_node_is_null(next)) rd_node_set_states(ctx, next, RD_STATE_FOCUS_VISIBLE, visible);
+    if (rd__slot(ctx, next)) rd_node_set_states(ctx, next, RD_STATE_FOCUS_VISIBLE, visible);
     return;
   }
-  if (!rd_node_is_null(prev) && rd__input_take_dirty(ctx, prev.index)) fire(ctx, RD_EVENT_CHANGE, prev, 0, true);
-  set_focus_states(ctx, false, false);
-  ctx->focused = next;
-  build_chain(ctx, &ctx->focus_chain, next);
-  if (!rd_node_is_null(next)) set_focus_states(ctx, true, visible);
+  // A listener that moves focus again supersedes this change: the inner change fires its own sequence,
+  // so this one stops.
+  uint32_t gen = ++ctx->focus_gen;
 
-  fire_focus(ctx, RD_EVENT_BLUR, prev, next, false);
-  fire_focus(ctx, RD_EVENT_FOCUS_OUT, prev, next, true);
-  fire_focus(ctx, RD_EVENT_FOCUS, next, prev, false);
-  fire_focus(ctx, RD_EVENT_FOCUS_IN, next, prev, true);
+  if (rd__slot(ctx, prev)) {
+    rd__input_end_typing(ctx, prev.index);
+    if (rd__input_take_dirty(ctx, prev.index)) fire(ctx, RD_EVENT_CHANGE, prev, 0, true);
+  }
+  if (ctx->focus_gen == gen) {
+    if (!rd_node_is_null(next) && !can_focus(ctx, next, false)) next = (rd_node){0};  // a change listener removed it
+    set_focus_states(ctx, false, false);
+    ctx->focused = next;
+    build_chain(ctx, &ctx->focus_chain, next);
+    if (!rd_node_is_null(next)) set_focus_states(ctx, true, visible);
+    fire_focus(ctx, RD_EVENT_BLUR, prev, next, false);
+  }
+  if (ctx->focus_gen == gen) fire_focus(ctx, RD_EVENT_FOCUS_OUT, prev, next, true);
+  if (ctx->focus_gen == gen) fire_focus(ctx, RD_EVENT_FOCUS, next, prev, false);
+  if (ctx->focus_gen == gen) fire_focus(ctx, RD_EVENT_FOCUS_IN, next, prev, true);
+}
+
+// Drops focus, with blur events, once the focused node was destroyed, detached, hidden or disabled.
+static rd_node focus_valid(rd_ctx* ctx) {
+  if (!rd_node_is_null(ctx->focused) && !can_focus(ctx, ctx->focused, false)) set_focus(ctx, (rd_node){0}, false);
+  return can_focus(ctx, ctx->focused, false) ? ctx->focused : (rd_node){0};
+}
+
+void rd__focus_fixup(rd_ctx* ctx) {
+  if (ctx) focus_valid(ctx);
 }
 
 bool rd_node_focus(rd_ctx* ctx, rd_node node) {
@@ -571,9 +599,14 @@ void rd_ctx_pointer(rd_ctx* ctx, float x, float y, uint8_t buttons, float wheel_
     bool was = ctx->pointer_buttons & b, is = buttons & b;
     if (was == is) continue;
     rd_node t = pointer_target(ctx, hit);
+    // History buttons over a disabled node or nothing go to the root, so a router there still hears them.
+    bool history = b == RD_BUTTON_BACK || b == RD_BUTTON_FORWARD;
     if (is) {
       ctx->pointer_buttons |= b;
-      if (disabled(ctx, t)) continue;
+      if (disabled(ctx, t)) {
+        if (history) fire(ctx, RD_EVENT_POINTER_DOWN, rd_ctx_root(ctx), b, true);
+        continue;
+      }
       if (b == RD_BUTTON_PRIMARY) {
         ctx->press_target = t;
         set_active(ctx, t, true);
@@ -589,10 +622,13 @@ void rd_ctx_pointer(rd_ctx* ctx, float x, float y, uint8_t buttons, float wheel_
       }
     } else {
       ctx->pointer_buttons &= (uint8_t)~b;
-      if (!disabled(ctx, t)) fire(ctx, RD_EVENT_POINTER_UP, t, b, true);
+      if (!disabled(ctx, t))
+        fire(ctx, RD_EVENT_POINTER_UP, t, b, true);
+      else if (history)
+        fire(ctx, RD_EVENT_POINTER_UP, rd_ctx_root(ctx), b, true);
       if (b == RD_BUTTON_PRIMARY) {
         ctx->selecting = false;
-        rd_node c      = common_ancestor(ctx, ctx->press_target, t);
+        rd_node c      = common_ancestor(ctx, pressed(ctx), t);
         if (!rd_node_is_null(c) && !disabled(ctx, c)) {
           // Another click on the same node, soon and close by, extends the count: a double click.
           bool again = rd_node_eq(c, ctx->last_click) && ctx->now - ctx->last_click_time <= MULTI_CLICK_SECONDS &&

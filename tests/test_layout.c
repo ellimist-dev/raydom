@@ -118,7 +118,47 @@ static void test_shrink(void) {
   rd_ctx_layout(ctx, 800, 600);
   CHECK_RECT(ctx, a, 0, 0, 150, 0);
   CHECK_RECT(ctx, b, 150, 0, 50, 0);
+
+  // Shrinking is weighted by the content-box base size (CSS Flexbox §9.7): a's is 60, b's 100, so of
+  // the 100px overflow a takes 37.5 and b 62.5.
+  rd_node row = add(ctx, rd_ctx_root(ctx), (rd_style){.flex_direction = RD_FLEX_ROW, .width = rd_px(100)});
+  rd_node p   = add(ctx, row,
+                    (rd_style){.flex_basis  = rd_px(100),
+                               .flex_shrink = rd_num(1),
+                               .padding     = rd_edges_vh(rd_px(0), rd_px(20))});
+  rd_node q   = add(ctx, row, (rd_style){.flex_basis = rd_px(100), .flex_shrink = rd_num(1)});
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK_RECT(ctx, p, 0, 0, 62.5f, 0);
+  CHECK_RECT(ctx, q, 62.5f, 0, 37.5f, 0);
   rd_ctx_destroy(ctx);
+}
+
+// Factors and lengths too large to add up still lay out, and finish.
+static void test_non_finite(void) {
+  rd_style cases[] = {
+      {.height = rd_px(10), .flex_grow = rd_num(INFINITY)},
+      {.height = rd_px(10), .flex_grow = rd_num(3e38f)},
+      {.height = rd_px(10), .width = rd_px(INFINITY), .flex_shrink = rd_num(1)},
+      {.height = rd_px(10), .width = rd_px(1e38f), .flex_shrink = rd_num(INFINITY)},
+      {.height = rd_px(10), .flex_basis = rd_px(-INFINITY), .flex_grow = rd_num(1), .margin = {.left = rd_px(1e38f)}},
+  };
+  for (size_t c = 0; c < sizeof cases / sizeof *cases; c++) {
+    rd_ctx* ctx  = rd_ctx_create();
+    rd_node root = rd_ctx_root(ctx);
+    rd_node_set_style(ctx, root, &(rd_style){.flex_direction = RD_FLEX_ROW});
+    rd_node a = add(ctx, root, cases[c]);
+    rd_node b = add(ctx, root, cases[c]);
+    rd_ctx_layout(ctx, 300, 200);
+    for (int j = 0; j < 2; j++) {
+      rd_rect r = rd_node_rect(ctx, j ? b : a);
+      CHECK(isfinite(r.x) && isfinite(r.y) && isfinite(r.width) && isfinite(r.height));
+    }
+    if (c < 2) {
+      CHECK_RECT(ctx, a, 0, 0, 150, 10);
+      CHECK_RECT(ctx, b, 150, 0, 150, 10);
+    }
+    rd_ctx_destroy(ctx);
+  }
 }
 
 static void test_max_clamp(void) {
@@ -310,6 +350,48 @@ static void test_absolute(void) {
   rd_ctx_destroy(ctx);
 }
 
+// CSS 2 §10.3.7 and §10.6.4: with both insets and a size, auto margins take what's left.
+static void test_absolute_auto_margins(void) {
+  rd_ctx* ctx  = rd_ctx_create();
+  rd_node root = rd_ctx_root(ctx);
+  rd_node a    = add(ctx, root,
+                     (rd_style){.position = RD_POSITION_ABSOLUTE,
+                                .inset    = rd_edges_all(rd_px(0)),
+                                .width    = rd_px(100),
+                                .height   = rd_px(50),
+                                .margin   = rd_edges_all(rd_auto())});
+  rd_node b    = add(ctx, root,
+                     (rd_style){.position = RD_POSITION_ABSOLUTE,
+                                .inset    = rd_edges_all(rd_px(10)),
+                                .width    = rd_px(100),
+                                .height   = rd_px(50),
+                                .margin   = {.left = rd_auto(), .top = rd_auto(), .bottom = rd_px(20)}});
+  rd_node c    = add(ctx, root,
+                     (rd_style){.position = RD_POSITION_ABSOLUTE,
+                                .inset    = rd_edges_all(rd_px(0)),
+                                .width    = rd_px(500),
+                                .height   = rd_px(400),
+                                .margin   = rd_edges_all(rd_auto())});
+  rd_node d    = add(ctx, root,
+                     (rd_style){.position = RD_POSITION_ABSOLUTE,
+                                .inset    = {.left = rd_px(0), .top = rd_px(0)},
+                                .width    = rd_px(100),
+                                .height   = rd_px(50),
+                                .margin   = rd_edges_all(rd_auto())});
+  rd_node e    = add(ctx, root,
+                     (rd_style){.position = RD_POSITION_ABSOLUTE,
+                                .inset    = rd_edges_all(rd_px(0)),
+                                .height   = rd_px(50),
+                                .margin   = rd_edges_all(rd_auto())});
+  rd_ctx_layout(ctx, 400, 300);
+  CHECK_RECT(ctx, a, 150, 125, 100, 50);
+  CHECK_RECT(ctx, b, 290, 220, 100, 50);
+  CHECK_RECT(ctx, c, 0, -50, 500, 400);  // a negative split puts the left margin at 0, not the top
+  CHECK_RECT(ctx, d, 0, 0, 100, 50);     // without both insets, auto margins are 0
+  CHECK_RECT(ctx, e, 0, 125, 400, 50);   // an auto width fills the space, with 0 margins
+  rd_ctx_destroy(ctx);
+}
+
 static void test_display_none_and_relative(void) {
   rd_ctx* ctx   = rd_ctx_create();
   rd_node c     = add(ctx, rd_ctx_root(ctx), (rd_style){.flex_direction = RD_FLEX_ROW});
@@ -378,11 +460,41 @@ static void test_caching(void) {
   rd_ctx_destroy(ctx);
 }
 
+static void baseline_tree(rd_ctx* ctx, rd_node out[2], fake_text* t) {
+  rd_node root = rd_ctx_root(ctx);
+  rd_node_set_style(ctx, root, &(rd_style){.align_items = RD_ALIGN_START});
+  rd_node a = add(ctx, root, (rd_style){0});
+  out[0]    = add(ctx, a,
+                  (rd_style){.flex_direction = RD_FLEX_ROW, .align_items = RD_ALIGN_BASELINE, .width = rd_pct(50)});
+  out[1]    = add(ctx, out[0], (rd_style){.flex_shrink = rd_num(1)});
+  rd_node_set_measure(ctx, out[1], measure_text, t, NULL);
+}
+
+// Measuring a baseline row lays its items out; the row's own cached layout must not keep them so.
+static void test_baseline_relayout(void) {
+  fake_text t1 = {80, 10, 0}, t2 = {80, 10, 0};
+  rd_ctx*   inc   = rd_ctx_create();
+  rd_ctx*   fresh = rd_ctx_create();
+  rd_node   n[2], m[2];
+  baseline_tree(inc, n, &t1);
+  baseline_tree(fresh, m, &t2);
+  rd_ctx_layout(inc, 300, 200);
+  rd_ctx_layout(inc, 400, 200);
+  rd_ctx_layout(fresh, 400, 200);
+  for (int j = 0; j < 2; j++) {
+    rd_rect r = rd_node_rect(fresh, m[j]);
+    check_rect(inc, n[j], r.x, r.y, r.width, r.height, __LINE__);
+  }
+  rd_ctx_destroy(inc);
+  rd_ctx_destroy(fresh);
+}
+
 int main(void) {
   test_column_stretch();
   test_justify();
   test_grow_and_gap();
   test_shrink();
+  test_non_finite();
   test_max_clamp();
   test_box_model();
   test_percentages();
@@ -392,8 +504,10 @@ int main(void) {
   test_reverse();
   test_measure();
   test_absolute();
+  test_absolute_auto_margins();
   test_display_none_and_relative();
   test_auto_height_and_content();
   test_caching();
+  test_baseline_relayout();
   return TEST_RESULT();
 }

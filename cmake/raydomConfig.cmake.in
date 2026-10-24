@@ -4,4 +4,13 @@ include(CMakeFindDependencyMacro)
 find_dependency(raylib 6.0...<6.1)
 
 include("${CMAKE_CURRENT_LIST_DIR}/raydomTargets.cmake")
+
+# Components: find_package(raydom COMPONENTS extras router) fails if the package was built without them.
+foreach (component extras router)
+    if (TARGET raydom::${component})
+        set(raydom_${component}_FOUND TRUE)
+    else ()
+        set(raydom_${component}_FOUND FALSE)
+    endif ()
+endforeach ()
 check_required_components(raydom)

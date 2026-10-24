@@ -385,6 +385,20 @@ static void trees(void) {
   CHECK(rdx_tree_item_of(ctx, tree, rd_node_last_child(ctx, row_main)) == main_c);  // the label
   click(ctx, toggle);
   CHECK(!rdx_tree_expanded(ctx, tree, src));
+
+  // Adding only marks the tree; whatever needs the visible items sees new ones before the next layout.
+  int extra = rdx_tree_add(ctx, tree, -1, "extra");
+  CHECK(rdx_tree_select(ctx, tree, extra) && rdx_tree_selected(ctx, tree) == extra && rdx_list_selected(ctx, tree) == 2);
+  int tail = rdx_tree_add(ctx, tree, -1, "tail");
+  rdx_tree_add(ctx, tree, src, "hidden.c");  // under a collapsed item: not a row
+  rd_node_focus(ctx, tree);
+  press(ctx, RD_KEY_END);
+  CHECK(rdx_tree_selected(ctx, tree) == tail && rdx_list_selected(ctx, tree) == 3);
+  rd_ctx_layout(ctx, 800, 600);
+  int rows = 0;
+  for (rd_node r = rd_node_next_sibling(ctx, rd_node_first_child(ctx, tree)); !rd_node_is_null(r); r = rd_node_next_sibling(ctx, r))
+    rows += rdx_tree_item_of(ctx, tree, r) >= 0;
+  CHECK(rows == 4);
   rd_ctx_destroy(ctx);
 }
 

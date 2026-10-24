@@ -29,7 +29,8 @@ extern "C" {
 // Pages are built when their route is entered and destroyed when it's left, unless the route has
 // RDR_ROUTE_KEEP_ALIVE: then the page is hidden and shown again when the route is entered next, and
 // lives as long as the router. A page is also left, and rebuilt, when its parameters change; a kept
-// page stays and reads the new values, listening for RD_EVENT_CHANGE on the root router.
+// page stays, shown and without a transition, and reads the new values, listening for RD_EVENT_CHANGE
+// on the root router.
 //
 // A navigation resolves the whole tree of routers and then fires RD_EVENT_CHANGE on the root router.
 // Navigating from a page's build function or a CHANGE listener queues the navigation, which runs when
@@ -37,7 +38,8 @@ extern "C" {
 //
 // The root router also takes, while the pointer or focus is inside it (or, if inside no router, for
 // the router used last): the mouse's back and forward buttons, Cmd+[ and Cmd+] (Super, elsewhere), and
-// Alt+Left and Alt+Right outside macOS, where Option+Left moves by word.
+// Alt+Left and Alt+Right outside macOS and iOS, where Option+Left moves by word. A browser build checks
+// the browser's platform for that.
 //
 // In a browser (Emscripten), those inputs would otherwise also navigate the page away from the app:
 // creating a router cancels the browser's handling of the side buttons over the canvas, and of the
@@ -89,8 +91,8 @@ typedef struct rdr_route_desc {
   uint32_t      flags RD_DEFAULT({});    // RDR_ROUTE_*
 } rdr_route_desc;
 
-// Adds a route. Takes effect at the next navigation. False for a malformed pattern (a wildcard not
-// last, an empty name, more than 16 optional segments) or a node that isn't a router; data isn't kept.
+// Adds a route. Takes effect at the next navigation. Patterns and paths have any number of segments.
+// False for a malformed pattern (a wildcard not last, an empty name, more than 16 optional segments) or a node that isn't a router; data isn't kept.
 bool rdr_router_add(rd_ctx* ctx, rd_node router, const rdr_route_desc* desc);
 
 // Navigation. path is absolute ("/a/b") or relative to the router's base ("b", "../c"). Any router in

@@ -1,4 +1,5 @@
 build/
+build-*/
 .cache/
 .envrc
 build-web/

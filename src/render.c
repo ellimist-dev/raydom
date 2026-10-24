@@ -9,15 +9,21 @@
 #include "rlgl.h"
 
 #ifdef __EMSCRIPTEN__
+#include <GLES2/gl2.h>
 #include <emscripten/emscripten.h>
 #endif
 
-enum { ATLAS_SIZE = 2048 };
+// The atlas starts at ATLAS_MIN and doubles, up to ATLAS_MAX, when one frame's glyphs don't fit. A
+// WHITE_TEXELS square in its corner is white: plain rectangles sample it, so they batch with glyphs.
+enum { ATLAS_MIN    = 2048,
+       ATLAS_MAX    = 4096,
+       WHITE_TEXELS = 4 };
 
 // One shader draws everything raydom draws, so consecutive draws batch. A vertex's normal holds what
 // varies per quad: (0, 0, 0) for a plain textured quad (text, sharp rectangles, raylib's own shapes), or
 // (width, height, radius) for a rounded box drawn as a signed distance field, with radius -1 when the
-// corners differ and come from the radii uniform. The fill is the vertex color. Uniforms hold what
+// corners differ and come from the radii uniform; an empty box isn't drawn, so a width of 0 can't
+// pass for a plain quad. Boxes without an image don't sample the texture, so they bind the atlas too. The fill is the vertex color. Uniforms hold what
 // rarely changes between boxes (borders, stroke, blur, image placement), so most boxes share them.
 static const char* FS_BODY =
     "uniform vec4 radii;\n"
@@ -159,7 +165,10 @@ typedef struct gpu {
   Shader      shader;
   int         loc[U_COUNT];
   Texture2D   atlas;
+  int          atlas_size;
   int         shelf_x, shelf_y, shelf_h;
+  uint32_t     frame, reset_frame;  // rd_draw calls, and the one that last emptied the atlas
+  bool         thrashing;           // a frame's glyphs overflowed even the largest atlas
   glyph_slot* glyphs;
   uint32_t    glyph_cap, glyph_count;
   uint8_t*     scratch;
@@ -168,6 +177,34 @@ typedef struct gpu {
   box_uniforms uniforms;  // as last uploaded; a box with the same ones joins the batch
   bool         uniforms_set;
 } gpu;
+
+static void atlas_clear_shelves(gpu* g) {
+  g->shelf_x = WHITE_TEXELS + 1;
+  g->shelf_y = 0;
+  g->shelf_h = WHITE_TEXELS;
+}
+
+// A cleared texture, so that bilinear samples at glyph edges read transparent gaps, with the white block.
+static bool atlas_create(gpu* g, int size) {
+  unsigned int id = rlLoadTexture(NULL, size, size, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8, 1);
+  if (!id) return false;
+  Texture2D t    = {id, size, size, 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
+  int       rows = 64;
+  uint8_t*  zero = calloc((size_t)size * (size_t)rows, 4);
+  if (!zero) {
+    rlUnloadTexture(id);
+    return false;
+  }
+  for (int y = 0; y < size; y += rows) UpdateTextureRec(t, (Rectangle){0, (float)y, (float)size, (float)rows}, zero);
+  memset(zero, 255, WHITE_TEXELS * WHITE_TEXELS * 4);
+  UpdateTextureRec(t, (Rectangle){0, 0, WHITE_TEXELS, WHITE_TEXELS}, zero);
+  free(zero);
+  SetTextureFilter(t, TEXTURE_FILTER_BILINEAR);
+  g->atlas      = t;
+  g->atlas_size = size;
+  atlas_clear_shelves(g);
+  return true;
+}
 
 static gpu* gpu_get(rd_ctx* ctx) {
   if (ctx->gpu) return ctx->gpu;
@@ -186,10 +223,12 @@ static gpu* gpu_get(rd_ctx* ctx) {
   free(fs);
   free(vs);
   for (int j = 0; j < U_COUNT; j++) g->loc[j] = GetShaderLocation(g->shader, UNIFORMS[j]);
-  Image img = GenImageColor(ATLAS_SIZE, ATLAS_SIZE, BLANK);
-  g->atlas  = LoadTextureFromImage(img);
-  UnloadImage(img);
-  SetTextureFilter(g->atlas, TEXTURE_FILTER_BILINEAR);
+  if (!atlas_create(g, ATLAS_MIN)) {
+    UnloadShader(g->shader);
+    free(g);
+    return NULL;
+  }
+  g->reset_frame = UINT32_MAX;
   ctx->gpu = g;
   return g;
 }
@@ -246,16 +285,42 @@ static void atlas_reset(gpu* g) {
   rlDrawRenderBatchActive();
   memset(g->glyphs, 0, g->glyph_cap * sizeof *g->glyphs);
   g->glyph_count = 0;
-  g->shelf_x = g->shelf_y = g->shelf_h = 0;
+  atlas_clear_shelves(g);
+}
+
+// Makes room for new glyphs by emptying the atlas, at most once a frame, so a frame that needs more
+// glyphs than fit doesn't re-rasterize them all every frame. When the glyphs in use don't fit (a
+// second overflow in a frame, or in the next one) the atlas doubles instead. Past the largest, the
+// glyphs that don't fit are skipped, with an empty atlas retried once a second.
+static bool atlas_make_room(gpu* g) {
+  bool again = g->reset_frame == g->frame || g->reset_frame + 1 == g->frame;
+  if (again && g->atlas_size < ATLAS_MAX) {
+    Texture2D old = g->atlas;
+    rlDrawRenderBatchActive();
+    if (atlas_create(g, g->atlas_size * 2)) {
+      UnloadTexture(old);
+      atlas_reset(g);
+      g->reset_frame = g->frame;
+      return true;
+    }
+  }
+  if (g->reset_frame == g->frame || (g->thrashing && g->frame - g->reset_frame < 60)) {
+    g->thrashing = true;
+    return false;
+  }
+  atlas_reset(g);
+  g->reset_frame = g->frame;
+  g->thrashing   = false;
+  return true;
 }
 
 static bool atlas_pack(gpu* g, int w, int h, int* x, int* y) {
-  if (g->shelf_x + w + 1 > ATLAS_SIZE) {
+  if (g->shelf_x + w + 1 > g->atlas_size) {
     g->shelf_y += g->shelf_h + 1;
     g->shelf_x = 0;
     g->shelf_h = 0;
   }
-  if (g->shelf_y + h + 1 > ATLAS_SIZE) return false;
+  if (g->shelf_y + h + 1 > g->atlas_size) return false;
   *x = g->shelf_x;
   *y = g->shelf_y;
   g->shelf_x += w + 1;
@@ -274,12 +339,10 @@ static const glyph_slot* glyph_get(gpu* g, rd__font* f, int32_t glyph, float px)
   rd__font_glyph_box(f, glyph, scale, &x0, &y0, &x1, &y1);
   int w = x1 - x0, h = y1 - y0, ax = 0, ay = 0;
   if (w > 0 && h > 0) {
-    if (w >= ATLAS_SIZE || h >= ATLAS_SIZE) return NULL;
-    if (!atlas_pack(g, w, h, &ax, &ay)) {
-      atlas_reset(g);
-      s = glyph_find(g, key);
-      if (!atlas_pack(g, w, h, &ax, &ay)) return NULL;
-    }
+    if (w >= ATLAS_MAX - WHITE_TEXELS || h >= ATLAS_MAX - WHITE_TEXELS) return NULL;
+    while (!atlas_pack(g, w, h, &ax, &ay))
+      if (!atlas_make_room(g)) return NULL;
+    s           = glyph_find(g, key);
     size_t need = (size_t)w * (size_t)h * 5;
     if (need > g->scratch_cap) {
       uint8_t* p = realloc(g->scratch, need);
@@ -375,13 +438,20 @@ static float even_radius(const float radii[4], box_uniforms* u) {
 // [0, size] with room for antialiasing or blur outside it.
 static void sdf_quad(gpu* g, Rectangle r, float pad, const float radii[4], const float border[4], rd_color fill,
                      rd_color stroke, float blur) {
+  if (!(r.width > 0) || !(r.height > 0)) return;
   box_uniforms u = {.blur = blur};
   float        k = even_radius(radii, &u);
   memcpy(u.borders, border, sizeof u.borders);
   if (border[0] > 0 || border[1] > 0 || border[2] > 0 || border[3] > 0) set_color4(u.stroke, stroke);
   box_uniforms_use(g, &u);
-  textured_quad(rlGetTextureIdDefault(), -pad, -pad, r.width + pad, r.height + pad, r.x - pad, r.y - pad,
+  textured_quad(g->atlas.id, -pad, -pad, r.width + pad, r.height + pad, r.x - pad, r.y - pad,
                 r.x + r.width + pad, r.y + r.height + pad, to_color(fill), (Vector3){r.width, r.height, k});
+}
+
+// A rectangle in the vertex color, from the atlas's white block so that it joins the glyphs' batch.
+static void fill_quad(gpu* g, Rectangle r, Color c) {
+  float u = (float)WHITE_TEXELS / 2 / (float)g->atlas_size;
+  textured_quad(g->atlas.id, u, u, u, u, r.x, r.y, r.x + r.width, r.y + r.height, c, PLAIN);
 }
 
 static void draw_rect(gpu* g, const rd__cmd* c, float dpi) {
@@ -393,21 +463,21 @@ static void draw_rect(gpu* g, const rd__cmd* c, float dpi) {
     sdf_quad(g, r, 1, c->radii, border, c->fill, c->stroke, 0);
     return;
   }
-  if (c->fill.a) DrawRectangleRec(r, to_color(c->fill));
+  if (c->fill.a) fill_quad(g, r, to_color(c->fill));
   if (!c->stroke.a) return;
   Color s = to_color(c->stroke);
   float t = snap(c->border[0], dpi), rt = snap(c->border[1], dpi), b = snap(c->border[2], dpi),
         l = snap(c->border[3], dpi);
-  if (t > 0) DrawRectangleRec((Rectangle){r.x, r.y, r.width, t}, s);
-  if (b > 0) DrawRectangleRec((Rectangle){r.x, r.y + r.height - b, r.width, b}, s);
-  if (l > 0) DrawRectangleRec((Rectangle){r.x, r.y + t, l, r.height - t - b}, s);
-  if (rt > 0) DrawRectangleRec((Rectangle){r.x + r.width - rt, r.y + t, rt, r.height - t - b}, s);
+  if (t > 0) fill_quad(g, (Rectangle){r.x, r.y, r.width, t}, s);
+  if (b > 0) fill_quad(g, (Rectangle){r.x, r.y + r.height - b, r.width, b}, s);
+  if (l > 0) fill_quad(g, (Rectangle){r.x, r.y + t, l, r.height - t - b}, s);
+  if (rt > 0) fill_quad(g, (Rectangle){r.x + r.width - rt, r.y + t, rt, r.height - t - b}, s);
 }
 
 // One unwrapped run of UTF-8, for placeholders.
 static void draw_run(gpu* g, rd__font* f, float size, const char* s, size_t len, float x, float base, Color col,
                      float dpi) {
-  float   px = roundf(size * dpi * 4) / 4, units = rd__font_scale(f, size), inv = 1 / (float)ATLAS_SIZE;
+  float   px = roundf(size * dpi * 4) / 4, units = rd__font_scale(f, size), inv = 1 / (float)g->atlas_size;
   int32_t prev = -1;
   for (size_t i = 0; i < len;) {
     int32_t adv, glyph = rd__font_glyph(f, rd__utf8_decode(s, len, &i), &adv);
@@ -435,20 +505,52 @@ static void draw_glyph(gpu* g, const rd__text_layout* tl, int32_t glyph, float p
                        float dpi) {
   const glyph_slot* s = glyph_get(g, tl->font, glyph, px);
   if (!s || !s->w) return;
-  float inv = 1 / (float)ATLAS_SIZE;
+  float inv = 1 / (float)g->atlas_size;
   float gx = (roundf(x * dpi) + (float)s->ox) / dpi, gy = (base * dpi + (float)s->oy) / dpi;
   textured_quad(g->atlas.id, (float)s->x * inv, (float)s->y * inv, (float)(s->x + s->w) * inv, (float)(s->y + s->h) * inv,
                 gx, gy, gx + (float)s->w / dpi, gy + (float)s->h / dpi, col, PLAIN);
 }
 
-// The highlight color of a glyph, if a highlight with a text color covers it.
-static Color glyph_color(const rd_text* t, uint32_t byte, Color base, float op) {
-  for (size_t j = t ? t->highlight_count : 0; j-- > 0;) {
-    const rd_highlight* h = &t->highlights[j];
-    if (h->color.a && byte >= h->start && byte < h->end)
-      return (Color){h->color.r, h->color.g, h->color.b, (unsigned char)lroundf((float)h->color.a * op)};
+// Highlight text colors for a run of increasing byte offsets: the highlights with a text color that
+// overlap the run, and the color until the next byte where it can change, so a glyph costs a compare.
+typedef struct hl_colors {
+  const rd_highlight** list;  // overlapping highlights, in priority order: the last wins
+  uint32_t             count;
+  uint32_t             until;  // the color holds for bytes below this
+  Color                color, base;
+  float                op;
+} hl_colors;
+
+static Color hl_color(hl_colors* h, uint32_t byte) {
+  if (byte < h->until) return h->color;
+  h->color   = h->base;
+  h->until   = UINT32_MAX;
+  bool found = false;
+  for (uint32_t j = h->count; j-- > 0;) {
+    const rd_highlight* r = h->list[j];
+    if (r->start > byte) {
+      if (r->start < h->until) h->until = (uint32_t)r->start;
+    } else if (byte < r->end) {
+      if (r->end < h->until) h->until = (uint32_t)r->end;  // a lower one may show through after it ends
+      if (!found) {
+        h->color = (Color){r->color.r, r->color.g, r->color.b, (unsigned char)lroundf((float)r->color.a * h->op)};
+        found    = true;
+      }
+    }
   }
-  return base;
+  return h->color;
+}
+
+// The lines of tl, laid out from top, that can draw inside clip: a line's glyphs may overhang its box
+// by a line or so.
+static void visible_lines(const rd__text_layout* tl, float top, rd_rect clip, uint32_t shown, uint32_t* l0,
+                          uint32_t* l1) {
+  float lh = tl->line_height > 0 ? tl->line_height : 1;
+  float a = floorf((clip.y - top) / lh) - 1, b = ceilf((clip.y + clip.height - top) / lh) + 1;
+  *l0 = a <= 0 ? 0 : a >= (float)shown ? shown
+                                       : (uint32_t)a;
+  *l1 = b <= 0 ? 0 : b >= (float)shown ? shown
+                                       : (uint32_t)b;
 }
 
 static void draw_text(gpu* g, rd_ctx* ctx, const rd__cmd* c, float dpi) {
@@ -459,7 +561,10 @@ static void draw_text(gpu* g, rd_ctx* ctx, const rd__cmd* c, float dpi) {
   float           px    = roundf(tl.size * dpi * 4) / 4;
   Color           col   = to_color(c->fill);
   float           op    = st->color.a ? (float)c->fill.a / (float)st->color.a : 1;
-  uint32_t        shown = rd__text_visible_lines(st, &tl);
+  uint32_t        shown = rd__text_visible_lines(st, &tl), l0, l1;
+  visible_lines(&tl, c->rect.y, c->clip, shown, &l0, &l1);
+  if (l0 >= l1) return;
+  float right = c->clip.x + c->clip.width;
 
   // Ellipsis: U+2026, or three periods when the font lacks it.
   bool        ellipsis = st->text_overflow == RD_TEXT_OVERFLOW_ELLIPSIS;
@@ -467,7 +572,20 @@ static void draw_text(gpu* g, rd_ctx* ctx, const rd__cmd* c, float dpi) {
   const char* ell   = dots ? "\xe2\x80\xa6" : "...";
   float       ell_w = ellipsis ? rd_font_measure(ctx, st->font, tl.size, ell, RD_TEXT_NUL) : 0;
 
-  for (uint32_t l = 0; l < shown; l++) {
+  hl_colors           hl = {.base = col, .op = op, .until = UINT32_MAX, .color = col};
+  const rd_highlight* few[16];
+  if (t && t->highlight_count && tl.cp_count) {
+    uint32_t lo_cp = tl.lines[l0].cp_start, hi_cp = tl.lines[l1 - 1].cp_end;
+    size_t   lo = lo_cp < tl.cp_count ? tl.offsets[lo_cp] : t->len, hi = hi_cp < tl.cp_count ? tl.offsets[hi_cp] : t->len;
+    hl.list = t->highlight_count <= 16 ? few : malloc(t->highlight_count * sizeof *hl.list);
+    for (size_t j = 0; hl.list && j < t->highlight_count; j++) {
+      const rd_highlight* h = &t->highlights[j];
+      if (h->color.a && h->start <= hi && h->end > lo && h->start < h->end) hl.list[hl.count++] = h;
+    }
+    hl.until = 0;  // computed at the first glyph
+  }
+
+  for (uint32_t l = l0; l < l1; l++) {
     const rd__line* ln    = &tl.lines[l];
     float           base  = snap(c->rect.y + (float)l * tl.line_height + tl.baseline, dpi);
     bool            more  = l + 1 == shown && shown < tl.line_count;
@@ -477,6 +595,7 @@ static void draw_text(gpu* g, rd_ctx* ctx, const rd__cmd* c, float dpi) {
     bool            done  = false;
     for (uint32_t k = ln->tok_start; k < ln->tok_end && !done; k++) {
       const rd__token* tok = &tl.tokens[k];
+      if (x > right) break;  // the rest of the line is past the clip
       if (tok->kind != RD_TOKEN_WORD) {
         x += tok->kind == RD_TOKEN_SPACE ? tok->width : 0;
         continue;
@@ -485,17 +604,18 @@ static void draw_text(gpu* g, rd_ctx* ctx, const rd__cmd* c, float dpi) {
       for (uint32_t j = tok->start; j < tok->end; j++) {
         int32_t adv, glyph = rd__font_glyph(tl.font, tl.cps[j], &adv);
         if (prev >= 0) x += (float)rd__font_kern(tl.font, prev, glyph) * tl.units;
-        if (cut && x + (float)adv * tl.units > limit) {
+        if ((cut && x + (float)adv * tl.units > limit) || x > right) {
           done = true;
           break;
         }
-        draw_glyph(g, &tl, glyph, px, x, base, glyph_color(t, tl.offsets[j], col, op), dpi);
+        draw_glyph(g, &tl, glyph, px, x, base, hl.count ? hl_color(&hl, tl.offsets[j]) : col, dpi);
         x += (float)adv * tl.units;
         prev = glyph;
       }
     }
     if (cut && (done || more)) draw_run(g, tl.font, tl.size, ell, strlen(ell), x, base, col, dpi);
   }
+  if (hl.list != few) free(hl.list);
 }
 
 // Images.
@@ -534,10 +654,15 @@ static void draw_image(gpu* g, rd_ctx* ctx, const rd__cmd* c, float dpi) {
   rd__image* im = rd__image_get(ctx, c->image);
   if (!im) return;
   if (im->svg) {
-    // Rasterize at the drawn size in device pixels; only ever larger, so smaller uses take mipmaps.
-    float need = fmaxf(c->dest.width / c->src.width, c->dest.height / c->src.height) * dpi;
-    need       = fminf(need, (float)RD__MAX_RASTER / fmaxf(im->natural_w, im->natural_h));
-    if (need > im->raster_scale * 1.001f && !rd__image_rasterize(im, need)) return;
+    // Rasterize at the drawn size in device pixels; only ever larger, so smaller uses take mipmaps. The
+    // scale goes up in steps of 1.25, so an image growing a little every frame (a pane being dragged
+    // wider) rasterizes now and then rather than every frame, minified by up to 1.25 in between.
+    float most = (float)RD__MAX_RASTER / fmaxf(im->natural_w, im->natural_h);
+    float need = fminf(fmaxf(c->dest.width / c->src.width, c->dest.height / c->src.height) * dpi, most);
+    if (need > im->raster_scale * 1.001f) {
+      float step = powf(1.25f, ceilf(logf(need) / logf(1.25f) - 1e-3f));
+      if (!rd__image_rasterize(im, fminf(fmaxf(step, need), most))) return;
+    }
   }
   Texture2D t;
   if (!image_texture(im, &t)) return;
@@ -572,38 +697,170 @@ void rd_set_pixel_ratio(rd_ctx* ctx, float ratio) {
   rd__mark_layout_dirty(ctx, ctx->root);
 }
 
-// Logical rectangles to raylib screen pixels, which raylib scales by its own DPI.
-static void scissor(rd_rect r, float ratio) {
-  int x0 = (int)floorf(r.x * ratio), y0 = (int)floorf(r.y * ratio);
-  int x1 = (int)ceilf((r.x + r.width) * ratio), y1 = (int)ceilf((r.y + r.height) * ratio);
-  BeginScissorMode(x0, y0, x1 > x0 ? x1 - x0 : 0, y1 > y0 ? y1 - y0 : 0);
+// Where rd_draw draws: the modelview it was called with, scaled by the pixel ratio, and the projection
+// and GL viewport of the target, the window or a render texture. Together they map logical
+// coordinates to framebuffer pixels, which is what scissors and glyph rasterization need: raylib's
+// modelview already carries the window's DPI scale on a high-density window, and BeginScissorMode
+// applies it again, so neither can be read from the modelview alone. Like raylib's own state, one per
+// process; set for the duration of rd_draw, and nested when a paint callback draws another context.
+typedef struct draw_target {
+  Matrix modelview, projection;
+  int    viewport[4];  // x, y (from the bottom), width, height, in framebuffer pixels
+} draw_target;
+static draw_target target;
+static int         draw_depth;
+
+static draw_target target_read(void);
+
+// A logical point to framebuffer pixels, y up as GL has it.
+static Vector2 to_pixels(const draw_target* t, float x, float y) {
+  const Matrix *m = &t->modelview, *p = &t->projection;
+  float         ex = m->m0 * x + m->m4 * y + m->m12, ey = m->m1 * x + m->m5 * y + m->m13;
+  float         cx = p->m0 * ex + p->m4 * ey + p->m12, cy = p->m1 * ex + p->m5 * ey + p->m13;
+  return (Vector2){(float)t->viewport[0] + (cx + 1) / 2 * (float)t->viewport[2],
+                   (float)t->viewport[1] + (cy + 1) / 2 * (float)t->viewport[3]};
+}
+
+// Framebuffer pixels per logical pixel.
+static float target_scale(const draw_target* t) {
+  Vector2 a = to_pixels(t, 0, 0), b = to_pixels(t, 1, 0);
+  return hypotf(b.x - a.x, b.y - a.y);
+}
+
+// Clips to a logical rectangle, set directly in framebuffer pixels.
+static void scissor_on(const draw_target* t, rd_rect r) {
+  Vector2 a = to_pixels(t, r.x, r.y), b = to_pixels(t, r.x + r.width, r.y + r.height);
+  int     x0 = (int)floorf(fminf(a.x, b.x)), y0 = (int)floorf(fminf(a.y, b.y));
+  int     x1 = (int)ceilf(fmaxf(a.x, b.x)), y1 = (int)ceilf(fmaxf(a.y, b.y));
+  rlDrawRenderBatchActive();
+  rlEnableScissorTest();
+  rlScissor(x0, y0, x1 > x0 ? x1 - x0 : 0, y1 > y0 ? y1 - y0 : 0);
 }
 
 void rd_paint_scissor(const rd_paint_info* info) {
   rd_rect c = info->content, k = info->clip;
   float   x0 = fmaxf(c.x, k.x), y0 = fmaxf(c.y, k.y);
   float   x1 = fminf(c.x + c.width, k.x + k.width), y1 = fminf(c.y + c.height, k.y + k.height);
-  scissor((rd_rect){x0, y0, fmaxf(0, x1 - x0), fmaxf(0, y1 - y0)}, info->ratio > 0 ? info->ratio : 1);
+  rd_rect r  = {x0, y0, fmaxf(0, x1 - x0), fmaxf(0, y1 - y0)};
+  if (draw_depth) {
+    scissor_on(&target, r);
+    return;
+  }
+  // Outside rd_draw: the current state, under the ratio rd_draw would have applied.
+  draw_target t = target_read();
+  float       s = info->ratio > 0 ? info->ratio : 1;
+  scissor_on(&t, (rd_rect){r.x * s, r.y * s, r.width * s, r.height * s});
 }
 
-// The modelview rd_draw draws with: raylib's, scaled by the pixel ratio. Like raylib's own state,
-// one per process; set for the duration of rd_draw.
-static Matrix draw_matrix;
+// Blending. Color blends as usual, but alpha accumulates toward opaque: with raylib's default, the same
+// factors for alpha, a translucent fill over an opaque pixel leaves it translucent (a 50% fill leaves
+// 75%). A desktop window ignores that; a browser composites the WebGL canvas over the page, which then
+// shows through fades, tints and shadows.
+//
+// rlgl keeps its blend mode and custom factors to itself, and setting them through it would lose the
+// app's. So raydom reads GL's blend state on entry, sets its own directly, and puts GL's back on exit,
+// which leaves GL as rlgl believes it is. Without the GL entry points, it goes through rlgl and leaves
+// RL_BLEND_ALPHA, as raylib's EndBlendMode does.
+#ifdef _WIN32
+#define RD_GLAPI __stdcall
+#else
+#define RD_GLAPI
+#endif
+#ifndef __EMSCRIPTEN__
+typedef void(RD_GLAPI* gl_get_integerv_fn)(unsigned int, int*);
+typedef void(RD_GLAPI* gl_blend_func_separate_fn)(unsigned int, unsigned int, unsigned int, unsigned int);
+typedef void(RD_GLAPI* gl_blend_equation_separate_fn)(unsigned int, unsigned int);
+static gl_get_integerv_fn            glGetIntegerv_;
+static gl_blend_func_separate_fn     glBlendFuncSeparate_;
+static gl_blend_equation_separate_fn glBlendEquationSeparate_;
+#endif
 
-// Color blends as usual, but alpha accumulates toward opaque: with raylib's default, the same factors
-// for alpha, a translucent fill over an opaque pixel leaves it translucent (a 50% fill leaves 75%). A
-// desktop window ignores that; a browser composites the WebGL canvas over the page, which then shows
-// through fades, tints and shadows.
-static void blend_for_canvas(void) {
+enum { BLEND_STATE = 6 };
+// GL_BLEND_SRC_RGB, GL_BLEND_DST_RGB, GL_BLEND_SRC_ALPHA, GL_BLEND_DST_ALPHA, GL_BLEND_EQUATION_RGB,
+// GL_BLEND_EQUATION_ALPHA.
+static const unsigned int BLEND_QUERY[BLEND_STATE]  = {0x80C9, 0x80C8, 0x80CB, 0x80CA, 0x8009, 0x883D};
+static const int          BLEND_CANVAS[BLEND_STATE] = {RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA, RL_ONE,
+                                                       RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD};
+
+typedef struct blend_state {
+  int  v[BLEND_STATE];
+  bool valid;  // read from GL; otherwise rlgl's blending is used
+} blend_state;
+
+static bool gl_blend_ready(void) {
+#ifdef __EMSCRIPTEN__
+  return true;
+#else
+  static bool tried;
+  if (!tried) {
+    tried                    = true;
+    glGetIntegerv_           = (gl_get_integerv_fn)rlGetProcAddress("glGetIntegerv");
+    glBlendFuncSeparate_     = (gl_blend_func_separate_fn)rlGetProcAddress("glBlendFuncSeparate");
+    glBlendEquationSeparate_ = (gl_blend_equation_separate_fn)rlGetProcAddress("glBlendEquationSeparate");
+  }
+  return glGetIntegerv_ && glBlendFuncSeparate_ && glBlendEquationSeparate_;
+#endif
+}
+
+// The current modelview, projection and GL viewport. Without GL's viewport (OpenGL 1.1, or no entry
+// point), the render size stands in, as raylib sets the viewport to it outside render textures.
+static draw_target target_read(void) {
+  draw_target t = {rlGetMatrixModelview(), rlGetMatrixProjection(), {0, 0, GetRenderWidth(), GetRenderHeight()}};
+  if (rlGetVersion() != RL_OPENGL_11 && gl_blend_ready())
+#ifdef __EMSCRIPTEN__
+    glGetIntegerv(0x0BA2, t.viewport);  // GL_VIEWPORT
+#else
+    glGetIntegerv_(0x0BA2, t.viewport);
+#endif
+  return t;
+}
+
+static void gl_blend_set(const int v[BLEND_STATE]) {
+#ifdef __EMSCRIPTEN__
+  glBlendFuncSeparate((GLenum)v[0], (GLenum)v[1], (GLenum)v[2], (GLenum)v[3]);
+  glBlendEquationSeparate((GLenum)v[4], (GLenum)v[5]);
+#else
+  glBlendFuncSeparate_((unsigned)v[0], (unsigned)v[1], (unsigned)v[2], (unsigned)v[3]);
+  glBlendEquationSeparate_((unsigned)v[4], (unsigned)v[5]);
+#endif
+}
+
+static blend_state blend_save(void) {
+  blend_state s = {0};
+  if (rlGetVersion() == RL_OPENGL_11 || !gl_blend_ready()) return s;
+  for (int j = 0; j < BLEND_STATE; j++)
+#ifdef __EMSCRIPTEN__
+    glGetIntegerv(BLEND_QUERY[j], &s.v[j]);
+#else
+    glGetIntegerv_(BLEND_QUERY[j], &s.v[j]);
+#endif
+  s.valid = true;
+  return s;
+}
+
+static void blend_for_canvas(const blend_state* saved) {
   rlDrawRenderBatchActive();
-  rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA, RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
+  if (saved->valid) {
+    gl_blend_set(BLEND_CANVAS);
+    return;
+  }
+  rlSetBlendFactorsSeparate(BLEND_CANVAS[0], BLEND_CANVAS[1], BLEND_CANVAS[2], BLEND_CANVAS[3], BLEND_CANVAS[4],
+                            BLEND_CANVAS[5]);
   rlSetBlendMode(RL_BLEND_CUSTOM_SEPARATE);
 }
 
-void rd_paint_restore(const rd_paint_info* info) {
-  if (!info || info->ratio == 1) return;
+static void blend_restore(const blend_state* saved) {
   rlDrawRenderBatchActive();
-  rlSetMatrixModelview(draw_matrix);
+  if (saved->valid)
+    gl_blend_set(saved->v);
+  else
+    rlSetBlendMode(RL_BLEND_ALPHA);
+}
+
+void rd_paint_restore(const rd_paint_info* info) {
+  if (!info || !draw_depth) return;
+  rlDrawRenderBatchActive();
+  rlSetMatrixModelview(target.modelview);
 }
 
 void rd_paint_text(rd_ctx* ctx, const rd_paint_info* info, rd_font font, float size, float x, float baseline,
@@ -612,36 +869,49 @@ void rd_paint_text(rd_ctx* ctx, const rd_paint_info* info, rd_font font, float s
   rd__font* f = rd__font_get(ctx, font);
   if (!g || !f || !info || !utf8 || size <= 0 || !IsWindowReady()) return;
   if (len == RD_TEXT_NUL) len = strlen(utf8);
-  // The glyphs come from raydom's atlas through its shader, which the callback runs without.
-  rlDrawRenderBatchActive();
-  shader_mode(g, true);
+  // Glyphs are plain textured quads, so they draw with whatever shader the callback has active, as
+  // raylib's DrawText does, and batch with its other drawing.
   rlNormal3f(0, 0, 0);
   draw_run(g, f, size, utf8, len, x, snap(baseline, info->dpi), to_color(color), info->dpi);
-  rlDrawRenderBatchActive();
-  shader_mode(g, false);
+}
+
+// Runs a node's paint callback. The callable may replace or destroy itself from inside (a C++ lambda
+// setting another painter), so its destroy is held back while it runs and called after it returns.
+static void run_paint(rd_ctx* ctx, uint32_t i, const rd_paint_info* info) {
+  rd_node_layout* L       = &ctx->layouts[i];
+  rd_paint_fn     fn      = L->paint_fn;
+  void*           data    = L->paint_data;
+  rd_destroy_fn   destroy = L->paint_destroy;
+  L->paint_destroy        = NULL;
+  fn(ctx, info, data);
+  L = rd__slot(ctx, info->node) ? &ctx->layouts[i] : NULL;  // layouts may have moved
+  if (L && L->paint_fn == fn && L->paint_data == data && !L->paint_destroy)
+    L->paint_destroy = destroy;  // still in place
+  else if (destroy && !(L && L->paint_data == data))
+    destroy(data);
 }
 
 void rd_draw(rd_ctx* ctx) {
   if (!ctx || !IsWindowReady()) return;  // raylib failed to open a window, or hasn't yet
   gpu* g = gpu_get(ctx);
   if (!g) return;
-#ifdef __EMSCRIPTEN__
-  float dpi = 1;  // raylib renders the web at CSS resolution, and its render size isn't kept up to date there
-#else
-  int   sw  = GetScreenWidth();
-  float dpi = sw > 0 ? (float)GetRenderWidth() / (float)sw : 1;
-  if (dpi <= 0) dpi = 1;
-#endif
-  float  ratio = rd_pixel_ratio(ctx);
-  Matrix base  = rlGetMatrixModelview(), outer = draw_matrix;  // outer: a paint callback may draw another context
-  dpi *= ratio;
+  g->frame++;
+  float       ratio = rd_pixel_ratio(ctx);
+  Matrix      base  = rlGetMatrixModelview();
+  draw_target outer = target;  // a paint callback may draw another context
   if (ratio != 1) {
     rlDrawRenderBatchActive();
     rlMatrixMode(RL_MODELVIEW);
     rlScalef(ratio, ratio, 1);
   }
-  draw_matrix = rlGetMatrixModelview();
-  blend_for_canvas();
+  target = target_read();
+  draw_depth++;
+  // Framebuffer pixels per logical pixel through the whole transform: the window's density, the ratio,
+  // and whatever the context is drawn under, such as another context's ratio.
+  float dpi = target_scale(&target);
+  if (!(dpi > 0)) dpi = ratio;
+  blend_state app_blend = blend_save();
+  blend_for_canvas(&app_blend);
   // Everything below draws with raydom's shader, so it batches; scale is constant for the draw.
   shader_mode(g, true);
   rlNormal3f(0, 0, 0);
@@ -674,29 +944,28 @@ void rd_draw(rd_ctx* ctx) {
       case RD_CMD_FILL: {
         Rectangle r = snap_rect(c->rect, dpi);
         if (r.width < 1 / dpi) r.width = 1 / dpi;
-        DrawRectangleRec(r, to_color(c->fill));
+        fill_quad(g, r, to_color(c->fill));
         break;
       }
       case RD_CMD_CLIP:
-        scissor(c->rect, ratio);
+        scissor_on(&target, c->rect);
         clip    = c->rect;
         clipped = true;
         break;
       case RD_CMD_PAINT: {
-        rd_node_layout* L = &ctx->layouts[c->node];
-        if (!L->paint_fn) break;
+        if (!ctx->layouts[c->node].paint_fn) break;
         shader_mode(g, false);  // the callback draws with raylib's own shader
         rlDrawRenderBatchActive();
         if (clipped) EndScissorMode();
         rd_paint_info info = {rd__handle(ctx, c->node), c->rect, c->clip, dpi, ratio};
-        L->paint_fn(ctx, &info, L->paint_data);
+        run_paint(ctx, c->node, &info);
         rlDrawRenderBatchActive();
         EndScissorMode();
-        rlSetMatrixModelview(draw_matrix);  // in case the callback reset it
-        blend_for_canvas();                 // or changed the blend mode
+        rlSetMatrixModelview(target.modelview);  // in case the callback reset it
+        blend_for_canvas(&app_blend);       // or changed the blend mode
         rlNormal3f(0, 0, 0);
         shader_mode(g, true);
-        if (clipped) scissor(clip, ratio);
+        if (clipped) scissor_on(&target, clip);
         break;
       }
       default:
@@ -705,13 +974,13 @@ void rd_draw(rd_ctx* ctx) {
   }
   shader_mode(g, false);
   if (clipped) EndScissorMode();
-  rlDrawRenderBatchActive();
-  rlSetBlendMode(RL_BLEND_ALPHA);
+  blend_restore(&app_blend);
   if (ratio != 1) {
     rlDrawRenderBatchActive();
     rlSetMatrixModelview(base);
   }
-  draw_matrix      = outer;
+  target = outer;
+  draw_depth--;
   ctx->paint_dirty = false;
 }
 

@@ -1,6 +1,7 @@
-# Builds and tests with sanitizers on Linux (GCC) and macOS (Apple Clang), checks that a downstream
-# project can consume raydom through FetchContent and as an installed package, that the README matches
-# the version, and that both books build. Runs on pull requests, and from docs.yml before publishing.
+# Builds and tests with sanitizers on Linux (GCC) and macOS (Apple Clang), builds for the browser with
+# Emscripten, checks that a downstream project can consume raydom through FetchContent and as an installed
+# package, that the README matches the version, and that both books build. Runs on pull requests, and
+# from docs.yml before publishing.
 name: ci
 
 on:
@@ -45,6 +46,26 @@ jobs:
 
       - name: Check versions
         run: just check-version
+
+  # The browser build: the showcase links, and the smoke test runs under Node within Emscripten's default
+  # 64 KB stack, where an overflow corrupts memory silently in a browser.
+  web:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 4.0.9
+
+      - name: Install just
+        run: sudo apt-get update && sudo apt-get install -y just
+
+      - name: Build the showcase
+        run: just build-web
+
+      - name: Smoke test under Node
+        run: just web-smoke
 
   books:
     runs-on: ubuntu-24.04

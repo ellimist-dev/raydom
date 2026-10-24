@@ -16,6 +16,12 @@ build-web:
     emcmake cmake -DPLATFORM=Web -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXE_LINKER_FLAGS="-O1 -sMINIFY_HTML=0" -S . -B build-web
     cmake --build build-web --target showcase
 
+# Runs the Emscripten smoke test under Node: the extras theme and the router within half the default stack.
+web-smoke:
+    emcmake cmake -DPLATFORM=Web -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXE_LINKER_FLAGS="-O1 -sMINIFY_HTML=0" -DRAYDOM_BUILD_TESTS=ON -S . -B build-web
+    cmake --build build-web --target web_smoke
+    node build-web/web_smoke.js
+
 # Builds the showcase for the browser and serves it at http://127.0.0.1:8090. Needs Go.
 serve: build-web
     cd serve && go run . -dir ../build-web/examples

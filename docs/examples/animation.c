@@ -1,5 +1,6 @@
 // Runs headless as a test for the "Animation" chapter: the clock is set by hand.
 #include <assert.h>
+#include <stdlib.h>
 #include <raydom/raydom.h>
 
 static void remove_node(rd_ctx* ctx, void* data) { rd_node_destroy(ctx, *(rd_node*)data); }
@@ -43,9 +44,12 @@ int main(void) {
   rd_node_append(ctx, rd_ctx_root(ctx), toast);
   // In: from transparent and 24px lower, to its place.
   rd_node_animate(ctx, toast, &(rd_style){.opacity = rd_num(0), .margin.top = rd_px(24)},
-                  &(rd_style){.opacity = rd_num(1), .margin.top = rd_px(0)}, 0.2, RD_EASING_EASE_OUT, NULL, NULL);
-  // ... later, out: fade, then remove it when the animation ends.
-  rd_node_animate(ctx, toast, NULL, &(rd_style){.opacity = rd_num(0)}, 0.15, RD_EASING_EASE_IN, remove_node, &toast);
+                  &(rd_style){.opacity = rd_num(1), .margin.top = rd_px(0)}, 0.2, RD_EASING_EASE_OUT);
+  // ... later, out: fade, then remove it when the animation ends, with a timer for the same time.
+  rd_node_animate(ctx, toast, NULL, &(rd_style){.opacity = rd_num(0)}, 0.15, RD_EASING_EASE_IN);
+  rd_node* doomed = malloc(sizeof *doomed);
+  *doomed         = toast;
+  rd_ctx_set_timer(ctx, 0.15, 0, remove_node, doomed, free);  // freed when it fires, or if cleared
   // ANCHOR_END: explicit
   rd_ctx_set_time(ctx, 1);
   rd_ctx_layout(ctx, 800, 600);

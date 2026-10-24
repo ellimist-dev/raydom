@@ -51,7 +51,8 @@ The root router also takes these inputs, while the pointer or focus is inside it
 
 - the mouse's back and forward side buttons (`RD_BUTTON_BACK`, `RD_BUTTON_FORWARD`);
 - Cmd+[ and Cmd+] on macOS, or Super elsewhere;
-- Alt+Left and Alt+Right outside macOS. On macOS Option+Left moves by word, so it isn't taken.
+- Alt+Left and Alt+Right outside macOS and iOS. There Option+Left moves by word, so it isn't taken. In a browser
+  the router checks the browser's platform, so a web build on a Mac leaves Option+Left alone too.
 
 In a browser these inputs also mean "leave this page". Browsers act on them as they happen, before raydom sees
 them on the next frame. So on the web, creating a router cancels the browser's handling: of the side buttons over
@@ -65,7 +66,8 @@ its parameters change: `/users/1` to `/users/2` builds a new page.
 
 `keep_alive` (C `RDR_ROUTE_KEEP_ALIVE`) hides the page instead of destroying it. The page is shown again,
 with its state, when the route is next entered, and lives as long as the router. A kept page isn't rebuilt
-when its parameters change. It reads the new values on the root router's `CHANGE`.
+when its parameters change, including while it shows: `/kept/1` to `/kept/2` leaves the page in place, with
+no transition and its focus kept. It reads the new values on the root router's `CHANGE`.
 
 ## Nested routers
 

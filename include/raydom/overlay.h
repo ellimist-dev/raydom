@@ -9,7 +9,8 @@ extern "C" {
 #endif
 
 // The overlay: a layer above the rest of the tree for menus, popovers, tooltips and modals. It is a
-// child of the root, kept last, and never clipped by other nodes. It always covers the root: its
+// child of the root, kept last, and never clipped by other nodes. Appends to the root go before it
+// while it is the root's child; if code moves it elsewhere, the next call puts it back last. It always covers the root: its
 // position, inset, margin and size properties are fixed, whatever its styles set. It isn't a hit
 // target itself, so it doesn't block the content under it; only its children are. Created on first
 // use. Give overlay children position: absolute so they don't stack in its flex layout.
@@ -35,8 +36,8 @@ typedef struct rd_anchor {
   bool     match_width RD_DEFAULT({});  // lay the node out at the anchor's width, for dropdowns
 } rd_anchor;
 
-// Null anchor clears it. Anchored nodes are positioned in tree order, so a submenu anchored to an
-// item of an anchored menu lands correctly. The node should be absolutely positioned.
+// Null anchor clears it. Anchored nodes are positioned in tree order, whatever order they were
+// anchored in, so a submenu after its menu in the tree lands next to the item's final position. The node should be absolutely positioned.
 bool rd_node_set_anchor(rd_ctx* ctx, rd_node node, const rd_anchor* anchor);
 // The side used after flipping, as of the last layout. For pointing an arrow at the anchor.
 rd_side rd_node_anchor_side(const rd_ctx* ctx, rd_node node);

@@ -24,7 +24,7 @@ typedef struct rd__cmd {
   rd_color fill, stroke;
   float    blur;
   float    dx;    // TEXT, PLACEHOLDER: horizontal scroll offset
-  rd_rect  clip;  // PAINT: the clip in effect
+  rd_rect  clip;  // PAINT, TEXT, PLACEHOLDER: the clip in effect
   uint32_t image;      // IMAGE: rect is the content box; dest is where the image lands in it,
   rd_rect  src, dest;  // and src the part of the image, in pixels, that goes there
 } rd__cmd;

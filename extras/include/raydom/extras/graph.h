@@ -57,8 +57,10 @@ typedef void (*rdx_graph_fn)(rdx_graph* g, rdx_graph_event ev, rdx_node node, vo
 enum { RDX_GRAPH_DRAG_NODES = 1u << 0,
        RDX_GRAPH_NO_GRID    = 1u << 1 };
 
-// Turns host into the view's canvas. The graph lives until host is destroyed. Labels are text nodes
-// added under host; style them through rdx_graph_label_class.
+// Turns host into the view's canvas, setting its paint callback. The graph lives until host is
+// destroyed. Labels are text nodes added under host; style them through rdx_graph_label_class. Null
+// if host already has a graph: a host holds one graph, to rebuild the view, destroy the host and
+// make a new one.
 rdx_graph* rdx_graph_create(rd_ctx* ctx, rd_node host);
 rd_node    rdx_graph_host(const rdx_graph* g);
 rd_ctx*    rdx_graph_ctx(const rdx_graph* g);

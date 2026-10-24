@@ -135,6 +135,13 @@ static void sliders(void) {
   press(ctx, RD_KEY_HOME);  // no change, no event
   CHECK(changes == 5);
 
+  // A press that began elsewhere and is released over the slider neither moves it nor commits.
+  rd_ctx_pointer(ctx, 700, 500, RD_BUTTON_PRIMARY, 0, 0);
+  rd_ctx_pointer(ctx, b.x + 8 + 100, y, RD_BUTTON_PRIMARY, 0, 0);
+  rd_ctx_pointer(ctx, b.x + 8 + 100, y, 0, 0, 0);
+  CHECK(near(rdx_slider_value(ctx, slider), 0) && changes == 5);
+  rd_node_focus(ctx, slider);
+
   // The fill and thumb follow the value.
   rdx_slider_set_value(ctx, slider, 2.6f);
   rd_ctx_layout(ctx, 800, 600);

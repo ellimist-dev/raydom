@@ -166,7 +166,10 @@ void    rd_node_release_pointer_capture(rd_ctx* ctx, rd_node node);
 rd_node rd_ctx_pointer_capture(const rd_ctx* ctx);
 
 // Feeds pointer state, dispatching events and updating hover and active states.
-// buttons is a mask of RD_BUTTON_*; wheel deltas are in notches.
+// buttons is a mask of RD_BUTTON_*; wheel deltas are in notches. Disabled nodes get no pointer
+// events, except that BACK and FORWARD over one (or over nothing) go to the root, for a router there.
+// A click whose pressed node was destroyed or detached goes to its nearest ancestor still in the tree.
+// It also drops focus from a node that can no longer have it (see rd_node_focus).
 void    rd_ctx_pointer(rd_ctx* ctx, float x, float y, uint8_t buttons, float wheel_x, float wheel_y);
 rd_node rd_ctx_hovered(const rd_ctx* ctx);
 // The cursor to show, as of the last layout: the hovered (or capturing) node's cursor, with AUTO
@@ -183,7 +186,10 @@ double rd_ctx_time(const rd_ctx* ctx);
 void rd_ctx_key(rd_ctx* ctx, rd_key key, bool down, bool repeat, uint8_t mods);
 void rd_ctx_text(rd_ctx* ctx, uint32_t codepoint);
 
-// Focus moves fire blur, focusout, focus, focusin. A null node clears focus.
+// Focus moves fire change (for an edited input), blur, focusout, focus, focusin. A listener that
+// moves focus again takes over, and the rest of the outer sequence is skipped. A null node clears
+// focus. A focused node that is destroyed, detached, hidden or disabled loses focus, with those
+// events, at the end of the next rd_ctx_layout; rd_ctx_focused returns null for it at once.
 bool    rd_node_focus(rd_ctx* ctx, rd_node node);
 rd_node rd_ctx_focused(const rd_ctx* ctx);
 // Next or previous node with focusable: tab, in tree order, wrapping, within the focus scope. False

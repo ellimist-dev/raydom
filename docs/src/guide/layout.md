@@ -23,6 +23,10 @@ these differences:
 `flex_basis: 0` with `flex_grow: 1` splits free space without regard to content, which is the common "fill the rest"
 pattern.
 
+Shrinking follows CSS: each item gives up overflow in proportion to `flex_shrink` times its base size less its
+padding and border. Two items with a 100px basis in a 100px row split the overflow evenly, unless one has 20px of
+padding on each side, in which case it shrinks by 37.5px and the other by 62.5px.
+
 ## Grid
 
 ```c
@@ -38,7 +42,8 @@ CSS. `rd_track_minmax` builds any other pair.
 
 Placement uses `grid_{column,row}_{start,end}`: `rd_line(n)` is a 1-based line, negative from the end of the
 explicit grid; `rd_span(n)` spans tracks. Items without placement are auto-placed in `grid_auto_flow` order into
-implicit tracks sized by `grid_auto_rows` and `grid_auto_columns`.
+implicit tracks sized by `grid_auto_rows` and `grid_auto_columns`. Items with only a row (or, in column flow, only a
+column) go there first, each after the ones before it in the same row, adding implicit columns when the row is full.
 
 The algorithm follows [CSS Grid §11](https://www.w3.org/TR/css-grid-1/#layout-algorithm). Named lines, named areas
 and `dense` packing are not implemented.
@@ -86,8 +91,9 @@ Layout results are cached per node and reused when neither the node nor its inpu
 ```
 
 An absolute node is positioned against its parent's padding box using `inset`. With both insets on an axis and
-no size, it stretches between them. It takes no space in the parent's
-flex or grid layout.
+no size, it stretches between them. With both insets and a size, `auto` margins share the space left over, so
+`inset: 0` with a width, a height and `margin: auto` centers it. It takes no space in the parent's flex or grid
+layout.
 
 ## Scrolling
 

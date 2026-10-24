@@ -175,7 +175,55 @@ static void test_setters(void) {
   rd_ctx_destroy(f.ctx);
 }
 
+// A host holds one graph: a second create fails and leaves the first working, and replacing the
+// host's paint doesn't free the graph its listeners use.
+static void test_one_per_host(void) {
+  fixture f;
+  setup(&f);
+  uint32_t children = rd_node_child_count(f.ctx, f.host);
+  CHECK(rdx_graph_create(f.ctx, f.host) == NULL && rd_node_child_count(f.ctx, f.host) == children);
+  rdx_node a = rdx_graph_add_node(f.g, &(rdx_node_desc){.position = {0, 0}});
+  rd_ctx_layout(f.ctx, 800, 600);
+  rd_ctx_pointer(f.ctx, 300, 200, 0, 0, 0);
+  CHECK(count(&f.log, RDX_EVENT_NODE_ENTER) == 1);
+  CHECK(rd_node_set_paint(f.ctx, f.host, NULL, NULL, NULL));
+  rd_ctx_pointer(f.ctx, 700, 500, 0, 0, 0);
+  CHECK(count(&f.log, RDX_EVENT_NODE_LEAVE) == 1 && rdx_graph_node_alive(f.g, a));
+  CHECK(rdx_graph_create(f.ctx, (rd_node){0}) == NULL);
+  rd_ctx_destroy(f.ctx);
+}
+
+// Edge labels follow their nodes after the next layout; freed slots are reused, the latest first.
+static void test_labels_follow(void) {
+  fixture f;
+  setup(&f);
+  rdx_node a = rdx_graph_add_node(f.g, &(rdx_node_desc){.position = {-100, 0}});
+  rdx_node b = rdx_graph_add_node(f.g, &(rdx_node_desc){.position = {100, 0}});
+  rdx_edge e = rdx_graph_connect(f.g, a, b, &(rdx_edge_desc){.label = "mid"});
+  rd_ctx_layout(f.ctx, 800, 600);
+  rd_node label = rd_node_first_child(f.ctx, rd_node_first_child(f.ctx, rd_node_first_child(f.ctx, f.host)));
+  rd_rect r     = rd_node_bounds(f.ctx, label);
+  CHECK(near(r.x + r.width / 2, 300) && near(r.y + r.height / 2, 200));
+  CHECK(rdx_graph_set_position(f.g, b, (rd_vec2){100, 200}));
+  rd_ctx_layout(f.ctx, 800, 600);
+  r = rd_node_bounds(f.ctx, label);
+  CHECK(near(r.x + r.width / 2, 300) && near(r.y + r.height / 2, 300));
+
+  rdx_node c  = rdx_graph_add_node(f.g, &(rdx_node_desc){0});
+  rdx_node d  = rdx_graph_add_node(f.g, &(rdx_node_desc){0});
+  rdx_edge e2 = rdx_graph_connect(f.g, c, d, NULL);
+  CHECK(rdx_graph_remove_node(f.g, c) && rdx_graph_remove_node(f.g, a));  // removes e2, then e
+  CHECK(rdx_graph_add_node(f.g, &(rdx_node_desc){0}).index == a.index);
+  CHECK(rdx_graph_add_node(f.g, &(rdx_node_desc){0}).index == c.index);
+  CHECK(rdx_graph_add_node(f.g, &(rdx_node_desc){0}).index == d.index + 1);
+  rdx_edge e3 = rdx_graph_connect(f.g, b, d, NULL);
+  CHECK(e3.index == e.index && e3.gen != e.gen && rdx_graph_connect(f.g, d, b, NULL).index == e2.index);
+  rd_ctx_destroy(f.ctx);
+}
+
 int main(void) {
+  test_one_per_host();
+  test_labels_follow();
   test_setters();
   test_nodes_edges_and_labels();
   test_pan_click_and_hover();

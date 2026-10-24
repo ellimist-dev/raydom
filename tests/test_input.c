@@ -1,5 +1,6 @@
 #include <math.h>
 #include <raydom/raydom.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "check.h"
@@ -361,6 +362,170 @@ static void test_utf8_editing(void) {
   rd_ctx_destroy(ctx);
 }
 
+// Focus moved by a change listener while the user focuses another node: the inner move wins, and
+// every node is blurred once.
+typedef struct trio {
+  rd_node n[3];
+  char    log[256];
+} trio;
+
+static void trio_record(rd_ctx* ctx, rd_event* ev, void* data) {
+  (void)ctx;
+  trio* t = data;
+  if (ev->phase != RD_PHASE_TARGET) return;
+  const char* kind = "change";
+  if (ev->type == RD_EVENT_BLUR) kind = "blur";
+  if (ev->type == RD_EVENT_FOCUS) kind = "focus";
+  char name = '-';
+  for (int j = 0; j < 3; j++)
+    if (rd_node_eq(ev->target, t->n[j])) name = (char)('A' + j);
+  size_t len = strlen(t->log);
+  snprintf(t->log + len, sizeof t->log - len, "%s(%c) ", kind, name);
+}
+
+static void focus_c(rd_ctx* ctx, rd_event* ev, void* data) {
+  (void)ev;
+  rd_node_focus(ctx, ((trio*)data)->n[2]);
+}
+
+static void test_focus_moved_by_listener(void) {
+  rd_ctx* ctx = font_ctx();
+  trio    t   = {0};
+  for (int j = 0; j < 3; j++) {
+    t.n[j] = add(ctx, rd_ctx_root(ctx), (rd_style){.width = rd_px(100), .height = rd_px(20)});
+    rd_node_make_input(ctx, t.n[j], 0);
+    rd_node_on(ctx, t.n[j], RD_EVENT_BLUR, trio_record, &t, NULL, 0);
+    rd_node_on(ctx, t.n[j], RD_EVENT_FOCUS, trio_record, &t, NULL, 0);
+    rd_node_on(ctx, t.n[j], RD_EVENT_CHANGE, trio_record, &t, NULL, 0);
+  }
+  rd_node_on(ctx, t.n[0], RD_EVENT_CHANGE, focus_c, &t, NULL, 0);
+  rd_ctx_layout(ctx, 400, 300);
+  rd_node_focus(ctx, t.n[0]);
+  type(ctx, "x");
+  t.log[0] = 0;
+  rd_node_focus(ctx, t.n[1]);
+  CHECK(strcmp(t.log, "change(A) blur(A) focus(C) ") == 0);
+  CHECK(rd_node_eq(rd_ctx_focused(ctx), t.n[2]));
+  CHECK(!(rd_node_states(ctx, t.n[0]) & RD_STATE_FOCUS) && !(rd_node_states(ctx, t.n[1]) & RD_STATE_FOCUS));
+  CHECK(rd_node_states(ctx, t.n[2]) & RD_STATE_FOCUS);
+  rd_ctx_destroy(ctx);
+}
+
+// A focused node that is hidden, disabled or destroyed loses focus at the next frame, with events.
+static void test_focus_dropped_when_unfocusable(void) {
+  rd_ctx* ctx   = font_ctx();
+  rd_node panel = add(ctx, rd_ctx_root(ctx), (rd_style){0});
+  rd_node input = add(ctx, panel, (rd_style){.width = rd_px(100)});
+  rd_node_make_input(ctx, input, 0);
+  log_t l = {0};
+  rd_node_on(ctx, input, RD_EVENT_BLUR, record, &l, NULL, 0);
+  rd_node_on(ctx, input, RD_EVENT_CHANGE, record, &l, NULL, 0);
+  rd_node_on(ctx, panel, RD_EVENT_FOCUS_OUT, record, &l, NULL, 0);
+  rd_ctx_layout(ctx, 400, 300);
+  rd_node_focus(ctx, input);
+  type(ctx, "a");
+  l.len = 0;
+  rd_node_merge_style(ctx, input, &(rd_style){.display = RD_DISPLAY_NONE});
+  rd_ctx_layout(ctx, 400, 300);
+  rd_ctx_pointer(ctx, 300, 250, 0, 0, 0);
+  CHECK(rd_node_is_null(rd_ctx_focused(ctx)));
+  CHECK(!(rd_node_states(ctx, panel) & RD_STATE_FOCUS_WITHIN));
+  CHECK(!(rd_node_states(ctx, input) & (RD_STATE_FOCUS | RD_STATE_FOCUS_WITHIN)));
+  CHECK(l.len == 3 && l.types[0] == RD_EVENT_CHANGE && l.types[1] == RD_EVENT_BLUR && l.types[2] == RD_EVENT_FOCUS_OUT);
+
+  rd_node_merge_style(ctx, input, &(rd_style){.display = RD_DISPLAY_FLEX});
+  rd_ctx_layout(ctx, 400, 300);
+  CHECK(rd_node_focus(ctx, input));
+  rd_node_set_states(ctx, panel, RD_STATE_DISABLED, true);
+  rd_ctx_layout(ctx, 400, 300);
+  rd_ctx_pointer(ctx, 301, 250, 0, 0, 0);
+  CHECK(rd_node_is_null(rd_ctx_focused(ctx)) && !(rd_node_states(ctx, panel) & RD_STATE_FOCUS_WITHIN));
+  rd_node_set_states(ctx, panel, RD_STATE_DISABLED, false);
+
+  rd_ctx_layout(ctx, 400, 300);
+  CHECK(rd_node_focus(ctx, input));
+  CHECK(rd_node_states(ctx, panel) & RD_STATE_FOCUS_WITHIN);
+  rd_node_destroy(ctx, input);
+  rd_ctx_layout(ctx, 400, 300);
+  rd_ctx_pointer(ctx, 302, 250, 0, 0, 0);
+  CHECK(!(rd_node_states(ctx, panel) & RD_STATE_FOCUS_WITHIN));
+  rd_ctx_destroy(ctx);
+}
+
+// A programmatic value ends the typing run and is its own undo step.
+static void test_programmatic_value_undo(void) {
+  rd_ctx* ctx   = font_ctx();
+  rd_node input = add(ctx, rd_ctx_root(ctx), (rd_style){.width = rd_px(300)});
+  rd_node_make_input(ctx, input, 0);
+  rd_ctx_layout(ctx, 400, 300);
+  rd_node_focus(ctx, input);
+  type(ctx, "abc");
+  rd_node_set_text(ctx, input, "hello", RD_TEXT_NUL);
+  rd_input_select(ctx, input, 5, 5);
+  type(ctx, "x");
+  press(ctx, RD_KEY_Z, SC);
+  CHECK(text_is(ctx, input, "hello"));
+  press(ctx, RD_KEY_Z, SC);
+  CHECK(text_is(ctx, input, "abc"));
+  press(ctx, RD_KEY_Z, SC | RD_MOD_SHIFT);
+  CHECK(text_is(ctx, input, "hello"));
+
+  // Moving the caret programmatically, or blurring, ends the run too.
+  type(ctx, "y");
+  rd_input_select(ctx, input, 0, 0);
+  type(ctx, "z");
+  press(ctx, RD_KEY_Z, SC);
+  CHECK(text_is(ctx, input, "helloy"));
+  rd_node_focus(ctx, (rd_node){0});
+  rd_node_focus(ctx, input);
+  rd_input_select(ctx, input, 6, 6);
+  type(ctx, "1");
+  rd_node_focus(ctx, (rd_node){0});
+  rd_node_focus(ctx, input);
+  rd_input_select(ctx, input, 7, 7);
+  type(ctx, "2");
+  press(ctx, RD_KEY_Z, SC);
+  CHECK(text_is(ctx, input, "helloy1"));
+  rd_ctx_destroy(ctx);
+}
+
+static const char* paste_source;
+static const char* clip_get(void* data) {
+  (void)data;
+  return paste_source;
+}
+static void clip_set(void* data, const char* text) { (void)data, (void)text; }
+
+static void test_surrogates_and_paste(void) {
+  rd_ctx* ctx   = font_ctx();
+  rd_node input = add(ctx, rd_ctx_root(ctx), (rd_style){.width = rd_px(300)});
+  rd_node_make_input(ctx, input, 0);
+  rd_ctx_layout(ctx, 400, 300);
+  rd_node_focus(ctx, input);
+  rd_ctx_text(ctx, 0xD83D);
+  rd_ctx_text(ctx, 0xDE00);
+  CHECK(text_is(ctx, input, "\xf0\x9f\x98\x80"));
+  rd_ctx_text(ctx, 0xDE00);  // lone low half
+  rd_ctx_text(ctx, 0xD83D);  // lone high half, then a normal code point
+  rd_ctx_text(ctx, 'a');
+  CHECK(text_is(ctx, input, "\xf0\x9f\x98\x80\x61"));
+
+  rd_ctx_set_clipboard(ctx, clip_get, clip_set, NULL);
+  rd_node_set_text(ctx, input, "", 0);
+  paste_source = "a\x01\tb\r\nc\x7f\xff\xed\xa0\x80\x64";
+  press(ctx, RD_KEY_V, SC);
+  CHECK(text_is(ctx, input, "a\tb c\xef\xbf\xbd\xef\xbf\xbd\x64"));  // a stray byte and a CESU-8 surrogate
+
+  rd_node area = add(ctx, rd_ctx_root(ctx), (rd_style){.width = rd_px(300)});
+  rd_node_make_input(ctx, area, RD_INPUT_MULTILINE);
+  rd_ctx_layout(ctx, 400, 300);
+  rd_node_focus(ctx, area);
+  paste_source = "x\r\ny\x1b";
+  press(ctx, RD_KEY_V, SC);
+  CHECK(text_is(ctx, area, "x\ny"));
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   test_tab_order_and_states();
   test_pointer_focus_and_activation();
@@ -370,5 +535,9 @@ int main(void) {
   test_multiline();
   test_pointer_caret_and_display();
   test_utf8_editing();
+  test_focus_moved_by_listener();
+  test_focus_dropped_when_unfocusable();
+  test_programmatic_value_undo();
+  test_surrogates_and_paste();
   return TEST_RESULT();
 }

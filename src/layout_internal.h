@@ -16,15 +16,37 @@ static const int AX_END[2]   = {EDGE_R, EDGE_B};
 
 #define EPS 0.001f
 
+// Keeps a helper's locals out of a caller's frame on the layout recursion.
+#if defined(_MSC_VER)
+#define RD__NOINLINE __declspec(noinline)
+#else
+#define RD__NOINLINE __attribute__((noinline))
+#endif
+
+// Lengths and flex factors are clamped to this, so sums of them stay finite and the iterative
+// algorithms converge.
+#define RD__MAX_LENGTH 1e9f
+
+// Non-finite to finite: NaN to 0, infinities to the limit.
+static inline float finite_len(float v) {
+  return isnan(v) ? 0 : v > RD__MAX_LENGTH ? RD__MAX_LENGTH
+                    : v < -RD__MAX_LENGTH  ? -RD__MAX_LENGTH
+                                           : v;
+}
+
 static inline float resolve(rd_val v, float ref) {
   switch (v.unit) {
     case RD_UNIT_PX:
-      return v.value;
+      return isnan(v.value) ? NAN : finite_len(v.value);
     case RD_UNIT_PCT:
-      return isnan(ref) ? NAN : v.value * ref / 100.0f;
+      return isnan(ref) || isnan(v.value) ? NAN : finite_len(v.value * ref / 100.0f);
     default:
       return NAN;
   }
+}
+
+static inline float resolve_factor(rd_val v) {
+  return v.unit == RD_UNIT_NUM && v.value > 0 ? fminf(v.value, RD__MAX_LENGTH) : 0;
 }
 
 static inline float resolve0(rd_val v, float ref) {

@@ -249,7 +249,9 @@ static void build(const rd_ctx* ctx, uint32_t i, const rd_style* parent, rd_styl
 
 // One node: recomputed if dirty or forced. True if its children need visiting; RD_FLAG_FORCE_CHILDREN
 // then says whether they must be recomputed whatever their flags, because inherited values changed.
-static bool compute_node(rd_ctx* ctx, uint32_t i, const rd_style* parent, bool force) {
+// A style computed outside the root's tree doesn't count as the node's first: inserting it is like
+// creating it (as in CSS), so it doesn't transition from values it showed while detached.
+static bool compute_node(rd_ctx* ctx, uint32_t i, const rd_style* parent, bool force, bool connected) {
   rd_slot*       s              = &ctx->slots[i];
   rd_node_style* ns             = &ctx->styles[i];
   bool           force_children = false;
@@ -257,6 +259,7 @@ static bool compute_node(rd_ctx* ctx, uint32_t i, const rd_style* parent, bool f
     rd_style next;
     build(ctx, i, parent, &next);
     rd__transition(ctx, i, &next);
+    if (!connected) ns->computed_once = false;
     unsigned d = style_diff(&next, &ns->computed);
     if (d) {
       ns->computed     = next;
@@ -274,14 +277,15 @@ static bool compute_node(rd_ctx* ctx, uint32_t i, const rd_style* parent, bool f
 // Pre-order over top's subtree without recursion (deep trees, small WebAssembly stacks): down to a first
 // child, else across to a sibling, else up, clearing each parent's force flag on the way out.
 static void compute_tree(rd_ctx* ctx, uint32_t top, const rd_style* top_parent) {
-  uint32_t i = top;
-  bool     descend = compute_node(ctx, i, top_parent, false);
+  uint32_t i         = top;
+  bool     connected = top == ctx->root;
+  bool     descend   = compute_node(ctx, i, top_parent, false, connected);
   for (;;) {
     uint32_t child = descend ? ctx->slots[i].first_child : 0;
     if (child) {
       i       = child;
       descend = compute_node(ctx, i, &ctx->styles[ctx->slots[i].parent].computed,
-                             ctx->slots[ctx->slots[i].parent].flags & RD_FLAG_FORCE_CHILDREN);
+                             ctx->slots[ctx->slots[i].parent].flags & RD_FLAG_FORCE_CHILDREN, connected);
       continue;
     }
     while (i != top && !ctx->slots[i].next_sibling) {
@@ -292,7 +296,8 @@ static void compute_tree(rd_ctx* ctx, uint32_t top, const rd_style* top_parent) 
     if (i == top) return;
     i               = ctx->slots[i].next_sibling;
     uint32_t parent = ctx->slots[i].parent;
-    descend = compute_node(ctx, i, &ctx->styles[parent].computed, ctx->slots[parent].flags & RD_FLAG_FORCE_CHILDREN);
+    descend = compute_node(ctx, i, &ctx->styles[parent].computed, ctx->slots[parent].flags & RD_FLAG_FORCE_CHILDREN,
+                           connected);
   }
 }
 

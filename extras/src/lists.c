@@ -34,6 +34,7 @@ typedef struct vlist {
 static const char list_key = 0;
 
 static void vlist_free(void* p);
+static void tree_flush(rd_ctx* ctx, tree* t);
 
 // The index a row shows. Rows' userdata stays the application's, like every node's.
 static int row_index(const vlist* l, rd_node row) {
@@ -103,9 +104,20 @@ static void update(rd_ctx* ctx, vlist* l) {
 }
 
 // Each list's layout hook: lives as long as the list's node, and skips while it's detached.
-static void hook(rd_ctx* ctx, void* data) { update(ctx, data); }
+static void hook(rd_ctx* ctx, void* data) {
+  vlist* l = data;
+  if (l->tree) tree_flush(ctx, l->tree);
+  update(ctx, l);
+}
 
 static vlist* find(const rd_ctx* ctx, rd_node n) { return rd_node_attached(ctx, n, &list_key); }
+
+// For calls that use the list's rows or count: a tree's are brought up to date first.
+static vlist* find_current(rd_ctx* ctx, rd_node n) {
+  vlist* l = find(ctx, n);
+  if (l && l->tree) tree_flush(ctx, l->tree);
+  return l;
+}
 
 static void scroll_to(rd_ctx* ctx, vlist* l, int index) {
   if (index < 0 || index >= l->count) return;
@@ -134,6 +146,7 @@ static bool set_selected(rd_ctx* ctx, vlist* l, int index) {
 static void row_press(rd_ctx* ctx, rd_event* ev, void* data) {
   vlist* l = data;
   if (ev->button != RD_BUTTON_PRIMARY) return;
+  if (l->tree) tree_flush(ctx, l->tree);
   int index = row_index(l, ev->current);
   if (index >= 0 && set_selected(ctx, l, index)) rd_node_dispatch(ctx, l->node, RD_EVENT_CHANGE);
 }
@@ -142,6 +155,7 @@ static bool tree_keys(rd_ctx* ctx, vlist* l, rd_event* ev);
 
 static void list_keys(rd_ctx* ctx, rd_event* ev, void* data) {
   vlist* l = data;
+  if (l->tree) tree_flush(ctx, l->tree);
   if (l->tree && tree_keys(ctx, l, ev)) return;
   int page = (int)fmaxf(1, floorf(view_height(ctx, l) / l->row_h) - 1), cur = l->selected, to;
   switch (ev->key) {
@@ -220,7 +234,7 @@ bool rdx_list_set_count(rd_ctx* ctx, rd_node list, int count) {
 }
 
 void rdx_list_refresh(rd_ctx* ctx, rd_node list) {
-  vlist* l = find(ctx, list);
+  vlist* l = find_current(ctx, list);
   if (!l) return;
   l->refill = true;
   update(ctx, l);
@@ -232,14 +246,14 @@ int rdx_list_selected(const rd_ctx* ctx, rd_node list) {
 }
 
 bool rdx_list_select(rd_ctx* ctx, rd_node list, int index) {
-  vlist* l = find(ctx, list);
+  vlist* l = find_current(ctx, list);
   if (!l || index < -1 || index >= l->count) return false;
   set_selected(ctx, l, index);
   return true;
 }
 
 void rdx_list_scroll_to(rd_ctx* ctx, rd_node list, int index) {
-  vlist* l = find(ctx, list);
+  vlist* l = find_current(ctx, list);
   if (l) scroll_to(ctx, l, index);
 }
 
@@ -366,6 +380,7 @@ struct tree {
   int*   visible;  // item ids in display order
   int    visible_count, visible_cap;
   int    selected;  // item id
+  bool   dirty;     // items were added or expanded: visible is rebuilt before it's next needed
 };
 
 static const float INDENT = 16;
@@ -390,26 +405,42 @@ static int visible_index(const tree* t, int id) {
   return -1;
 }
 
-// Rebuilds the visible items; a selected item that's now hidden passes the selection to its visible
-// ancestor.
+static bool shown(const tree* t, int id) {
+  for (int p = t->items[id].parent; p >= 0; p = t->items[p].parent)
+    if (!t->items[p].expanded) return false;
+  return true;
+}
+
+// A selected item that's hidden passes the selection to its visible ancestor.
+static void reselect(tree* t) {
+  while (t->selected >= 0 && !shown(t, t->selected)) t->selected = t->items[t->selected].parent;
+}
+
+// Rebuilds the visible items and the rows showing them.
 static void reflow(rd_ctx* ctx, tree* t) {
+  t->dirty         = false;
   t->visible_count = 0;
   flatten_from(t, t->first_root);
   vlist* l = t->list;
   l->count = t->visible_count;
-  int sel  = t->selected;
-  while (sel >= 0 && visible_index(t, sel) < 0) sel = t->items[sel].parent;
-  t->selected = sel;
-  l->selected = sel >= 0 ? visible_index(t, sel) : -1;
+  reselect(t);
+  l->selected = t->selected >= 0 ? visible_index(t, t->selected) : -1;
   l->refill   = true;
   update(ctx, l);
 }
 
+// Adding and expanding only mark the tree, so building one is linear: it's flattened once, at the
+// next layout or the next call that needs the visible items.
+static void tree_flush(rd_ctx* ctx, tree* t) {
+  if (t->dirty) reflow(ctx, t);
+}
+
 static void toggle_click(rd_ctx* ctx, rd_event* ev, void* data) {
-  tree* t  = data;
-  int   id = row_index(t->list, rd_node_parent(ctx, ev->current));
+  tree* t = data;
+  tree_flush(ctx, t);
+  int id = row_index(t->list, rd_node_parent(ctx, ev->current));
   if (id < 0 || id >= t->visible_count) return;
-  id                   = t->visible[id];
+  id                    = t->visible[id];
   t->items[id].expanded = !t->items[id].expanded;
   reflow(ctx, t);
 }
@@ -523,8 +554,8 @@ int rdx_tree_add(rd_ctx* ctx, rd_node node, int parent, const char* label) {
     t->items[*last].next = id;
   else
     *first = id;
-  *last = id;
-  reflow(ctx, t);
+  *last    = id;
+  t->dirty = true;
   return id;
 }
 
@@ -532,7 +563,8 @@ bool rdx_tree_expand(rd_ctx* ctx, rd_node node, int id, bool expanded) {
   tree* t = tree_find(ctx, node);
   if (!t || id < 0 || id >= t->count) return false;
   t->items[id].expanded = expanded;
-  reflow(ctx, t);
+  reselect(t);
+  t->dirty = true;
   return true;
 }
 

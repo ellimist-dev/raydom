@@ -264,6 +264,7 @@ bool rd_node_set_text(rd_ctx* ctx, rd_node node, const char* utf8, size_t len) {
     t->ctx  = ctx;
     t->node = node.index;
   }
+  if (t->input) rd__input_before_set(t, copy, len);
   free(t->utf8);
   free(t->cps);
   free(t->offsets);
@@ -450,11 +451,17 @@ float rd__text_cp_x(const rd__text_layout* tl, uint32_t line, uint32_t cp) {
   return f.x;
 }
 
+// By binary search: lines start in order.
 uint32_t rd__text_line_of(const rd__text_layout* tl, uint32_t cp) {
-  uint32_t line = 0;
-  for (uint32_t l = 0; l < tl->line_count; l++)
-    if (tl->lines[l].cp_start <= cp) line = l;
-  return line;
+  uint32_t lo = 0, hi = tl->line_count;  // the first line starting after cp
+  while (lo < hi) {
+    uint32_t mid = lo + (hi - lo) / 2;
+    if (tl->lines[mid].cp_start <= cp)
+      lo = mid + 1;
+    else
+      hi = mid;
+  }
+  return lo ? lo - 1 : 0;
 }
 
 typedef struct find_cp {

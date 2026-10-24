@@ -145,14 +145,15 @@ static void explicit_and_inherited(void) {
   static rd_node toast;
   toast = add(ctx, rd_ctx_root(ctx), (rd_style){.height = rd_px(10)});
   CHECK(rd_node_animate(ctx, toast, &(rd_style){.opacity = rd_num(0), .margin.top = rd_px(40)},
-                        &(rd_style){.opacity = rd_num(1), .margin.top = rd_px(0)}, 1, RD_EASING_LINEAR, NULL, NULL));
+                        &(rd_style){.opacity = rd_num(1), .margin.top = rd_px(0)}, 1, RD_EASING_LINEAR));
   at(ctx, 0);
   CHECK(near(cs(ctx, toast)->opacity.value * 100, 0) && near(rd_node_rect(ctx, toast).y, 40));
   at(ctx, 0.5);
   CHECK(near(cs(ctx, toast)->opacity.value * 100, 50) && near(rd_node_rect(ctx, toast).y, 20));
   at(ctx, 1);
   CHECK(near(cs(ctx, toast)->opacity.value * 100, 100) && near(rd_node_rect(ctx, toast).y, 0));
-  rd_node_animate(ctx, toast, NULL, &(rd_style){.opacity = rd_num(0)}, 0.5, RD_EASING_LINEAR, done, &toast);
+  CHECK(rd_node_animate(ctx, toast, NULL, &(rd_style){.opacity = rd_num(0)}, 0.5, RD_EASING_LINEAR));
+  CHECK(rd_ctx_set_timer(ctx, 0.5, 0, done, &toast, NULL).index);
   at(ctx, 1.25);
   CHECK(near(cs(ctx, toast)->opacity.value * 100, 50) && done_calls == 0);
   at(ctx, 1.5);
@@ -172,11 +173,75 @@ static void explicit_and_inherited(void) {
   rd_node_destroy(ctx, parent);
   at(ctx, 2.6);
   CHECK(!rd_ctx_animating(ctx));
-  CHECK(!rd_node_animate(ctx, parent, NULL, &(rd_style){.opacity = rd_num(1)}, 1, 0, NULL, NULL));
+  CHECK(!rd_node_animate(ctx, parent, NULL, &(rd_style){.opacity = rd_num(1)}, 1, 0));
+  rd_ctx_destroy(ctx);
+}
+
+// Several rd_node_animate calls before one style computation keep their own durations.
+static void separate_timings(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_node n   = add(ctx, rd_ctx_root(ctx), (rd_style){.width = rd_px(100), .height = rd_px(10)});
+  at(ctx, 0);
+  CHECK(rd_node_animate(ctx, n, NULL, &(rd_style){.opacity = rd_num(0)}, 1, RD_EASING_LINEAR));
+  CHECK(rd_node_animate(ctx, n, NULL, &(rd_style){.width = rd_px(200)}, 0.2, RD_EASING_LINEAR));
+  at(ctx, 0);
+  at(ctx, 0.1);
+  CHECK(near(cs(ctx, n)->opacity.value * 100, 90) && near(cs(ctx, n)->width.value, 150));
+  at(ctx, 0.2);
+  CHECK(near(cs(ctx, n)->opacity.value * 100, 80) && near(cs(ctx, n)->width.value, 200) && rd_ctx_animating(ctx));
+  at(ctx, 1);
+  CHECK(near(cs(ctx, n)->opacity.value * 100, 0) && !rd_ctx_animating(ctx));
+  rd_ctx_destroy(ctx);
+}
+
+// A style computed while detached isn't a first style: inserting is like creating, so inherited values
+// show at once rather than transitioning from the detached ones.
+static void inserted_after_detached_compute(void) {
+  rd_ctx* ctx    = rd_ctx_create();
+  rd_node parent = add(ctx, rd_ctx_root(ctx), (rd_style){.color = rd_rgb(255, 255, 255), .font_size = rd_px(30)});
+  at(ctx, 0);
+  rd_node n = rd_node_create(ctx);
+  rd_node_set_style(ctx, n, &(rd_style){.transition_duration = rd_s(1), .transition_easing = RD_EASING_LINEAR});
+  CHECK(cs(ctx, n)->color.r == 0);
+  rd_node_append(ctx, parent, n);
+  at(ctx, 0);
+  at(ctx, 0.5);
+  CHECK(cs(ctx, n)->color.r == 255 && near(cs(ctx, n)->font_size.value, 30) && !rd_ctx_animating(ctx));
+  // Once connected, changes transition as usual.
+  rd_node_merge_style(ctx, parent, &(rd_style){.font_size = rd_px(10)});
+  at(ctx, 0.5);
+  at(ctx, 1);
+  CHECK(near(cs(ctx, n)->font_size.value, 20));
+  rd_ctx_destroy(ctx);
+}
+
+// Moved from one parent to another through a detached state: the new parent's inherited values show at
+// once, as for an inserted element, rather than transitioning from the old parent's.
+static void reinserted(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_node a   = add(ctx, rd_ctx_root(ctx), (rd_style){.color = rd_rgb(255, 0, 0)});
+  rd_node b   = add(ctx, rd_ctx_root(ctx), (rd_style){.color = rd_rgb(0, 0, 255)});
+  rd_node n   = rd_node_create(ctx);
+  rd_node_set_style(ctx, n, &(rd_style){.transition_duration = rd_s(1), .transition_easing = RD_EASING_LINEAR});
+  rd_node_append(ctx, a, n);
+  at(ctx, 0);
+  CHECK(cs(ctx, n)->color.r == 255);
+  rd_node_detach(ctx, n);
+  rd_node_append(ctx, b, n);
+  at(ctx, 0.5);
+  CHECK(cs(ctx, n)->color.b == 255 && cs(ctx, n)->color.r == 0 && !rd_ctx_animating(ctx));
+  // Moving it within the tree, without detaching, still transitions.
+  rd_node_append(ctx, a, n);
+  at(ctx, 0.5);
+  at(ctx, 1);
+  CHECK(cs(ctx, n)->color.r > 100 && cs(ctx, n)->color.r < 160);
   rd_ctx_destroy(ctx);
 }
 
 int main(void) {
+  separate_timings();
+  inserted_after_detached_compute();
+  reinserted();
   paint();
   layout();
   auto_height();

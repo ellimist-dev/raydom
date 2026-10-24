@@ -188,9 +188,24 @@ static void test_wheel_gestures(void) {
   rd_ctx_destroy(ctx);
 }
 
+// Offsets inside a codepoint snap to a boundary, also after the text changes under the selection.
+static void test_select_snaps_to_codepoints(void) {
+  rd_ctx* ctx = setup();
+  rd_node t   = add_text(ctx, rd_ctx_root(ctx), (rd_style){0}, "\xc3\xa9t\xc3\xa9");  // "été"
+  rd_ctx_layout(ctx, 400, 300);
+  CHECK(rd_ctx_select(ctx, t, 1, t, 4));
+  size_t a, f;
+  CHECK(rd_ctx_selection(ctx, NULL, &a, NULL, &f) && a == 2 && f == 5);
+  CHECK(selected_is(ctx, "t\xc3\xa9"));
+  rd_node_set_text(ctx, t, "\xe4\xb8\x80\xe4\xb8\x80", RD_TEXT_NUL);  // offsets 2 and 5 are now mid-codepoint
+  CHECK(selected_is(ctx, "\xe4\xb8\x80"));
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   test_drag_across_nodes();
   test_selection_yields();
   test_wheel_gestures();
+  test_select_snaps_to_codepoints();
   return TEST_RESULT();
 }

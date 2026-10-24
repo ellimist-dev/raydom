@@ -19,7 +19,8 @@ typedef struct gnode {
   rd_vec2  pos;
   float    radius;
   rd_color color;
-  rd_node  label;  // wrapper; its first child is the text
+  rd_node  label;      // wrapper; its first child is the text
+  uint32_t next_free;  // while dead: the next free slot, plus one
 } gnode;
 
 typedef struct gedge {
@@ -30,6 +31,7 @@ typedef struct gedge {
   float    width;
   bool     directed;
   rd_node  label;
+  uint32_t next_free;
 } gedge;
 
 typedef enum drag_mode { MODE_NONE,
@@ -43,10 +45,11 @@ struct rdx_graph {
   rd_color background;
   rd_class label_class, node_label_wrap, edge_label_wrap;
 
-  gnode*   nodes;  // index 0 unused
-  uint32_t node_len, node_cap;
+  gnode*   nodes;                          // index 0 unused
+  uint32_t node_len, node_cap, node_free;  // free: the first free slot, plus one; 0 for none
   gedge*   edges;
-  uint32_t edge_len, edge_cap;
+  uint32_t edge_len, edge_cap, edge_free;
+  bool     edge_labels_dirty;  // a node moved or resized: edge labels are placed at the next layout
 
   rdx_message* messages;
   size_t       message_count;
@@ -214,16 +217,33 @@ static void place(rdx_graph* g, rd_node label, float wx, float wy, float below) 
                                             .top  = rd_px((wy - g->center.y) * g->zoom + below)}});
 }
 
+static void place_node_label(rdx_graph* g, const gnode* n) {
+  place(g, n->label, n->pos.x, n->pos.y, n->radius * g->zoom + LABEL_GAP);
+}
+
+static void place_edge_label(rdx_graph* g, const gedge* e) {
+  rd_vec2 a, b;
+  if (rd_node_alive(g->ctx, e->label) && edge_span(g, e, &a, &b)) place(g, e->label, (a.x + b.x) / 2, (a.y + b.y) / 2, 0);
+}
+
+static void sync_edge_labels(rdx_graph* g) {
+  for (uint32_t i = 0; i < g->edge_len; i++)
+    if (g->edges[i].alive) place_edge_label(g, &g->edges[i]);
+  g->edge_labels_dirty = false;
+}
+
 static void sync_labels(rdx_graph* g) {
-  for (uint32_t i = 1; i < g->node_len; i++) {
-    gnode* n = &g->nodes[i];
-    if (n->alive) place(g, n->label, n->pos.x, n->pos.y, n->radius * g->zoom + LABEL_GAP);
-  }
-  for (uint32_t i = 0; i < g->edge_len; i++) {
-    gedge*  e = &g->edges[i];
-    rd_vec2 a, b;
-    if (e->alive && edge_span(g, e, &a, &b)) place(g, e->label, (a.x + b.x) / 2, (a.y + b.y) / 2, 0);
-  }
+  for (uint32_t i = 1; i < g->node_len; i++)
+    if (g->nodes[i].alive) place_node_label(g, &g->nodes[i]);
+  sync_edge_labels(g);
+}
+
+// Moving a node moves the labels of its edges; finding those would mean a scan of every edge per move,
+// so they are placed together, once, after the layout that follows.
+static void layout_hook(rd_ctx* ctx, void* data) {
+  (void)ctx;
+  rdx_graph* g = data;
+  if (g->edge_labels_dirty) sync_edge_labels(g);
 }
 
 static void apply_fit(rdx_graph* g, float width, float height) {
@@ -267,9 +287,14 @@ static void hover(rdx_graph* g, rdx_node n) {
   if (node_get(g, n)) emit(g, RDX_EVENT_NODE_ENTER, n);
 }
 
+static const char graph_key = 0;
+
+static rdx_graph* graph_find(const rd_ctx* ctx, rd_node host) { return rd_node_attached(ctx, host, &graph_key); }
+
 static void on_down(rd_ctx* ctx, rd_event* ev, void* data) {
-  rdx_graph* g = data;
-  if (ev->button != RD_BUTTON_PRIMARY) return;
+  (void)data;
+  rdx_graph* g = graph_find(ctx, ev->current);
+  if (!g || ev->button != RD_BUTTON_PRIMARY) return;
   rdx_node n = rdx_graph_node_at(g, ev->x, ev->y);
   g->press   = n;
   g->press_x = ev->x;
@@ -286,8 +311,9 @@ static void on_down(rd_ctx* ctx, rd_event* ev, void* data) {
 }
 
 static void on_move(rd_ctx* ctx, rd_event* ev, void* data) {
-  (void)ctx;
-  rdx_graph* g = data;
+  (void)data;
+  rdx_graph* g = graph_find(ctx, ev->current);
+  if (!g) return;
   if (g->mode == MODE_NONE || !(ev->buttons & RD_BUTTON_PRIMARY)) {
     hover(g, rdx_graph_node_at(g, ev->x, ev->y));
     return;
@@ -306,9 +332,9 @@ static void on_move(rd_ctx* ctx, rd_event* ev, void* data) {
 }
 
 static void on_up(rd_ctx* ctx, rd_event* ev, void* data) {
-  (void)ctx;
-  rdx_graph* g = data;
-  if (ev->button != RD_BUTTON_PRIMARY) return;
+  (void)data;
+  rdx_graph* g = graph_find(ctx, ev->current);
+  if (!g || ev->button != RD_BUTTON_PRIMARY) return;
   if (!g->moved && node_get(g, g->press) && same(rdx_graph_node_at(g, ev->x, ev->y), g->press))
     emit(g, RDX_EVENT_NODE_CLICK, g->press);
   g->mode  = MODE_NONE;
@@ -316,15 +342,16 @@ static void on_up(rd_ctx* ctx, rd_event* ev, void* data) {
 }
 
 static void on_leave(rd_ctx* ctx, rd_event* ev, void* data) {
-  (void)ctx;
-  (void)ev;
-  hover(data, (rdx_node){0});
+  (void)data;
+  rdx_graph* g = graph_find(ctx, ev->current);
+  if (g) hover(g, (rdx_node){0});
 }
 
 // The wheel zooms around the point under the cursor.
 static void on_wheel(rd_ctx* ctx, rd_event* ev, void* data) {
-  (void)ctx;
-  rdx_graph* g = data;
+  (void)data;
+  rdx_graph* g = graph_find(ctx, ev->current);
+  if (!g) return;
   rd_event_prevent_default(ev);
   if (ev->wheel_y == 0) return;
   rd_vec2 before = to_world(g, ev->x, ev->y);
@@ -479,13 +506,42 @@ static void graph_free(void* data) {
 
 // Public API.
 
+// The graph is attached to the host, which owns it; listeners find it there. The paint callback and
+// layout hook hold it directly: they go with the host too, and run only while it lives.
 rdx_graph* rdx_graph_create(rd_ctx* ctx, rd_node host) {
-  if (!rd_node_alive(ctx, host)) return NULL;
+  if (!rd_node_alive(ctx, host) || graph_find(ctx, host)) return NULL;
   rdx_graph* g = calloc(1, sizeof *g);
   if (!g) return NULL;
-  g->ctx         = ctx;
-  g->host        = host;
-  g->zoom        = 1;
+  g->ctx  = ctx;
+  g->host = host;
+  g->zoom = 1;
+  if (!rd_node_attach(ctx, host, &graph_key, g, graph_free)) {
+    free(g);
+    return NULL;
+  }
+  g->origin             = rd_node_create(ctx);
+  rd_event_type types[] = {RD_EVENT_POINTER_DOWN, RD_EVENT_POINTER_MOVE, RD_EVENT_POINTER_UP, RD_EVENT_POINTER_LEAVE, RD_EVENT_WHEEL};
+  rd_event_fn   fns[]   = {on_down, on_move, on_up, on_leave, on_wheel};
+  rd_listener   on[5]   = {0};
+  bool          ok      = rd_node_append(ctx, host, g->origin);
+  for (int j = 0; j < 5 && ok; j++) ok = (on[j] = rd_node_on(ctx, host, types[j], fns[j], NULL, NULL, 0)).id;
+  bool painted = ok && rd_node_set_paint(ctx, host, paint, g, NULL);
+  if (!painted || !rd_node_on_layout(ctx, host, layout_hook, g, NULL)) {  // the hook can't be removed: last
+    if (painted) rd_node_set_paint(ctx, host, NULL, NULL, NULL);
+    for (int j = 0; j < 5; j++)
+      if (on[j].id) rd_node_off(ctx, on[j]);
+    rd_node_destroy(ctx, g->origin);
+    rd_node_attach(ctx, host, &graph_key, NULL, NULL);  // frees g
+    return NULL;
+  }
+  rd_node_set_style(ctx, g->origin,
+                    &(rd_style){.position       = RD_POSITION_ABSOLUTE,
+                                .inset          = {.left = rd_pct(50), .top = rd_pct(50)},
+                                .width          = rd_px(0),
+                                .height         = rd_px(0),
+                                .pointer_events = RD_POINTER_EVENTS_NONE});
+  rd_node_merge_style(ctx, host, &(rd_style){.overflow_x = RD_OVERFLOW_HIDDEN, .overflow_y = RD_OVERFLOW_HIDDEN});
+  // Classes live as long as the context, so they're made only once nothing can fail.
   g->label_class = rd_class_create(ctx, &(rd_style){.font_size = rd_px(12), .white_space = RD_WHITE_SPACE_NOWRAP});
   rd_style wrap  = {
        .position       = RD_POSITION_ABSOLUTE,
@@ -497,25 +553,6 @@ rdx_graph* rdx_graph_create(rd_ctx* ctx, rd_node host) {
   g->node_label_wrap   = rd_class_create(ctx, &wrap);
   wrap.justify_content = RD_ALIGN_CENTER;
   g->edge_label_wrap   = rd_class_create(ctx, &wrap);
-  g->origin            = rd_node_create(ctx);
-  rd_node_set_style(ctx, g->origin,
-                    &(rd_style){.position       = RD_POSITION_ABSOLUTE,
-                                .inset          = {.left = rd_pct(50), .top = rd_pct(50)},
-                                .width          = rd_px(0),
-                                .height         = rd_px(0),
-                                .pointer_events = RD_POINTER_EVENTS_NONE});
-  rd_node_append(ctx, host, g->origin);
-  rd_node_merge_style(ctx, host, &(rd_style){.overflow_x = RD_OVERFLOW_HIDDEN, .overflow_y = RD_OVERFLOW_HIDDEN});
-
-  if (!rd_node_set_paint(ctx, host, paint, g, graph_free)) {
-    free(g);
-    return NULL;
-  }
-  rd_node_on(ctx, host, RD_EVENT_POINTER_DOWN, on_down, g, NULL, 0);
-  rd_node_on(ctx, host, RD_EVENT_POINTER_MOVE, on_move, g, NULL, 0);
-  rd_node_on(ctx, host, RD_EVENT_POINTER_UP, on_up, g, NULL, 0);
-  rd_node_on(ctx, host, RD_EVENT_POINTER_LEAVE, on_leave, g, NULL, 0);
-  rd_node_on(ctx, host, RD_EVENT_WHEEL, on_wheel, g, NULL, 0);
   return g;
 }
 
@@ -542,17 +579,20 @@ bool rdx_graph_on(rdx_graph* g, rdx_graph_fn fn, void* data, rd_destroy_fn destr
 
 rdx_node rdx_graph_add_node(rdx_graph* g, const rdx_node_desc* d) {
   if (!g || !d) return (rdx_node){0};
-  uint32_t i = 1;
-  while (i < g->node_len && g->nodes[i].alive) i++;
+  uint32_t i = g->node_free ? g->node_free - 1 : (g->node_len ? g->node_len : 1);
   if (i >= g->node_len) {
     if (!grow((void**)&g->nodes, &g->node_cap, i + 1, sizeof *g->nodes)) return (rdx_node){0};
     g->node_len = i + 1;
+  } else {
+    g->node_free = g->nodes[i].next_free;
   }
   gnode* n  = &g->nodes[i];
   *n        = (gnode){.gen = n->gen + 1, .alive = true, .pos = d->position, .color = d->color};
   n->radius = d->radius > 0 ? d->radius : DEFAULT_RADIUS;
-  if (d->label) n->label = make_label(g, d->label, g->node_label_wrap);
-  sync_labels(g);
+  if (d->label) {
+    n->label = make_label(g, d->label, g->node_label_wrap);
+    place_node_label(g, n);
+  }
   return (rdx_node){i, n->gen};
 }
 
@@ -566,8 +606,10 @@ bool rdx_graph_remove_node(rdx_graph* g, rdx_node node) {
     if (e->alive && (same(e->from, node) || same(e->to, node))) rdx_graph_remove_edge(g, (rdx_edge){i, e->gen});
   }
   rd_node_destroy(g->ctx, n->label);
-  n->alive = false;
-  n->label = (rd_node){0};
+  n->alive     = false;
+  n->label     = (rd_node){0};
+  n->next_free = g->node_free;
+  g->node_free = node.index + 1;
   return true;
 }
 
@@ -575,7 +617,8 @@ bool rdx_graph_set_position(rdx_graph* g, rdx_node node, rd_vec2 p) {
   gnode* n = node_get(g, node);
   if (!n) return false;
   n->pos = p;
-  sync_labels(g);
+  place_node_label(g, n);
+  g->edge_labels_dirty = true;
   return true;
 }
 
@@ -594,7 +637,8 @@ bool rdx_graph_set_radius(rdx_graph* g, rdx_node node, float r) {
   gnode* n = node_get(g, node);
   if (!n) return false;
   n->radius = r > 0 ? r : DEFAULT_RADIUS;
-  sync_labels(g);
+  place_node_label(g, n);
+  g->edge_labels_dirty = true;
   return true;
 }
 
@@ -602,7 +646,7 @@ bool rdx_graph_set_label(rdx_graph* g, rdx_node node, const char* label) {
   gnode* n = node_get(g, node);
   if (!n) return false;
   set_label(g, &n->label, label, g->node_label_wrap);
-  sync_labels(g);
+  place_node_label(g, n);
   return true;
 }
 
@@ -612,11 +656,12 @@ void rdx_graph_set_selected(rdx_graph* g, rdx_node node) {
 
 rdx_edge rdx_graph_connect(rdx_graph* g, rdx_node from, rdx_node to, const rdx_edge_desc* d) {
   if (!node_get(g, from) || !node_get(g, to) || same(from, to)) return (rdx_edge){0};
-  uint32_t i = 0;
-  while (i < g->edge_len && g->edges[i].alive) i++;
+  uint32_t i = g->edge_free ? g->edge_free - 1 : g->edge_len;
   if (i == g->edge_len) {
     if (!grow((void**)&g->edges, &g->edge_cap, i + 1, sizeof *g->edges)) return (rdx_edge){0};
     g->edge_len = i + 1;
+  } else {
+    g->edge_free = g->edges[i].next_free;
   }
   gedge* e = &g->edges[i];
   *e       = (gedge){.gen = e->gen + 1, .alive = true, .from = from, .to = to, .color = {120, 130, 150, 255, true}};
@@ -627,7 +672,7 @@ rdx_edge rdx_graph_connect(rdx_graph* g, rdx_node from, rdx_node to, const rdx_e
     if (d->label) e->label = make_label(g, d->label, g->edge_label_wrap);
   }
   if (e->width <= 0) e->width = DEFAULT_EDGE_WIDTH;
-  sync_labels(g);
+  place_edge_label(g, e);
   return (rdx_edge){i, e->gen};
 }
 
@@ -635,8 +680,10 @@ bool rdx_graph_remove_edge(rdx_graph* g, rdx_edge edge) {
   gedge* e = edge_get(g, edge);
   if (!e) return false;
   rd_node_destroy(g->ctx, e->label);
-  e->alive = false;
-  e->label = (rd_node){0};
+  e->alive     = false;
+  e->label     = (rd_node){0};
+  e->next_free = g->edge_free;
+  g->edge_free = edge.index + 1;
   return true;
 }
 
@@ -650,7 +697,7 @@ bool rdx_graph_set_edge_label(rdx_graph* g, rdx_edge edge, const char* label) {
   gedge* e = edge_get(g, edge);
   if (!e) return false;
   set_label(g, &e->label, label, g->edge_label_wrap);
-  sync_labels(g);
+  place_edge_label(g, e);
   return true;
 }
 

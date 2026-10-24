@@ -91,7 +91,9 @@ pass `rdx_table_list(table)`; for a tree, `rdx_tree_item_of` returns the item id
 Items are added under a parent (-1 for the top level) and get an id. The tree shows the expanded items as an
 indented, virtualized list with disclosure chevrons. Right expands an item, or moves to its first child; Left
 collapses it, or moves to its parent; Enter toggles. Selecting a hidden item with `rdx_tree_select` expands its
-ancestors, and collapsing an ancestor of the selection moves the selection to the ancestor.
+ancestors, and collapsing an ancestor of the selection moves the selection to the ancestor. Adding and expanding
+items doesn't rebuild the rows; the tree does that once, at the next layout or the next call that needs them, so
+building a tree of any size is linear in its items.
 
 ## Breadcrumb
 

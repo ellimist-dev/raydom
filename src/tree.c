@@ -197,10 +197,25 @@ bool rd_node_append(rd_ctx* ctx, rd_node parent, rd_node child) {
   return rd_node_insert_before(ctx, parent, child, (rd_node){0, 0});
 }
 
+static bool connected(const rd_ctx* ctx, uint32_t i) {
+  while (ctx->slots[i].parent) i = ctx->slots[i].parent;
+  return i == ctx->root;
+}
+
+// Pre-order successor of i within the subtree at top; 0 past its end.
+static uint32_t next_in_subtree(const rd_ctx* ctx, uint32_t i, uint32_t top) {
+  if (ctx->slots[i].first_child) return ctx->slots[i].first_child;
+  for (; i != top; i = ctx->slots[i].parent)
+    if (ctx->slots[i].next_sibling) return ctx->slots[i].next_sibling;
+  return 0;
+}
+
 bool rd_node_insert_before(rd_ctx* ctx, rd_node parent, rd_node child, rd_node ref) {
   if (!rd__slot(ctx, parent) || !rd__slot(ctx, child) || child.index == ctx->root) return false;
   // The overlay stays the root's last child so it draws above, and is hit-tested before, everything else.
-  if (rd_node_is_null(ref) && parent.index == ctx->root && rd__slot(ctx, ctx->overlay) && child.index != ctx->overlay.index)
+  // Once moved out of the root it is an ordinary node until rd_ctx_overlay puts it back.
+  if (rd_node_is_null(ref) && parent.index == ctx->root && rd__slot(ctx, ctx->overlay) &&
+      child.index != ctx->overlay.index && ctx->slots[ctx->overlay.index].parent == ctx->root)
     ref = ctx->overlay;
   if (!rd_node_is_null(ref)) {
     rd_slot* r = rd__slot(ctx, ref);
@@ -210,11 +225,19 @@ bool rd_node_insert_before(rd_ctx* ctx, rd_node parent, rd_node child, rd_node r
   for (uint32_t a = parent.index; a; a = ctx->slots[a].parent)
     if (a == child.index) return false;
   uint32_t old_parent = ctx->slots[child.index].parent;
+  bool     arriving   = !connected(ctx, child.index) && connected(ctx, parent.index);
   if (old_parent) rd__mark_layout_dirty(ctx, old_parent);
   unlink_node(ctx, child.index);
   link_node(ctx, parent.index, child.index, ref.index);
   rd__mark_layout_dirty(ctx, parent.index);
   rd__mark_style_dirty(ctx, child.index);
+  // A subtree inserted into the tree starts fresh, as an inserted element does in CSS: its first style
+  // there doesn't transition from what it had before it was detached.
+  if (arriving)
+    for (uint32_t i = child.index; i;) {
+      ctx->styles[i].computed_once = false;
+      i = next_in_subtree(ctx, i, child.index);
+    }
   return true;
 }
 

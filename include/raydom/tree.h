@@ -53,7 +53,7 @@ bool rd_node_alive(const rd_ctx* ctx, rd_node node);
 
 // Moves child if it already has a parent. Fails on cycles, dead handles, or child == root.
 bool rd_node_append(rd_ctx* ctx, rd_node parent, rd_node child);
-// Null ref appends.
+// Null ref appends. Appending to the root inserts before the overlay while the overlay is its child.
 bool rd_node_insert_before(rd_ctx* ctx, rd_node parent, rd_node child, rd_node ref);
 void rd_node_detach(rd_ctx* ctx, rd_node node);
 

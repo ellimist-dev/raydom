@@ -11,6 +11,9 @@ What raydom doesn't do in this version. Behavior outside these limits is unspeci
 - No `aspect_ratio`, no `transform`. Animate `inset` to move a node without reflowing its neighbors.
 - Transitions don't animate `width: auto`, unit changes (px to %), or `display`; those change at once.
 - `min_width`/`min_height` `auto` is 0, not the content size.
+- Lengths, sizes and flex factors are clamped to ±1e9 (pixels, or the factor itself); a NaN length means `auto`.
+- In WebAssembly builds, Emscripten's default 64 KB stack holds about 200 levels of nested flex containers, or 340
+  of nested grids. Deeper trees need a larger `-sSTACK_SIZE`.
 
 ## Text
 

@@ -8,6 +8,8 @@
 #include <initializer_list>
 #include <iterator>
 #include <new>
+#include <optional>
+#include <string>
 #include <string_view>
 #include <type_traits>
 #include <utility>
@@ -369,6 +371,10 @@ public:
     if (!rd_node_set_paint(ctx_, handle_, call, p, [](void* d) noexcept { delete static_cast<Fn*>(d); })) delete p;
     return *this;
   }
+  Node clear_paint() const {
+    rd_node_set_paint(ctx_, handle_, nullptr, nullptr, nullptr);
+    return *this;
+  }
 
   Node mark_layout_dirty() const {
     rd_node_mark_layout_dirty(ctx_, handle_);
@@ -455,26 +461,13 @@ public:
   // Fires an event at the node; false if a listener prevented the default.
   bool dispatch(rd_event_type type) const { return rd_node_dispatch(ctx_, handle_, type); }
 
-  // Animates to `to` over seconds; see rd_node_animate. done(), if given, runs afterward and is owned
-  // by the timer.
-  Node animate(const Style& to, double seconds, rd_easing easing = RD_EASING_EASE) const {
-    rd_node_animate(ctx_, handle_, nullptr, &to.get(), seconds, easing, nullptr, nullptr);
-    return *this;
+  // Animates to `to` over seconds; see rd_node_animate. False, with nothing changed, if it can't. To act
+  // when it ends, set a timer for the same seconds (Context::set_timeout), which can be cleared.
+  bool animate(const Style& to, double seconds, rd_easing easing = RD_EASING_EASE) const {
+    return rd_node_animate(ctx_, handle_, nullptr, &to.get(), seconds, easing);
   }
-  Node animate(const Style& from, const Style& to, double seconds, rd_easing easing = RD_EASING_EASE) const {
-    rd_node_animate(ctx_, handle_, &from.get(), &to.get(), seconds, easing, nullptr, nullptr);
-    return *this;
-  }
-  template <class F>
-  Node animate(const Style& to, double seconds, rd_easing easing, F&& done) const {
-    using Fn = std::decay_t<F>;
-    Fn* p    = new (std::nothrow) Fn(std::forward<F>(done));
-    if (!p) return animate(to, seconds, easing);
-    rd_timer_fn call = [](rd_ctx*, void* d) noexcept { (*static_cast<Fn*>(d))(); };
-    rd_destroy_fn del = [](void* d) noexcept { delete static_cast<Fn*>(d); };
-    rd_node_animate(ctx_, handle_, nullptr, &to.get(), seconds, easing, nullptr, nullptr);
-    if (!rd_ctx_set_timer(ctx_, seconds, 0, call, p, del).index) delete p;
-    return *this;
+  bool animate(const Style& from, const Style& to, double seconds, rd_easing easing = RD_EASING_EASE) const {
+    return rd_node_animate(ctx_, handle_, &from.get(), &to.get(), seconds, easing);
   }
 
   // f() after every layout while this node lives; see rd_node_on_layout. The callable is owned by the hook.
@@ -656,10 +649,48 @@ public:
   // The clock timers run on; rd_update sets it from raylib.
   void set_time(double seconds) const { rd_ctx_set_time(ctx_, seconds); }
   double time() const { return rd_ctx_time(ctx_); }
-  // Text from a paint callback; see rd_paint_text.
-  void paint_text(const rd_paint_info& info, std::string_view s, float x, float baseline, float size, rd_color color,
+  // Text from a paint callback; see rd_paint_text. In its order, with the font last.
+  void paint_text(const rd_paint_info& info, float size, float x, float baseline, std::string_view s, rd_color color,
                   rd_font font = {}) const {
     rd_paint_text(ctx_, &info, font, size, x, baseline, s.data(), s.size(), color);
+  }
+
+  // f() after every layout, for the context's lifetime; see rd_ctx_on_layout. The callable is owned by the
+  // hook. False on allocation failure.
+  template <class F>
+  bool on_layout(F&& f) const {
+    using Fn = std::decay_t<F>;
+    Fn* p    = new (std::nothrow) Fn(std::forward<F>(f));
+    if (!p) return false;
+    rd_layout_hook call = [](rd_ctx*, void* d) noexcept { (*static_cast<Fn*>(d))(); };
+    if (rd_ctx_on_layout(ctx_, call, p, [](void* d) noexcept { delete static_cast<Fn*>(d); })) return true;
+    delete p;
+    return false;
+  }
+
+  // Document text selection, in byte offsets; see rd_ctx_select.
+  struct Selection {
+    Node        anchor;
+    std::size_t anchor_offset;
+    Node        focus;
+    std::size_t focus_offset;
+  };
+  bool select(Node anchor, std::size_t anchor_offset, Node focus, std::size_t focus_offset) const {
+    return rd_ctx_select(ctx_, anchor.handle(), anchor_offset, focus.handle(), focus_offset);
+  }
+  void clear_selection() const { rd_ctx_clear_selection(ctx_); }
+  // Empty when nothing is selected.
+  std::optional<Selection> selection() const {
+    rd_node     a, f;
+    std::size_t ao, fo;
+    if (!rd_ctx_selection(ctx_, &a, &ao, &f, &fo)) return std::nullopt;
+    return Selection{{ctx_, a}, ao, {ctx_, f}, fo};
+  }
+  // The selected text, one line per text node.
+  std::string selection_text() const {
+    std::string s(rd_ctx_selection_text(ctx_, nullptr, 0), '\0');
+    if (!s.empty()) rd_ctx_selection_text(ctx_, s.data(), s.size() + 1);
+    return s;
   }
 
   Node      hovered() const { return {ctx_, rd_ctx_hovered(ctx_)}; }
@@ -668,6 +699,9 @@ public:
   Node focused() const { return {ctx_, rd_ctx_focused(ctx_)}; }
   void blur() const { rd_node_focus(ctx_, {}); }
   bool focus_next(bool backward = false) const { return rd_ctx_focus_next(ctx_, backward); }
+  // Keeps Tab inside scope; a null node is the whole tree. See rd_ctx_set_focus_scope.
+  void set_focus_scope(Node scope) const { rd_ctx_set_focus_scope(ctx_, scope.handle()); }
+  Node focus_scope() const { return {ctx_, rd_ctx_focus_scope(ctx_)}; }
   void key(rd_key k, bool down, std::uint8_t mods = 0, bool repeat = false) const {
     rd_ctx_key(ctx_, k, down, repeat, mods);
   }
@@ -697,6 +731,8 @@ public:
   // raylib: input and layout at the screen size, then drawing inside BeginDrawing/EndDrawing.
   void update() const { rd_update(ctx_); }
   void draw() const { rd_draw(ctx_); }
+  // See rd_set_event_waiting.
+  void set_event_waiting(bool enabled) const { rd_set_event_waiting(ctx_, enabled); }
   // See rd_set_pixel_ratio.
   void  set_pixel_ratio(float ratio) const { rd_set_pixel_ratio(ctx_, ratio); }
   float pixel_ratio() const { return rd_pixel_ratio(ctx_); }

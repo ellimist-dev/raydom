@@ -318,6 +318,67 @@ static void interning(void) {
   rd_ctx_destroy(ctx);
 }
 
+// CSS Grid §8.5 step 2: items locked to a row take the first free column past the ones this step
+// already put in that row, adding implicit columns as needed.
+static void test_row_locked_placement(void) {
+  rd_ctx*   ctx  = rd_ctx_create();
+  rd_tracks cols = TRACKS(ctx, rd_track_of(rd_px(50)), rd_track_of(rd_px(50)));
+  rd_style  gs   = {.display               = RD_DISPLAY_GRID,
+                    .grid_template_columns = cols,
+                    .grid_auto_columns     = rd_track_of(rd_px(50)),
+                    .grid_auto_rows        = rd_track_of(rd_px(20)),
+                    .justify_items         = RD_ALIGN_START,
+                    .width                 = rd_px(300)};
+  rd_node   g    = add(ctx, rd_ctx_root(ctx), gs);
+  rd_node   it[3];
+  for (int j = 0; j < 3; j++) it[j] = add(ctx, g, (rd_style){.grid_row_start = rd_line(1), .width = rd_px(10)});
+  gs.justify_items = RD_ALIGN_STRETCH;
+  rd_node h        = add(ctx, rd_ctx_root(ctx), gs);
+  add(ctx, h, (rd_style){.grid_column_start = rd_line(2), .grid_row_start = rd_line(1)});
+  rd_node x = add(ctx, h, (rd_style){.grid_row_start = rd_line(1), .grid_column_start = rd_span(2)});
+  rd_node y = add(ctx, h, (rd_style){.grid_row_start = rd_line(1)});
+  rd_node z = add(ctx, h, (rd_style){0});
+  rd_ctx_layout(ctx, 400, 300);
+  CHECK_RECT(ctx, it[0], 0, 0, 10, 20);
+  CHECK_RECT(ctx, it[1], 50, 0, 10, 20);
+  CHECK_RECT(ctx, it[2], 100, 0, 10, 20);
+  CHECK_RECT(ctx, x, 100, 0, 100, 20);
+  CHECK_RECT(ctx, y, 200, 0, 50, 20);  // past x, not back in the free first column
+  CHECK_RECT(ctx, z, 0, 0, 50, 20);    // auto-placed items still fill from the start
+  rd_ctx_destroy(ctx);
+}
+
+static int counted_calls;
+
+static rd_size measure_counted(void* data, float w, rd_measure_mode wm, float h, rd_measure_mode hm) {
+  counted_calls++;
+  return measure_words(data, w, wm, h, hm);
+}
+
+// A grid item that isn't stretched is measured under several keys per layout; they all stay cached.
+static void test_unstretched_items_cached(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_node g   = add(ctx, rd_ctx_root(ctx),
+                    (rd_style){.display               = RD_DISPLAY_GRID,
+                               .grid_template_columns = TRACKS(ctx, rd_track_of(rd_fr(1)), rd_track_of(rd_auto())),
+                               .justify_items         = RD_ALIGN_START,
+                               .align_items           = RD_ALIGN_START});
+  words   w[16];
+  rd_node leaf[16];
+  for (int j = 0; j < 16; j++) {
+    w[j]    = (words){3 + j, 10, 10};
+    leaf[j] = add(ctx, g, (rd_style){0});
+    rd_node_set_measure(ctx, leaf[j], j ? measure_counted : measure_words, &w[j], NULL);
+  }
+  rd_ctx_layout(ctx, 400, 3000);
+  counted_calls = 0;
+  w[0].count    = 4;  // one item changes, as a text edit would
+  rd_node_mark_layout_dirty(ctx, leaf[0]);
+  rd_ctx_layout(ctx, 400, 3000);
+  CHECK(counted_calls == 0);
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   interning();
   auto_repeat();
@@ -330,5 +391,7 @@ int main(void) {
   test_column_flow_and_auto_rows();
   test_percent_tracks_and_span();
   test_grid_in_flex_row();
+  test_row_locked_placement();
+  test_unstretched_items_cached();
   return TEST_RESULT();
 }

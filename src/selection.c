@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "events_internal.h"
 #include "input_internal.h"
 #include "layout_internal.h"
 #include "selection_internal.h"
@@ -47,16 +48,17 @@ void rd_ctx_clear_selection(rd_ctx* ctx) {
   set(ctx, (rd_node){0}, 0, (rd_node){0}, 0);
 }
 
-static size_t clamp_offset(const rd_ctx* ctx, rd_node n, size_t off) {
-  size_t len = rd__text_get(ctx, n.index)->len;
-  return off < len ? off : len;
+// Onto a codepoint boundary (the next one inside a codepoint), so the selected text stays valid UTF-8.
+static size_t snap_offset(const rd_text* t, size_t off) {
+  return off >= t->len ? t->len : t->offsets[rd__text_cp_of_byte(t, off)];
 }
 
 bool rd_ctx_select(rd_ctx* ctx, rd_node anchor, size_t anchor_offset, rd_node focus, size_t focus_offset) {
   if (!rd__slot(ctx, anchor) || !rd__slot(ctx, focus) || !rd__is_text(ctx, anchor.index) ||
       !rd__is_text(ctx, focus.index))
     return false;
-  set(ctx, anchor, clamp_offset(ctx, anchor, anchor_offset), focus, clamp_offset(ctx, focus, focus_offset));
+  set(ctx, anchor, snap_offset(rd__text_get(ctx, anchor.index), anchor_offset), focus,
+      snap_offset(rd__text_get(ctx, focus.index), focus_offset));
   return true;
 }
 
@@ -72,8 +74,7 @@ bool rd_ctx_selection(const rd_ctx* ctx, rd_node* anchor, size_t* anchor_offset,
 
 // Ordering.
 
-// Numbers attached nodes in pre-order; detached ones get UINT32_MAX.
-static void number(rd_ctx* ctx) {
+void rd__tree_number(rd_ctx* ctx) {
   for (uint32_t i = 1; i < ctx->len; i++) ctx->layouts[i].order = UINT32_MAX;
   uint32_t next = 0;
   for (uint32_t i = ctx->root; i;) {
@@ -90,7 +91,12 @@ static void number(rd_ctx* ctx) {
 bool rd__selection_prepare(rd_ctx* ctx) {
   ctx->sel_active = false;
   if (!has_selection(ctx)) return false;
-  number(ctx);
+  // The text may have changed since the selection was made.
+  rd_text *at = rd__text_get(ctx, ctx->sel_anchor.index), *ft = rd__text_get(ctx, ctx->sel_focus.index);
+  if (!at || !ft) return false;
+  ctx->sel_anchor_off = snap_offset(at, ctx->sel_anchor_off);
+  ctx->sel_focus_off  = snap_offset(ft, ctx->sel_focus_off);
+  rd__tree_number(ctx);
   uint32_t a = ctx->layouts[ctx->sel_anchor.index].order, f = ctx->layouts[ctx->sel_focus.index].order;
   if (a == UINT32_MAX || f == UINT32_MAX) return false;
   bool forward       = a < f || (a == f && ctx->sel_anchor_off <= ctx->sel_focus_off);
