@@ -5,6 +5,7 @@
 ```text
  application
      │
+     ├── raydom::router   routes, history, nested routers, links, transitions
      ├── raydom::extras   controls, popups, views, toasts, network view, file dialogs
      │        │           (public core API only, plus rd_ctx_extension and layout hooks)
      ▼        ▼

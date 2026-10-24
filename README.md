@@ -15,7 +15,9 @@ statically linked binary.
 - Canvas nodes for custom raylib drawing
 - `raydom::extras`: checkbox, switch, radio group, slider, toast, menu, context menu, select, modal, tooltip, tabs,
   splitter, virtualized list, table and tree view components; an interactive network view (3D
-  spheres, edges, labels, pan and zoom); native open, save and folder dialogs
+  spheres, edges, labels, pan and zoom); native open, save and folder dialogs; breadcrumbs
+- `raydom::router`: path routing with parameters, optional segments and wildcards, nested routers, history with
+  back and forward (keys and mouse side buttons), links, kept-alive pages and slide or fade transitions
 
 ## Built with raydom
 
@@ -46,10 +48,10 @@ patch versions don't.
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.5)
+    GIT_TAG        v0.3.0)
 FetchContent_MakeAvailable(raydom)
 
-target_link_libraries(your_app PRIVATE raydom::raydom)   # or raydom::extras
+target_link_libraries(your_app PRIVATE raydom::raydom)   # or raydom::extras, raydom::router
 ```
 
 If your project already defines a `raylib` target, raydom uses it. Otherwise it looks for an installed raylib, then
@@ -64,7 +66,7 @@ cmake --install build --prefix /your/prefix
 ```
 
 ```cmake
-find_package(raydom 0.2 CONFIG REQUIRED)
+find_package(raydom 0.3 CONFIG REQUIRED)
 target_link_libraries(your_app PRIVATE raydom::raydom)
 ```
 
@@ -73,6 +75,7 @@ target_link_libraries(your_app PRIVATE raydom::raydom)
 | Option                 | Default            | Effect                                         |
 | ---------------------- | ------------------ | ---------------------------------------------- |
 | `RAYDOM_BUILD_EXTRAS`  | `ON`               | Build `raydom::extras`                         |
+| `RAYDOM_BUILD_ROUTER`  | `ON`               | Build `raydom::router`                         |
 | `RAYDOM_FILE_DIALOG`   | `ON`               | Native file dialogs in extras; needs libdbus on Linux |
 | `RAYDOM_FETCH_RAYLIB`  | `ON`               | Download raylib when it can't be found         |
 | `RAYDOM_INSTALL`       | top-level only     | Generate install rules and the CMake package   |
@@ -167,6 +170,11 @@ int main() {
 
 Link `raydom::extras` and include `<raydom/extras/graph.h>` (C) or `<raydom/extras/graph.hh>` (C++) for the network
 view. The showcase's Network tab drives a deterministic Paxos simulation with it.
+
+### Router
+
+Link `raydom::router` and include `<raydom/router/router.h>` (C) or `<raydom/router/router.hh>` (C++). The showcase's
+Router tab is a small routed app: sidebar links, back and forward, a breadcrumb, and a nested settings router.
 
 ## Building from source
 

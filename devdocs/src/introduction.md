@@ -16,9 +16,11 @@ which test pins it down.
   styles, and lambda callbacks. No exceptions.
 - **Extras** (`extras/`): components built only on the public core API (controls, popups, views, toasts, a network
   view, native file dialogs), in a second library, `raydom::extras`.
+- **Router** (`router/`): path routing, history, nested routers and page transitions, in a third library,
+  `raydom::router`, also built only on the public core API. It doesn't depend on extras.
 - **Docs** (`docs/`): the user book, whose code samples are programs compiled and run by the test suite.
-- **The showcase** (`examples/showcase/`): one application with a feature tour, a desktop messaging app and a
-  Paxos simulation, used as the integration test you look at.
+- **The showcase** (`examples/showcase/`): one application with a feature tour, a desktop messaging app, a
+  Paxos simulation and a routed app, used as the integration test you look at.
 
 ## Map of the repository
 
@@ -28,6 +30,7 @@ which test pins it down.
 | `src/`                   | The core; `*_internal.h` are private headers                       |
 | `src/external/`          | Vendored stb_truetype, stb_image, nanosvg                          |
 | `extras/`                | `raydom::extras`: headers, sources, vendored nativefiledialog      |
+| `router/`                | `raydom::router`: headers and source                               |
 | `tests/`                 | One test program per subsystem, and `consumer/` for packaging      |
 | `docs/`                  | The user book, its example programs and its tools                  |
 | `devdocs/`               | This book                                                          |

@@ -12,7 +12,10 @@ inside its content box.
 ```
 
 The callback runs inside `rd_draw`, after the node's background and border and before its children, so children
-draw on top. raydom flushes raylib's batch before the call, with no scissor or shader active.
+draw on top. raydom flushes raylib's batch before the call, with no scissor or shader active. Blending is raydom's: colors
+blend as usual, and alpha accumulates toward opaque. raylib's default blends alpha like color, so a translucent
+fill over an opaque pixel leaves it translucent; the desktop ignores that, but a browser composites the canvas over
+the page, which would show through. A callback may change the blend mode; raydom sets its own again afterwards.
 
 `rd_paint_info` has:
 
@@ -28,6 +31,24 @@ callback. Restore any other raylib state you change. Rendering to a texture with
 callback is safe: size the texture and draw into it in device pixels (`content` times `dpi`), then call
 `rd_paint_restore(info)` after `EndTextureMode`, which resets the transform raydom drew with. raydom restores it
 again after the callback.
+
+## Text
+
+`rd_paint_text(ctx, info, font, size, x, baseline, utf8, len, color)` draws a line of text from the callback with
+raydom's fonts, rasterized for the display's density like the rest of the UI. That keeps labels on a canvas
+sharp and in the same typeface as the interface around it. `x` is the left edge and `baseline` the baseline, in
+logical coordinates. To center a label in a box, measure it with `rd_font_measure` and place the baseline with
+`rd_font_get_metrics`:
+
+```c
+rd_font_metrics m = rd_font_get_metrics(ctx, (rd_font){0}, 18);  // {0}: the default font
+float           w = rd_font_measure(ctx, (rd_font){0}, 18, label, RD_TEXT_NUL);
+rd_paint_text(ctx, info, (rd_font){0}, 18, box.x + (box.width - w) / 2,
+              box.y + (box.height + m.ascent - m.descent) / 2, label, RD_TEXT_NUL, rd_hex(0xe4e7ee));
+```
+
+Text draws over whatever the callback drew before it and under what it draws after. It doesn't wrap. In C++:
+`ctx.paint_text(info, label, x, baseline, size, color)`, with `ctx.measure_text` and `ctx.font_metrics`.
 
 ## Pixel ratio
 

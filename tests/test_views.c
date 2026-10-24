@@ -388,7 +388,39 @@ static void trees(void) {
   rd_ctx_destroy(ctx);
 }
 
+static int  crumb_changes;
+static void on_crumb(rd_ctx* ctx, rd_event* ev, void* data) {
+  (void)ctx, (void)ev, (void)data;
+  crumb_changes++;
+}
+
+static void breadcrumbs(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_font_load_file(ctx, RAYDOM_TEST_FONT);
+  rd_node b = rdx_breadcrumb_create(ctx);
+  rd_node_append(ctx, rd_ctx_root(ctx), b);
+  rd_node_on(ctx, b, RD_EVENT_CHANGE, on_crumb, NULL, NULL, 0);
+  CHECK(rdx_breadcrumb_count(ctx, b) == 0 && rdx_breadcrumb_clicked(ctx, b) == -1);
+  CHECK(rdx_breadcrumb_set(ctx, b, (const char*[]){"Home", "Users", "Ann"}, 3));
+  CHECK(rdx_breadcrumb_count(ctx, b) == 3 && rd_node_child_count(ctx, b) == 5);
+  rd_node home = rd_node_first_child(ctx, b), users = rd_node_next_sibling(ctx, rd_node_next_sibling(ctx, home));
+  rd_node ann  = rd_node_last_child(ctx, b);
+  CHECK(rd_node_role(ctx, home) == RD_ROLE_LINK && rd_node_role(ctx, ann) != RD_ROLE_LINK);
+  click(ctx, users);
+  CHECK(rdx_breadcrumb_clicked(ctx, b) == 1 && crumb_changes == 1);
+  click(ctx, ann);  // the current item does nothing
+  CHECK(rdx_breadcrumb_clicked(ctx, b) == 1 && crumb_changes == 1);
+  rd_node_focus(ctx, home);
+  press(ctx, RD_KEY_ENTER);
+  CHECK(rdx_breadcrumb_clicked(ctx, b) == 0 && crumb_changes == 2);
+  CHECK(rdx_breadcrumb_set(ctx, b, (const char*[]){"Only"}, 1) && rdx_breadcrumb_count(ctx, b) == 1);
+  CHECK(rdx_breadcrumb_set(ctx, b, NULL, 0) && rdx_breadcrumb_count(ctx, b) == 0);
+  CHECK(!rdx_breadcrumb_set(ctx, rd_ctx_root(ctx), NULL, 0) && rdx_breadcrumb_clicked(ctx, rd_ctx_root(ctx)) == -1);
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
+  breadcrumbs();
   tabs();
   splits();
   table_ownership();

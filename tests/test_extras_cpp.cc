@@ -36,6 +36,8 @@ int main() {
   CHECK(select.set_selected(1) && select.selected() == 1);
   rdx::List list = rdx::list(ctx, 10, 20, [](rd::Node, int) {});
   CHECK(list.set_count(5) && list.select(3) && list.selected() == 3 && !list.select(9));
+  rdx::Breadcrumb crumbs = rdx::breadcrumb(ctx, {"Home", "Docs"});
+  CHECK(crumbs.count() == 2 && crumbs.clicked() == -1 && crumbs.set({"A", "B", "C"}) && crumbs.count() == 3);
   rdx::Table table = rdx::table(ctx, {{"Name"}}, 4, 20, {});
   CHECK(table.list() && table.list().set_count(2));
   rdx::Tree tree = rdx::tree(ctx);

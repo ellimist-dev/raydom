@@ -35,9 +35,12 @@ RD_ENUM typedef enum rd_event_phase : uint8_t {
   RD_PHASE_BUBBLE,
 } rd_event_phase;
 
+// BACK and FORWARD are a mouse's side buttons. Only PRIMARY clicks; the others fire down and up.
 enum { RD_BUTTON_PRIMARY   = 1u << 0,
        RD_BUTTON_SECONDARY = 1u << 1,
-       RD_BUTTON_MIDDLE    = 1u << 2 };
+       RD_BUTTON_MIDDLE    = 1u << 2,
+       RD_BUTTON_BACK      = 1u << 3,
+       RD_BUTTON_FORWARD   = 1u << 4 };
 
 RD_ENUM typedef enum rd_key : uint16_t {
   RD_KEY_UNKNOWN,
@@ -104,6 +107,8 @@ RD_ENUM typedef enum rd_key : uint16_t {
   RD_KEY_F10,
   RD_KEY_F11,
   RD_KEY_F12,
+  RD_KEY_LEFT_BRACKET,
+  RD_KEY_RIGHT_BRACKET,
 } rd_key;
 
 enum { RD_MOD_SHIFT = 1u << 0,
@@ -171,6 +176,8 @@ rd_cursor rd_ctx_cursor(const rd_ctx* ctx);
 // Seconds on any monotonic clock; used to end wheel gestures, and fires due timers (timer.h).
 // rd_update sets it from raylib.
 void rd_ctx_set_time(rd_ctx* ctx, double seconds);
+// The clock as last set: what timers and animations run on. 0 before the first set.
+double rd_ctx_time(const rd_ctx* ctx);
 
 // Keyboard input goes to the focused node, or the root when nothing has focus.
 void rd_ctx_key(rd_ctx* ctx, rd_key key, bool down, bool repeat, uint8_t mods);

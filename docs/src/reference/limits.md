@@ -35,6 +35,13 @@ What raydom doesn't do in this version. Behavior outside these limits is unspeci
 - Shadows are outer box shadows only.
 - No gradients.
 
+## Router
+
+Paths have no query strings or fragments, and segments aren't percent-decoded. In WebAssembly builds the router
+doesn't read or write the browser's URL or history; it keeps the browser from leaving the page on back and forward
+input instead. There are no transforms, so slide transitions move pages
+with `inset`. Layout caches keep that cheap: a page's contents aren't measured again while it slides.
+
 ## Threads
 
 A context is single-threaded. Separate contexts on separate threads don't share state, but raylib drawing must

@@ -11,6 +11,7 @@
 | Images         | GIFs show the first frame; SVG lacks text, filters, masks, clip paths and patterns |
 | Input          | No touch or gestures beyond raylib's mouse                                |
 | Views          | Fixed row heights; no column resizing; tree items are added up front      |
+| Router         | No browser history or URL sync on the web; no query strings or percent-decoding; slide moves `inset` (no transforms in the core); cached layout keeps it to the wrapper and its ancestors per frame |
 | Threads        | A context is single-threaded                                              |
 
 ## Debt

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>raydom showcase</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #0f1115; }
+    /* The canvas holds device pixels; CSS shows it at the window's size (see fit_canvas in main.cc). */
+    canvas { display: block; outline: none; width: 100vw; height: 100vh; }
+    #status { position: fixed; inset: 0; display: grid; place-items: center; color: #8a93a6;
+              font: 14px ui-monospace, Menlo, monospace; }
+  </style>
+</head>
+<body>
+  <!-- The showcase's page: Emscripten's shell file, with the program inlined where SCRIPT is. -->
+  <div id="status">loading</div>
+  <canvas id="canvas" tabindex="-1"></canvas>
+  <script>
+    var Module = {
+      canvas: document.getElementById('canvas'),
+      onRuntimeInitialized() { document.getElementById('status').remove(); Module.canvas.focus(); },
+      setStatus(text) { if (text) document.getElementById('status')?.replaceChildren(text.toLowerCase()); },
+    };
+    Module.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+  </script>
+  {{{ SCRIPT }}}
+</body>
+</html>

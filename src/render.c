@@ -8,6 +8,10 @@
 #include "render_internal.h"
 #include "rlgl.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#endif
+
 enum { ATLAS_SIZE = 2048 };
 
 // One shader draws everything raydom draws, so consecutive draws batch. A vertex's normal holds what
@@ -586,10 +590,35 @@ void rd_paint_scissor(const rd_paint_info* info) {
 // one per process; set for the duration of rd_draw.
 static Matrix draw_matrix;
 
+// Color blends as usual, but alpha accumulates toward opaque: with raylib's default, the same factors
+// for alpha, a translucent fill over an opaque pixel leaves it translucent (a 50% fill leaves 75%). A
+// desktop window ignores that; a browser composites the WebGL canvas over the page, which then shows
+// through fades, tints and shadows.
+static void blend_for_canvas(void) {
+  rlDrawRenderBatchActive();
+  rlSetBlendFactorsSeparate(RL_SRC_ALPHA, RL_ONE_MINUS_SRC_ALPHA, RL_ONE, RL_ONE_MINUS_SRC_ALPHA, RL_FUNC_ADD, RL_FUNC_ADD);
+  rlSetBlendMode(RL_BLEND_CUSTOM_SEPARATE);
+}
+
 void rd_paint_restore(const rd_paint_info* info) {
   if (!info || info->ratio == 1) return;
   rlDrawRenderBatchActive();
   rlSetMatrixModelview(draw_matrix);
+}
+
+void rd_paint_text(rd_ctx* ctx, const rd_paint_info* info, rd_font font, float size, float x, float baseline,
+                   const char* utf8, size_t len, rd_color color) {
+  gpu*      g = ctx ? ctx->gpu : NULL;
+  rd__font* f = rd__font_get(ctx, font);
+  if (!g || !f || !info || !utf8 || size <= 0 || !IsWindowReady()) return;
+  if (len == RD_TEXT_NUL) len = strlen(utf8);
+  // The glyphs come from raydom's atlas through its shader, which the callback runs without.
+  rlDrawRenderBatchActive();
+  shader_mode(g, true);
+  rlNormal3f(0, 0, 0);
+  draw_run(g, f, size, utf8, len, x, snap(baseline, info->dpi), to_color(color), info->dpi);
+  rlDrawRenderBatchActive();
+  shader_mode(g, false);
 }
 
 void rd_draw(rd_ctx* ctx) {
@@ -612,6 +641,7 @@ void rd_draw(rd_ctx* ctx) {
     rlScalef(ratio, ratio, 1);
   }
   draw_matrix = rlGetMatrixModelview();
+  blend_for_canvas();
   // Everything below draws with raydom's shader, so it batches; scale is constant for the draw.
   shader_mode(g, true);
   rlNormal3f(0, 0, 0);
@@ -663,6 +693,7 @@ void rd_draw(rd_ctx* ctx) {
         rlDrawRenderBatchActive();
         EndScissorMode();
         rlSetMatrixModelview(draw_matrix);  // in case the callback reset it
+        blend_for_canvas();                 // or changed the blend mode
         rlNormal3f(0, 0, 0);
         shader_mode(g, true);
         if (clipped) scissor(clip, ratio);
@@ -674,6 +705,8 @@ void rd_draw(rd_ctx* ctx) {
   }
   shader_mode(g, false);
   if (clipped) EndScissorMode();
+  rlDrawRenderBatchActive();
+  rlSetBlendMode(RL_BLEND_ALPHA);
   if (ratio != 1) {
     rlDrawRenderBatchActive();
     rlSetMatrixModelview(base);
@@ -702,6 +735,8 @@ static const struct {
     {KEY_PAGE_UP, RD_KEY_PAGE_UP},
     {KEY_PAGE_DOWN, RD_KEY_PAGE_DOWN},
     {KEY_SPACE, RD_KEY_SPACE},
+    {KEY_LEFT_BRACKET, RD_KEY_LEFT_BRACKET},
+    {KEY_RIGHT_BRACKET, RD_KEY_RIGHT_BRACKET},
 };
 
 static const char* clipboard_get(void* data) {
@@ -754,6 +789,25 @@ static void apply_cursor(rd_ctx* ctx) {
   ctx->applied_cursor = c;
 }
 
+#ifdef __EMSCRIPTEN__
+// Emscripten's GLFW reports every button past the middle one as the right button, so a mouse's side
+// buttons would read as right clicks. In the browser raydom tracks the right and side buttons itself,
+// from the canvas's events, as RD_BUTTON_SECONDARY, RD_BUTTON_BACK and RD_BUTTON_FORWARD.
+static uint8_t web_buttons(void) {
+  return (uint8_t)EM_ASM_INT({
+    let b = globalThis.__raydomButtons;
+    if (!b) {
+      b = globalThis.__raydomButtons = {held : 0};
+      const bits = ({2 : 2, 3 : 8, 4 : 16});  // parenthesized: a bare comma would split the macro
+      window.addEventListener('mousedown', (e) => { if (bits[e.button] && e.target === Module['canvas']) b.held |= bits[e.button]; }, true);
+      window.addEventListener('mouseup', (e) => { if (bits[e.button]) b.held &= ~bits[e.button]; }, true);
+      window.addEventListener('blur', () => { b.held = 0; });
+    }
+    return b.held;
+  });
+}
+#endif
+
 void rd_update(rd_ctx* ctx) {
   if (!ctx || !IsWindowReady()) return;
   rd_ctx_set_time(ctx, GetTime());
@@ -761,8 +815,15 @@ void rd_update(rd_ctx* ctx) {
   float   ratio = rd_pixel_ratio(ctx);
   Vector2 m = GetMousePosition(), w = GetMouseWheelMoveV();
   uint8_t buttons = (IsMouseButtonDown(MOUSE_BUTTON_LEFT) ? RD_BUTTON_PRIMARY : 0) |
+                    (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE) ? RD_BUTTON_MIDDLE : 0) |
+#ifdef __EMSCRIPTEN__
+                    web_buttons();
+#else
                     (IsMouseButtonDown(MOUSE_BUTTON_RIGHT) ? RD_BUTTON_SECONDARY : 0) |
-                    (IsMouseButtonDown(MOUSE_BUTTON_MIDDLE) ? RD_BUTTON_MIDDLE : 0);
+                    // GLFW's buttons 4 and 5, which raylib calls side and extra, are back and forward.
+                    (IsMouseButtonDown(MOUSE_BUTTON_SIDE) ? RD_BUTTON_BACK : 0) |
+                    (IsMouseButtonDown(MOUSE_BUTTON_EXTRA) ? RD_BUTTON_FORWARD : 0);
+#endif
   rd_ctx_pointer(ctx, m.x / ratio, m.y / ratio, buttons, w.x, w.y);
   rd_ctx_layout(ctx, (float)GetScreenWidth() / ratio, (float)GetScreenHeight() / ratio);
   apply_cursor(ctx);

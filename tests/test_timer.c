@@ -43,7 +43,9 @@ int main(void) {
   rd_ctx* ctx = rd_ctx_create();
   journal lg  = {0};
   tag     a = {&lg, 'a'}, b = {&lg, 'b'}, r = {&lg, 'r'}, x = {&lg, 'x'};
+  CHECK(rd_ctx_time(ctx) == 0 && rd_ctx_time(NULL) == 0);
   rd_ctx_set_time(ctx, 10);
+  CHECK(rd_ctx_time(ctx) == 10);
   CHECK(isinf(rd_ctx_timer_wait(ctx)));
 
   // One-shots fire once, in due order, and are destroyed after firing.

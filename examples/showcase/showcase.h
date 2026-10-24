@@ -18,3 +18,6 @@ rd::Node build_messages(rd::Context& ctx);
 
 // Network: a Paxos run in raydom::extras' network view.
 rd::Node build_network(rd::Context& ctx);
+
+// Router: an app on raydom::router, with a breadcrumb and a nested, kept-alive settings section.
+rd::Node build_routes(rd::Context& ctx);

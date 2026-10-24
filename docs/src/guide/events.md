@@ -55,7 +55,11 @@ Event fields: `x`, `y` in root coordinates; `local_x`, `local_y` relative to `cu
 `wheel_y` in notches; `button` (the button that changed) and `buttons` (held mask); `clicks` for `CLICK`; `key`, `mods`, `repeat`;
 `codepoint` for text; `related` for focus events.
 
-`CLICK` fires for the primary button only. `ev->clicks` counts rapid clicks on the same node: 1, then 2 for a double
+Buttons are `RD_BUTTON_PRIMARY`, `SECONDARY`, `MIDDLE`, and a mouse's side buttons `RD_BUTTON_BACK` and
+`RD_BUTTON_FORWARD`; [the router](../router/router.md) takes the side buttons for history. In the browser,
+Emscripten's GLFW reports every button past the middle one as the right button. So `rd_update` reads the right and
+side buttons from the canvas's own events there. `CLICK` fires for the
+primary button only. `ev->clicks` counts rapid clicks on the same node: 1, then 2 for a double
 click and 3 for a triple, when each follows the last within half a second and four pixels. Keyboard activation
 (Enter or Space) is always 1.
 

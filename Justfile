@@ -10,8 +10,15 @@ showcase: build
 test: build
     ctest --test-dir build --output-on-failure
 
+# The web build (emcmake on the PATH). Linking at -O1 without HTML minification works with an emsdk
+# whose npm packages aren't installed.
 build-web:
-    emcmake cmake -DPLATFORM=Web -S . -B build-web && cmake --build build-web
+    emcmake cmake -DPLATFORM=Web -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXE_LINKER_FLAGS="-O1 -sMINIFY_HTML=0" -S . -B build-web
+    cmake --build build-web --target showcase
+
+# Builds the showcase for the browser and serves it at http://127.0.0.1:8090. Needs Go.
+serve: build-web
+    cd serve && go run . -dir ../build-web/examples
 
 # Serves the book at http://localhost:3000 and opens it; rebuilds on save. Needs mdbook (brew install mdbook).
 docs:
@@ -27,7 +34,7 @@ docs-build:
 
 # clang-tidy from $CLANG_TIDY, the PATH, or Homebrew's LLVM.
 lint: build
-    "${CLANG_TIDY:-$(command -v clang-tidy || echo /opt/homebrew/opt/llvm/bin/clang-tidy)}" -p build src/*.c extras/src/*.c tests/*.c tests/*.cc
+    "${CLANG_TIDY:-$(command -v clang-tidy || echo /opt/homebrew/opt/llvm/bin/clang-tidy)}" -p build src/*.c extras/src/*.c router/src/*.c tests/*.c tests/*.cc
 
 # Fails when the README's install snippets don't match the version in CMakeLists.txt.
 check-version:

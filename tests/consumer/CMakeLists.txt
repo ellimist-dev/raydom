@@ -18,7 +18,7 @@ endif ()
 
 # C11 with -pedantic: the C headers mustn't need C23 or warn.
 add_executable(consumer_c main.c)
-target_link_libraries(consumer_c PRIVATE raydom::raydom)
+target_link_libraries(consumer_c PRIVATE raydom::router)
 set_target_properties(consumer_c PROPERTIES C_STANDARD 11 C_STANDARD_REQUIRED ON C_EXTENSIONS OFF)
 target_compile_options(consumer_c PRIVATE -Wall -Wextra -pedantic -Werror)
 

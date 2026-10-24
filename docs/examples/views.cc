@@ -1,4 +1,4 @@
-// Runs headless as a test for the "Tabs, splitters, lists, tables and trees" chapter.
+// Runs headless as a test for the "Tabs, splitters, lists, tables, trees and breadcrumbs" chapter.
 #include <raydom/extras/popups.hh>
 #include <raydom/extras/views.hh>
 #include <raydom/raydom.hh>
@@ -87,12 +87,17 @@ int main() {
   tree.on(RD_EVENT_CHANGE, [&] { /* rdx::tree_label(tree, rdx::tree_selected(tree)) */ });
   // ANCHOR_END: tree
 
-  ctx.root().append(tabs).append(split).append(tree);
+  // ANCHOR: breadcrumb
+  rdx::Breadcrumb crumbs = rdx::breadcrumb(ctx, {"Home", "Projects", "Loom"});
+  crumbs.on(RD_EVENT_CHANGE, [] { /* go to item rdx::Breadcrumb::clicked() */ });
+  // ANCHOR_END: breadcrumb
+
+  ctx.root().append(tabs).append(split).append(tree).append(crumbs);
   ctx.layout(1000, 1200);
   contacts.focus();
   ctx.press(RD_KEY_END);
   ctx.layout(1000, 1200);
-  assert(rdx::list_selected(contacts) == 49999 && rdx::selected_tab(tabs) == 0);
+  assert(rdx::list_selected(contacts) == 49999 && rdx::selected_tab(tabs) == 0 && crumbs.count() == 3);
 
   rd_rect r = rows.bounds();  // a double click on the third row
   float   y = r.y + 28 * 2 + 10;

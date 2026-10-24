@@ -20,6 +20,7 @@
 - [Time: timers, animation, hooks](architecture/time.md)
 - [The C++ layer](architecture/cpp.md)
 - [Extras](architecture/extras.md)
+- [Router](architecture/router.md)
 - [Documentation](architecture/docs.md)
 
 # Decisions

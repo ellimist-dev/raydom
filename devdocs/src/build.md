@@ -6,8 +6,9 @@
 | ----------------- | ----------------- | ------------------------------------------------------------- |
 | `raydom`          | `raydom::raydom`  | The core: `src/*.c` plus vendored stb and nanosvg, compiled in |
 | `raydom_extras`   | `raydom::extras`  | `extras/src/*.c`, the file dialog backend; links `raydom`     |
+| `raydom_router`   | `raydom::router`  | `router/src/router.c`; links `raydom`                         |
 
-Both are static libraries. `raydom` publicly requires `c_std_23` and `cxx_std_20`, links raylib publicly, and on
+All are static libraries. `raydom` publicly requires `c_std_23` and `cxx_std_20`, links raylib publicly, and on
 macOS the frameworks raylib needs. Warnings (`-Wall -Wextra`) are private; the sanitizer link flag is
 `BUILD_INTERFACE` only, for the tests and examples, and never part of the installed package.
 
@@ -41,14 +42,14 @@ where they came from.
 
 ## Options
 
-`RAYDOM_BUILD_EXTRAS`, `RAYDOM_FILE_DIALOG`, `RAYDOM_FETCH_RAYLIB`, `RAYDOM_INSTALL`, `RAYDOM_BUILD_TESTS`,
+`RAYDOM_BUILD_EXTRAS`, `RAYDOM_BUILD_ROUTER`, `RAYDOM_FILE_DIALOG`, `RAYDOM_FETCH_RAYLIB`, `RAYDOM_INSTALL`, `RAYDOM_BUILD_TESTS`,
 `RAYDOM_BUILD_EXAMPLES`, `RAYDOM_SANITIZE`. Tests, examples and install rules default to on only when raydom is the
 top-level project, so a project embedding it with FetchContent builds just the libraries.
 
 ## Installing
 
 `RAYDOM_INSTALL=ON` installs the libraries, headers (including the generated `version.h`) and a CMake package:
-`raydomConfig.cmake` calls `find_dependency(raylib)` and imports `raydom::raydom` and `raydom::extras`. The version
+`raydomConfig.cmake` calls `find_dependency(raylib)` and imports `raydom::raydom`, `raydom::extras` and `raydom::router`. The version
 file uses `SameMinorVersion` while the major version is 0 and `SameMajorVersion` after.
 
 Platform libraries the extras need (AppKit, UniformTypeIdentifiers, ole32, dbus-1) are attached as plain link

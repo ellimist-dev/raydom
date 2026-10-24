@@ -35,6 +35,7 @@ typedef struct rdx_classes {
   rd_class list, list_row;  // also the rows of tables and trees
   rd_class table, table_header, table_header_cell, table_cell;
   rd_class tree_toggle, tree_label;
+  rd_class breadcrumb, breadcrumb_item, breadcrumb_current, breadcrumb_separator;
 } rdx_classes;
 
 // Null if the classes can't be created.

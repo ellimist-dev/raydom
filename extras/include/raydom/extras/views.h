@@ -115,6 +115,16 @@ int         rdx_tree_parent(const rd_ctx* ctx, rd_node tree, int item);
 // rather than a visible row index that shifts as items expand and collapse.
 int         rdx_tree_item_of(const rd_ctx* ctx, rd_node tree, rd_node node);
 
+// Breadcrumbs: a row of items separated by chevrons, the last one the current page. A click on an
+// earlier item, or Enter on it, fires CHANGE on the breadcrumb; rdx_breadcrumb_clicked says which.
+// With raydom::router, set the labels from rdr_router_trail on the router's CHANGE, and navigate to
+// the clicked crumb's path.
+rd_node rdx_breadcrumb_create(rd_ctx* ctx);
+// Replaces the items with copies of labels. False on allocation failure, leaving the items partial.
+bool    rdx_breadcrumb_set(rd_ctx* ctx, rd_node breadcrumb, const char* const* labels, size_t count);
+size_t  rdx_breadcrumb_count(const rd_ctx* ctx, rd_node breadcrumb);
+int     rdx_breadcrumb_clicked(const rd_ctx* ctx, rd_node breadcrumb);  // the last item clicked, or -1
+
 #ifdef __cplusplus
 }
 #endif

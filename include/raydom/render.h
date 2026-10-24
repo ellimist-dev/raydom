@@ -28,8 +28,9 @@ typedef struct rd_paint_info {
 
 // Custom drawing with raylib, for canvases. Called from rd_draw after the node's background and
 // before its children, with raylib's batch flushed and no scissor or shader active, and the
-// transform scaled by the pixel ratio so that drawing is in logical coordinates. Restore any raylib
-// state you change. Render-texture passes are safe; with a pixel ratio, size and draw into the
+// transform scaled by the pixel ratio so that drawing is in logical coordinates. Blending is raydom's:
+// colors blend as usual and alpha accumulates toward opaque, so translucent drawing doesn't make a web
+// canvas see-through; raydom restores it after the callback. Restore any other raylib state you change. Render-texture passes are safe; with a pixel ratio, size and draw into the
 // texture in device pixels (dpi), and call rd_paint_restore after EndTextureMode.
 typedef void (*rd_paint_fn)(rd_ctx* ctx, const rd_paint_info* info, void* data);
 
@@ -40,6 +41,13 @@ void rd_paint_scissor(const rd_paint_info* info);
 // Restores the transform the callback started with, after raylib calls that reset it: EndTextureMode,
 // EndMode2D, EndMode3D. Nothing to do with a pixel ratio of 1.
 void rd_paint_restore(const rd_paint_info* info);
+// Draws a line of text from a paint callback, with raydom's fonts: rasterized for the display's
+// density, like the rest of the UI. x is the left edge and baseline the baseline, in logical
+// coordinates; rd_font_measure and rd_font_get_metrics give the width and the ascent for placing it.
+// A null font ({0}) is the default font; len may be RD_TEXT_NUL. No wrapping. Draws on top of what
+// the callback drew before it.
+void rd_paint_text(rd_ctx* ctx, const rd_paint_info* info, rd_font font, float size, float x, float baseline,
+                   const char* utf8, size_t len, rd_color color);
 
 // raylib integration. rd_update reads raylib's mouse state and lays the tree out at the screen
 // size; rd_draw draws it between BeginDrawing and EndDrawing. Both do nothing without a raylib window

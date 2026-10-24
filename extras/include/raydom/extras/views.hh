@@ -156,6 +156,27 @@ inline Table table(const rd::Context& ctx, const std::vector<Column>& columns, i
 }
 inline rd::Node table_list(rd::Node table) { return {table.ctx(), rdx_table_list(table.ctx(), table.handle())}; }
 
+class Breadcrumb : public rd::Node {
+public:
+  using rd::Node::Node;
+  Breadcrumb() = default;
+  explicit Breadcrumb(rd::Node n) : rd::Node(n) {}
+  bool set(const std::vector<std::string>& labels) const {
+    std::vector<const char*> p;
+    p.reserve(labels.size());
+    for (const std::string& l : labels) p.push_back(l.c_str());
+    return rdx_breadcrumb_set(ctx(), handle(), p.data(), p.size());
+  }
+  size_t count() const { return rdx_breadcrumb_count(ctx(), handle()); }
+  int    clicked() const { return rdx_breadcrumb_clicked(ctx(), handle()); }
+};
+
+inline Breadcrumb breadcrumb(const rd::Context& ctx, const std::vector<std::string>& labels = {}) {
+  Breadcrumb b{ctx.get(), rdx_breadcrumb_create(ctx.get())};
+  if (b && !labels.empty()) b.set(labels);
+  return b;
+}
+
 inline Tree tree(const rd::Context& ctx, float row_height = 0) { return {ctx.get(), rdx_tree_create(ctx.get(), row_height)}; }
 inline int  tree_add(rd::Node tree, int parent, const std::string& label) {
   return rdx_tree_add(tree.ctx(), tree.handle(), parent, label.c_str());

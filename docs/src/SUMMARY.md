@@ -30,9 +30,13 @@
 
 - [Controls and toasts](extras/controls.md)
 - [Menus, selects, modals and tooltips](extras/popups.md)
-- [Tabs, splitters, lists, tables and trees](extras/views.md)
+- [Tabs, splitters, lists, tables, trees and breadcrumbs](extras/views.md)
 - [Network view](extras/graph.md)
 - [File dialogs](extras/dialog.md)
+
+# Router
+
+- [Router](router/router.md)
 
 # Reference
 

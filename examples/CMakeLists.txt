@@ -20,12 +20,20 @@ if (NOT RAYDOM_HAVE_EMBED)
     return()
 endif ()
 
-add_executable(showcase showcase/main.cc showcase/tour.cc showcase/messages.cc showcase/network.cc)
-target_link_libraries(showcase raydom_extras)
+if (NOT TARGET raydom_router)
+    message(STATUS "raydom: showcase needs raydom::router; skipping")
+    return()
+endif ()
+
+add_executable(showcase showcase/main.cc showcase/tour.cc showcase/messages.cc showcase/network.cc showcase/routes.cc)
+target_link_libraries(showcase raydom_extras raydom_router)
 target_compile_options(showcase PRIVATE --embed-dir=${SHOWCASE_FONT_DIR} $<$<CXX_COMPILER_ID:Clang,AppleClang>:-Wno-c23-extensions>)
 set_source_files_properties(showcase/main.cc PROPERTIES OBJECT_DEPENDS "${SHOWCASE_FONT_DIR}/anonymous_pro_bold.ttf")
 
 if (EMSCRIPTEN)
-    target_link_options(showcase PRIVATE -sUSE_GLFW=3 -sASYNCIFY -sALLOW_MEMORY_GROWTH=1 -sSINGLE_FILE=1)
-    set_target_properties(showcase PROPERTIES SUFFIX ".html")
+    # The browser drives the frames (emscripten_set_main_loop), so no Asyncify. One self-contained page,
+    # from web/shell.html: full window, sized in device pixels. just serve builds and serves it.
+    set(shell ${CMAKE_CURRENT_SOURCE_DIR}/showcase/web/shell.html)
+    target_link_options(showcase PRIVATE -sUSE_GLFW=3 -sALLOW_MEMORY_GROWTH=1 -sSINGLE_FILE=1 --shell-file ${shell})
+    set_target_properties(showcase PROPERTIES SUFFIX ".html" LINK_DEPENDS ${shell})
 endif ()

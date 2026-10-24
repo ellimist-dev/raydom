@@ -625,6 +625,7 @@ public:
   float   measure_text(std::string_view s, float size, rd_font f = {0, true}) const {
     return rd_font_measure(ctx_, f, size, s.data(), s.size());
   }
+  rd_font_metrics font_metrics(float size, rd_font f = {0, true}) const { return rd_font_get_metrics(ctx_, f, size); }
 
   // Null class on allocation failure.
   Class create_class(const Style& base = {}) const { return {ctx_, rd_class_create(ctx_, &base.get())}; }
@@ -654,6 +655,12 @@ public:
   bool clear_timer(rd_timer t) const { return rd_ctx_clear_timer(ctx_, t); }
   // The clock timers run on; rd_update sets it from raylib.
   void set_time(double seconds) const { rd_ctx_set_time(ctx_, seconds); }
+  double time() const { return rd_ctx_time(ctx_); }
+  // Text from a paint callback; see rd_paint_text.
+  void paint_text(const rd_paint_info& info, std::string_view s, float x, float baseline, float size, rd_color color,
+                  rd_font font = {}) const {
+    rd_paint_text(ctx_, &info, font, size, x, baseline, s.data(), s.size(), color);
+  }
 
   Node      hovered() const { return {ctx_, rd_ctx_hovered(ctx_)}; }
   rd_cursor cursor() const { return rd_ctx_cursor(ctx_); }

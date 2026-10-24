@@ -9,7 +9,8 @@
 | `rd__`      | Internal to the core, shared between core files (`src/*_internal.h`)    |
 | `rdx_`, `RDX_` | Public extras API                                                    |
 | `rdx__`     | Internal to extras (`extras/src/extras_internal.h`)                     |
-| `rd::`, `rdx::` | C++ layers                                                          |
+| `rdr_`, `RDR_` | Public router API                                                    |
+| `rd::`, `rdx::`, `rdr::` | C++ layers                                                          |
 
 Everything else in a `.c` file is `static`. Internal headers are not installed.
 
@@ -30,6 +31,11 @@ Names are snake_case in C and C++. Types are lowercase (`rd_node`, `rd_style`). 
   section an algorithm follows. Don't narrate code.
 - Public headers document each function in one or two lines above it: what it does, what it returns on failure,
   who owns what.
+- Keep stack frames small. Emscripten's default stack is 64 KB, and an overflow there corrupts memory silently
+  rather than crashing where it happens. Each `rd_style` is about 500 bytes, and every compound literal takes its
+  own slot, so a function building many styles adds up: extras' theme definitions are split into non-inlined
+  parts for this. Check with `emcc -O3 -Wframe-larger-than=16384`. The vendored `stbi__load_main` takes 38 KB,
+  which is acceptable only because image loading runs from shallow call stacks.
 
 ## Errors
 

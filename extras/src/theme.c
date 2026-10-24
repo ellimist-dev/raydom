@@ -70,13 +70,16 @@ static rd_style quick(rd_style s) {
 
 static void state(rd_ctx* ctx, rd_class c, rd_state st, rd_style s) { rd_class_set_state(ctx, c, st, &s); }
 
-// Every class, from the palette. Runs again when the palette changes, updating the classes in place.
-static void define(rd_ctx* ctx, rdx__theme* t) {
-  rdx_classes*       c    = &t->classes;
-  const rdx_palette* p    = &t->palette;
-  rd_shadow          ring = rd_shadow_of(0, 0, 0, alpha(p->accent, 200));
-  ring.spread             = rd_px(2);
+// define() is split in parts that aren't inlined into each other: every rd_style literal takes its own
+// stack slot, and all of them in one frame (75 KB) overflow Emscripten's default 64 KB stack.
+#if defined(_MSC_VER)
+#define NOINLINE __declspec(noinline)
+#else
+#define NOINLINE __attribute__((noinline))
+#endif
 
+// Checkboxes, switches, radio buttons and sliders.
+static NOINLINE void define_controls(rd_ctx* ctx, rdx_classes* c, const rdx_palette* p, rd_shadow ring) {
   cls(ctx, &c->label, (rd_style){.user_select = RD_USER_SELECT_NONE});
 
   // A row: the control and its label. Focus shows a ring around the row; disabled dims it.
@@ -176,7 +179,10 @@ static void define(rd_ctx* ctx, rdx__theme* t) {
   glow.spread    = rd_px(5);
   state(ctx, c->slider_thumb, RD_STATE_HOVER, (rd_style){.box_shadow = glow});
   state(ctx, c->slider_thumb, RD_STATE_ACTIVE, (rd_style){.background = p->accent_hover, .box_shadow = glow});
+}
 
+// Toasts.
+static NOINLINE void define_toasts(rd_ctx* ctx, rdx_classes* c, const rdx_palette* p, rd_shadow ring) {
   cls(ctx, &c->toast_stack, (rd_style){.position = RD_POSITION_ABSOLUTE, .row_gap = rd_px(8),
                                        .pointer_events = RD_POINTER_EVENTS_NONE});
   cls(ctx, &c->toast, (rd_style){.flex_direction = RD_FLEX_ROW,
@@ -207,7 +213,10 @@ static void define(rd_ctx* ctx, rdx__theme* t) {
   cls(ctx, &c->toast_success, (rd_style){.background = p->success});
   cls(ctx, &c->toast_warning, (rd_style){.background = p->warning});
   cls(ctx, &c->toast_error, (rd_style){.background = p->error});
+}
 
+// Menus, selects, numeric inputs, modals and tooltips.
+static NOINLINE void define_popups(rd_ctx* ctx, rdx_classes* c, const rdx_palette* p, rd_shadow ring) {
   // Menus, and the lists of selects.
   cls(ctx, &c->menu, (rd_style){.position      = RD_POSITION_ABSOLUTE,
                                 .min_width     = rd_px(180),
@@ -323,7 +332,10 @@ static void define(rd_ctx* ctx, rdx__theme* t) {
                                    .color          = p->text,
                                    .font_size      = rd_px(12),
                                    .pointer_events = RD_POINTER_EVENTS_NONE});
+}
 
+// Tabs, splitters, lists, tables, trees and breadcrumbs.
+static NOINLINE void define_views(rd_ctx* ctx, rdx_classes* c, const rdx_palette* p, rd_shadow ring) {
   // Tabs: the selected tab is checked, and its underline slides in color.
   cls(ctx, &c->tabs, (rd_style){.row_gap = rd_px(0)});
   cls(ctx, &c->tab_bar, (rd_style){.flex_direction = RD_FLEX_ROW,
@@ -381,6 +393,29 @@ static void define(rd_ctx* ctx, rdx__theme* t) {
                                        .color = p->muted, .cursor = RD_CURSOR_POINTER});
   cls(ctx, &c->tree_label, (rd_style){.white_space = RD_WHITE_SPACE_NOWRAP, .text_overflow = RD_TEXT_OVERFLOW_ELLIPSIS,
                                        .flex_shrink = rd_num(1), .margin = {.left = rd_px(4)}});
+
+  cls(ctx, &c->breadcrumb, (rd_style){.flex_direction = RD_FLEX_ROW, .align_items = RD_ALIGN_CENTER, .column_gap = rd_px(4),
+                                      .flex_wrap = RD_FLEX_WRAP});
+  cls(ctx, &c->breadcrumb_item, quick((rd_style){.color = p->muted, .padding = rd_edges_vh(rd_px(2), rd_px(4)),
+                                                 .border_radius = rd_corners_all(rd_px(4)), .white_space = RD_WHITE_SPACE_NOWRAP,
+                                                 .user_select = RD_USER_SELECT_NONE}));
+  state(ctx, c->breadcrumb_item, RD_STATE_HOVER, (rd_style){.color = p->text, .background = p->row_hover});
+  state(ctx, c->breadcrumb_item, RD_STATE_FOCUS_VISIBLE, (rd_style){.box_shadow = ring});
+  cls(ctx, &c->breadcrumb_current, (rd_style){.color = p->text, .padding = rd_edges_vh(rd_px(2), rd_px(4)),
+                                              .white_space = RD_WHITE_SPACE_NOWRAP});
+  cls(ctx, &c->breadcrumb_separator, (rd_style){.width = rd_px(12), .height = rd_px(12), .flex_shrink = rd_num(0), .color = p->muted});
+}
+
+// Every class, from the palette. Runs again when the palette changes, updating the classes in place.
+static void define(rd_ctx* ctx, rdx__theme* t) {
+  rdx_classes*       c    = &t->classes;
+  const rdx_palette* p    = &t->palette;
+  rd_shadow          ring = rd_shadow_of(0, 0, 0, alpha(p->accent, 200));
+  ring.spread             = rd_px(2);
+  define_controls(ctx, c, p, ring);
+  define_toasts(ctx, c, p, ring);
+  define_popups(ctx, c, p, ring);
+  define_views(ctx, c, p, ring);
 
   if (t->images_loaded) return;
   t->images_loaded = true;

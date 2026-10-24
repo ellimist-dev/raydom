@@ -474,6 +474,8 @@ void rd_ctx_set_time(rd_ctx* ctx, double seconds) {
   rd__timers_run(ctx);
 }
 
+double rd_ctx_time(const rd_ctx* ctx) { return ctx ? ctx->now : 0; }
+
 static rd_node pointer_target(rd_ctx* ctx, rd_node hit) {
   return rd__slot(ctx, ctx->capture) ? ctx->capture : hit;
 }
@@ -565,7 +567,7 @@ void rd_ctx_pointer(rd_ctx* ctx, float x, float y, uint8_t buttons, float wheel_
       rd__selection_drag(ctx, rd__slot(ctx, hit) ? hit.index : 0, x, y);  // 0 if a listener destroyed it
   }
 
-  for (uint8_t b = 1; b && b <= RD_BUTTON_MIDDLE; b = (uint8_t)(b << 1)) {
+  for (uint8_t b = 1; b && b <= RD_BUTTON_FORWARD; b = (uint8_t)(b << 1)) {
     bool was = ctx->pointer_buttons & b, is = buttons & b;
     if (was == is) continue;
     rd_node t = pointer_target(ctx, hit);

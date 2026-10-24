@@ -457,6 +457,7 @@ static void paint(rd_ctx* ctx, const rd_paint_info* info, void* data) {
   draw_nodes(g);
   EndMode3D();
   EndTextureMode();
+  rd_paint_restore(info);  // EndTextureMode reset the transform, which carries the pixel ratio
 
   rd_paint_scissor(info);
   DrawTexturePro(g->target.texture, (Rectangle){0, 0, (float)w, (float)-h}, (Rectangle){c.x, c.y, c.width, c.height},

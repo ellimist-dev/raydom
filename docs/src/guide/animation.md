@@ -68,9 +68,13 @@ C++: `node.animate(to, 0.2)`, `node.animate(from, to, 0.2)`, and `node.animate(t
 ## Clock and frames
 
 Animations advance in `rd_ctx_layout`, on the context's clock (`rd_ctx_set_time`, which `rd_update` sets from
-raylib). `rd_ctx_animating` is true while anything moves. With
+raylib); `rd_ctx_time` reads it. `rd_ctx_animating` is true while anything moves. With
 [`rd_set_event_waiting`](../getting-started/frame-loop.md#event-waiting), frames keep running while anything
 animates and wait for input once everything is still.
+
+For motion you compute yourself, such as a canvas drawing an algorithm's state, run a repeating timer while it
+moves and advance by the difference in `rd_ctx_time` between calls. The timer keeps frames coming, and the motion
+stays on the same clock as everything else, so a test can drive it with `rd_ctx_set_time`.
 
 Animating layout costs one layout pass per frame for the animating parts of the tree, which is the same cost as
 resizing the window.

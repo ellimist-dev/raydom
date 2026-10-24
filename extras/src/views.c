@@ -374,3 +374,72 @@ bool rdx_split_set_direction(rd_ctx* ctx, rd_node root, bool vertical, bool reve
   orient(ctx, s);
   return true;
 }
+
+// Breadcrumbs. The children alternate: item, separator, item, ..., the current item last.
+
+typedef struct crumbs {
+  int clicked;
+} crumbs;
+
+static const char crumbs_key = 0;
+
+static crumbs* crumbs_find(const rd_ctx* ctx, rd_node root) { return rd_node_attached(ctx, root, &crumbs_key); }
+
+static void crumb_click(rd_ctx* ctx, rd_event* ev, void* data) {
+  (void)data;
+  rd_node root = rd_node_parent(ctx, ev->current);
+  crumbs* c    = crumbs_find(ctx, root);
+  int     k    = index_in(ctx, root, ev->current);
+  if (!c || k < 0) return;
+  c->clicked = k / 2;
+  rd_node_dispatch(ctx, root, RD_EVENT_CHANGE);
+}
+
+rd_node rdx_breadcrumb_create(rd_ctx* ctx) {
+  const rdx_classes* cl = rdx_theme(ctx);
+  crumbs*            c  = cl ? calloc(1, sizeof *c) : NULL;
+  if (!c) return (rd_node){0};
+  c->clicked   = -1;
+  rd_node root = rd_node_create(ctx);
+  if (!rd_node_attach(ctx, root, &crumbs_key, c, free)) {
+    free(c);
+    rd_node_destroy(ctx, root);
+    return (rd_node){0};
+  }
+  rd_node_add_class(ctx, root, cl->breadcrumb);
+  rd_node_set_role(ctx, root, RD_ROLE_LIST);
+  return root;
+}
+
+bool rdx_breadcrumb_set(rd_ctx* ctx, rd_node root, const char* const* labels, size_t count) {
+  const rdx_classes* cl = rdx_theme(ctx);
+  rdx__theme*        th = rdx__theme_get(ctx);
+  if (!crumbs_find(ctx, root) || !cl || !th || (count && !labels)) return false;
+  for (rd_node n = rd_node_first_child(ctx, root); !rd_node_is_null(n); n = rd_node_first_child(ctx, root)) rd_node_destroy(ctx, n);
+  for (size_t k = 0; k < count; k++) {
+    bool    last = k + 1 == count;
+    rd_node item = rd_node_create_text(ctx, labels[k] ? labels[k] : "", RD_TEXT_NUL);
+    if (rd_node_is_null(item)) return false;
+    rd_node_add_class(ctx, item, last ? cl->breadcrumb_current : cl->breadcrumb_item);
+    rd_node_append(ctx, root, item);
+    if (last) break;
+    if (!rd_node_set_role(ctx, item, RD_ROLE_LINK) || !rd_node_on(ctx, item, RD_EVENT_CLICK, crumb_click, NULL, NULL, 0).id)
+      return false;
+    rd_node sep = rd_node_create(ctx);
+    if (rd_node_is_null(sep)) return false;
+    rd_node_add_class(ctx, sep, cl->breadcrumb_separator);
+    rd_node_set_image(ctx, sep, th->chevron_right);
+    rd_node_append(ctx, root, sep);
+  }
+  return true;
+}
+
+size_t rdx_breadcrumb_count(const rd_ctx* ctx, rd_node root) {
+  if (!crumbs_find(ctx, root)) return 0;
+  return (rd_node_child_count(ctx, root) + 1) / 2;
+}
+
+int rdx_breadcrumb_clicked(const rd_ctx* ctx, rd_node root) {
+  crumbs* c = crumbs_find(ctx, root);
+  return c ? c->clicked : -1;
+}
