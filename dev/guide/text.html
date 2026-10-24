@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-46055788.js";
+            window.path_to_searchindex_js = "../searchindex-bd641951.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-c393df87.js"></script>
+        <script src="../toc-1e1dc0b8.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -190,7 +190,8 @@ rd_node_append(ctx, root, code);
 </code></pre>
 <p><code>rd_font_load</code> takes TrueType or OpenType data in memory. With <code>copy = false</code> the data must outlive the context;
 with <code>true</code> raydom copies it. <code>rd_font_load_file</code> reads and copies a file. Both return a null handle (<code>id == 0</code>) on
-failure. The first font loaded becomes the default; <code>rd_ctx_set_default_font</code> changes it. In a style,
+failure. The first font loaded becomes the default; <code>rd_ctx_set_default_font</code> changes it. Either way, text already
+in the tree is measured again with the new default at the next layout. In a style,
 <code>(rd_font){0, true}</code> means “the default font”.</p>
 <p><code>font</code> and <code>font_size</code> are inherited, so setting them on a container applies them to all the text inside it.
 Glyphs are rasterized on demand into an atlas per font size and display scale.</p>

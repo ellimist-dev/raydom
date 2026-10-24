@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-46055788.js";
+            window.path_to_searchindex_js = "../searchindex-bd641951.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-c393df87.js"></script>
+        <script src="../toc-1e1dc0b8.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -238,20 +238,28 @@ toast = rd_node_create(ctx);
 rd_node_append(ctx, rd_ctx_root(ctx), toast);
 // In: from transparent and 24px lower, to its place.
 rd_node_animate(ctx, toast, &amp;(rd_style){.opacity = rd_num(0), .margin.top = rd_px(24)},
-                &amp;(rd_style){.opacity = rd_num(1), .margin.top = rd_px(0)}, 0.2, RD_EASING_EASE_OUT, NULL, NULL);
-// ... later, out: fade, then remove it when the animation ends.
-rd_node_animate(ctx, toast, NULL, &amp;(rd_style){.opacity = rd_num(0)}, 0.15, RD_EASING_EASE_IN, remove_node, &amp;toast);
+                &amp;(rd_style){.opacity = rd_num(1), .margin.top = rd_px(0)}, 0.2, RD_EASING_EASE_OUT);
+// ... later, out: fade, then remove it when the animation ends, with a timer for the same time.
+rd_node_animate(ctx, toast, NULL, &amp;(rd_style){.opacity = rd_num(0)}, 0.15, RD_EASING_EASE_IN);
+rd_node* doomed = malloc(sizeof *doomed);
+*doomed         = toast;
+rd_ctx_set_timer(ctx, 0.15, 0, remove_node, doomed, free);  // freed when it fires, or if cleared
 </code></pre>
 <p><code>rd_node_animate</code> merges <code>to</code> into the node’s inline style and animates the properties it sets, from what the node
 shows, over the given seconds and easing, whatever the node’s transition properties say. <code>from</code> sets starting values
-for some properties, which is how a node that was just created animates in. <code>done</code> runs once the time is up; it’s a
-<a href="../getting-started/frame-loop.html#timers">timer</a>, so it may destroy the node.</p>
-<p>C++: <code>node.animate(to, 0.2)</code>, <code>node.animate(from, to, 0.2)</code>, and <code>node.animate(to, 0.15, RD_EASING_EASE_IN, [&amp;] { ... })</code>.</p>
+for some properties, which is how a node that was just created animates in. Several calls before the next frame add
+up, each property keeping its own duration and easing. To act when the animation ends, for example to destroy a node
+it faded out, set a <a href="../getting-started/frame-loop.html#timers">timer</a> for the same seconds: it runs on the same
+clock, can be cleared if the node is shown again, and frees its data with its destroy function.</p>
+<p>C++: <code>node.animate(to, 0.2)</code> and <code>node.animate(from, to, 0.2)</code> return false if nothing could start; for the end, <code>ctx.set_timeout(0.2, [=] { ... })</code> returns the <code>rd_timer</code> to clear.</p>
 <h2 id="clock-and-frames"><a class="header" href="#clock-and-frames">Clock and frames</a></h2>
 <p>Animations advance in <code>rd_ctx_layout</code>, on the context’s clock (<code>rd_ctx_set_time</code>, which <code>rd_update</code> sets from
-raylib). <code>rd_ctx_animating</code> is true while anything moves. With
+raylib); <code>rd_ctx_time</code> reads it. <code>rd_ctx_animating</code> is true while anything moves. With
 <a href="../getting-started/frame-loop.html#event-waiting"><code>rd_set_event_waiting</code></a>, frames keep running while anything
 animates and wait for input once everything is still.</p>
+<p>For motion you compute yourself, such as a canvas drawing an algorithm’s state, run a repeating timer while it
+moves and advance by the difference in <code>rd_ctx_time</code> between calls. The timer keeps frames coming, and the motion
+stays on the same clock as everything else, so a test can drive it with <code>rd_ctx_set_time</code>.</p>
 <p>Animating layout costs one layout pass per frame for the animating parts of the tree, which is the same cost as
 resizing the window.</p>
 

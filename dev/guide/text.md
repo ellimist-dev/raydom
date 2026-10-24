@@ -14,7 +14,8 @@ rd_node_append(ctx, root, code);
 
 `rd_font_load` takes TrueType or OpenType data in memory. With `copy = false` the data must outlive the context;
 with `true` raydom copies it. `rd_font_load_file` reads and copies a file. Both return a null handle (`id == 0`) on
-failure. The first font loaded becomes the default; `rd_ctx_set_default_font` changes it. In a style,
+failure. The first font loaded becomes the default; `rd_ctx_set_default_font` changes it. Either way, text already
+in the tree is measured again with the new default at the next layout. In a style,
 `(rd_font){0, true}` means "the default font".
 
 `font` and `font_size` are inherited, so setting them on a container applies them to all the text inside it.

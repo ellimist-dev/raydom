@@ -1,4 +1,4 @@
-# Tabs, splitters, lists, tables and trees
+# Tabs, splitters, lists, tables, trees and breadcrumbs
 
 ```cpp
 #include <raydom/extras/views.hh>  // C: views.h
@@ -134,7 +134,21 @@ tree.on(RD_EVENT_CHANGE, [&] { /* rdx::tree_label(tree, rdx::tree_selected(tree)
 Items are added under a parent (-1 for the top level) and get an id. The tree shows the expanded items as an
 indented, virtualized list with disclosure chevrons. Right expands an item, or moves to its first child; Left
 collapses it, or moves to its parent; Enter toggles. Selecting a hidden item with `rdx_tree_select` expands its
-ancestors, and collapsing an ancestor of the selection moves the selection to the ancestor.
+ancestors, and collapsing an ancestor of the selection moves the selection to the ancestor. Adding and expanding
+items doesn't rebuild the rows; the tree does that once, at the next layout or the next call that needs them, so
+building a tree of any size is linear in its items.
+
+## Breadcrumb
+
+```cpp
+rdx::Breadcrumb crumbs = rdx::breadcrumb(ctx, {"Home", "Projects", "Loom"});
+crumbs.on(RD_EVENT_CHANGE, [] { /* go to item rdx::Breadcrumb::clicked() */ });
+```
+
+A row of items separated by chevrons, the last one the current page. A click on an earlier item, or Enter on it,
+fires `CHANGE`, and `rdx_breadcrumb_clicked` says which item. Earlier items are links; the current one isn't
+interactive. `rdx_breadcrumb_set` replaces every item. With the [router](../router/router.md#breadcrumbs), fill it
+from the router's trail.
 
 ## Restyling
 
@@ -145,5 +159,6 @@ ancestors, and collapsing an ancestor of the selection moves the selection to th
 | `list`, `list_row`                                         | Lists, and the rows of tables and trees   |
 | `table`, `table_header`, `table_header_cell`, `table_cell` | Tables                                    |
 | `tree_toggle`, `tree_label`                                | Tree rows                                 |
+| `breadcrumb`, `breadcrumb_item`, `breadcrumb_current`, `breadcrumb_separator` | Breadcrumbs  |
 
 Rows, cells and items leave node userdata to the application.

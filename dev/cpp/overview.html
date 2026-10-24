@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-46055788.js";
+            window.path_to_searchindex_js = "../searchindex-bd641951.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-c393df87.js"></script>
+        <script src="../toc-1e1dc0b8.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -228,6 +228,27 @@ callable is moved into a heap allocation owned by raydom and deleted when the li
 destroyed. Captured references must outlive the node, or the listener must be removed first. Callbacks run from C,
 so they are <code>noexcept</code>: an exception escaping one terminates the program rather than unwinding through C frames.</p>
 <p><code>node.emplace_userdata&lt;T&gt;(args...)</code> constructs a <code>T</code> owned by the node; <code>node.userdata&lt;T&gt;()</code> returns it.</p>
+<p><code>node.clear_paint()</code> and <code>node.clear_measure()</code> remove a callable. <code>ctx.on_layout(f)</code> runs <code>f()</code> after every
+layout for the context’s lifetime; <code>node.on_layout(f)</code> for the node’s. <code>node.animate(to, seconds, easing, done)</code>
+returns false, without scheduling <code>done</code>, when the animation can’t start.</p>
+<h2 id="context"><a class="header" href="#context">Context</a></h2>
+<p>Besides creating nodes, the context wraps the rest of the C API that takes an <code>rd_ctx</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>C++</th><th>C</th></tr>
+</thead>
+<tbody>
+<tr><td><code>ctx.select(anchor, offset, focus, offset)</code></td><td><code>rd_ctx_select</code></td></tr>
+<tr><td><code>ctx.clear_selection()</code></td><td><code>rd_ctx_clear_selection</code></td></tr>
+<tr><td><code>ctx.selection()</code>: a <code>std::optional&lt;Context::Selection&gt;</code></td><td><code>rd_ctx_selection</code></td></tr>
+<tr><td><code>ctx.selection_text()</code>: a <code>std::string</code></td><td><code>rd_ctx_selection_text</code></td></tr>
+<tr><td><code>ctx.set_focus_scope(node)</code>, <code>ctx.focus_scope()</code></td><td><code>rd_ctx_set_focus_scope</code>, <code>rd_ctx_focus_scope</code></td></tr>
+<tr><td><code>ctx.set_event_waiting(on)</code></td><td><code>rd_set_event_waiting</code></td></tr>
+<tr><td><code>ctx.paint_text(info, size, x, baseline, text, color, font)</code></td><td><code>rd_paint_text</code>, font last and optional</td></tr>
+</tbody>
+</table>
+</div>
 <h2 id="the-quickstart-annotated"><a class="header" href="#the-quickstart-annotated">The quickstart, annotated</a></h2>
 <pre><code class="language-cpp">#include &lt;raydom/raydom.hh&gt;
 #include &lt;raylib.h&gt;

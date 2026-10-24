@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-bd9e8e22.js";
+            window.path_to_searchindex_js = "searchindex-23463021.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-0c2227d3.js"></script>
+        <script src="toc-a1b31a27.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -192,9 +192,11 @@ text shaping and wrapping, event dispatch, animation, and a renderer on raylib. 
 styles, and lambda callbacks. No exceptions.</li>
 <li><strong>Extras</strong> (<code>extras/</code>): components built only on the public core API (controls, popups, views, toasts, a network
 view, native file dialogs), in a second library, <code>raydom::extras</code>.</li>
+<li><strong>Router</strong> (<code>router/</code>): path routing, history, nested routers and page transitions, in a third library,
+<code>raydom::router</code>, also built only on the public core API. It doesn’t depend on extras.</li>
 <li><strong>Docs</strong> (<code>docs/</code>): the user book, whose code samples are programs compiled and run by the test suite.</li>
-<li><strong>The showcase</strong> (<code>examples/showcase/</code>): one application with a feature tour, a desktop messaging app and a
-Paxos simulation, used as the integration test you look at.</li>
+<li><strong>The showcase</strong> (<code>examples/showcase/</code>): one application with a feature tour, a desktop messaging app, a
+Paxos simulation and a routed app, used as the integration test you look at.</li>
 </ul>
 <h2 id="map-of-the-repository"><a class="header" href="#map-of-the-repository">Map of the repository</a></h2>
 <div class="table-wrapper">
@@ -207,6 +209,7 @@ Paxos simulation, used as the integration test you look at.</li>
 <tr><td><code>src/</code></td><td>The core; <code>*_internal.h</code> are private headers</td></tr>
 <tr><td><code>src/external/</code></td><td>Vendored stb_truetype, stb_image, nanosvg</td></tr>
 <tr><td><code>extras/</code></td><td><code>raydom::extras</code>: headers, sources, vendored nativefiledialog</td></tr>
+<tr><td><code>router/</code></td><td><code>raydom::router</code>: headers and source</td></tr>
 <tr><td><code>tests/</code></td><td>One test program per subsystem, and <code>consumer/</code> for packaging</td></tr>
 <tr><td><code>docs/</code></td><td>The user book, its example programs and its tools</td></tr>
 <tr><td><code>devdocs/</code></td><td>This book</td></tr>

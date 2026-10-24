@@ -37,10 +37,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-46055788.js";
+            window.path_to_searchindex_js = "searchindex-bd641951.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-c393df87.js"></script>
+        <script src="toc-1e1dc0b8.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -216,13 +216,13 @@ Clang, which take their fixed-type enums as an extension; or C++20 for the C++ l
 <pre><code class="language-cmake">include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.5)
+    GIT_TAG        v0.3.0)
 FetchContent_MakeAvailable(raydom)
 
 target_link_libraries(your_app PRIVATE raydom::raydom)
 </code></pre>
 <p>Link <code>raydom::extras</code> instead to get the <a href="#network-view">network view</a> and <a href="#file-dialogs">file dialogs</a>;
-it links <code>raydom::raydom</code> for you.</p>
+it links <code>raydom::raydom</code> for you. Link <code>raydom::router</code> for <a href="#router">the router</a>.</p>
 <p>raylib is resolved in this order: an existing <code>raylib</code> target in the project, an installed raylib found with
 <code>find_package</code>, then a download. Set <code>RAYDOM_FETCH_RAYLIB=OFF</code> to require one of the first two.</p>
 <h2 id="installed-package"><a class="header" href="#installed-package">Installed package</a></h2>
@@ -230,7 +230,7 @@ it links <code>raydom::raydom</code> for you.</p>
 cmake --build build
 cmake --install build --prefix /your/prefix
 </code></pre>
-<pre><code class="language-cmake">find_package(raydom 0.2 CONFIG REQUIRED)
+<pre><code class="language-cmake">find_package(raydom 0.3 CONFIG REQUIRED)
 target_link_libraries(your_app PRIVATE raydom::raydom)
 </code></pre>
 <p>The package’s version check accepts any patch release of the requested minor version while raydom is below 1.0.
@@ -243,6 +243,7 @@ After 1.0 it accepts any later release with the same major version.</p>
 </thead>
 <tbody>
 <tr><td><code>RAYDOM_BUILD_EXTRAS</code></td><td><code>ON</code></td><td>Build <code>raydom::extras</code></td></tr>
+<tr><td><code>RAYDOM_BUILD_ROUTER</code></td><td><code>ON</code></td><td>Build <code>raydom::router</code></td></tr>
 <tr><td><code>RAYDOM_FILE_DIALOG</code></td><td><code>ON</code></td><td>Native <a href="#file-dialogs">file dialogs</a> in extras; needs libdbus on Linux</td></tr>
 <tr><td><code>RAYDOM_FETCH_RAYLIB</code></td><td><code>ON</code></td><td>Download raylib when it can’t be found</td></tr>
 <tr><td><code>RAYDOM_INSTALL</code></td><td>top-level only</td><td>Generate install rules and the CMake package</td></tr>
@@ -369,7 +370,7 @@ project(hello LANGUAGES C CXX)
 include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.5)
+    GIT_TAG        v0.3.0)
 FetchContent_MakeAvailable(raydom)
 
 add_executable(hello main.cc)
@@ -494,7 +495,8 @@ rd_node_detach(ctx, c);        // c stays alive, owned by the context, outside t
 rd_node_append(ctx, list, c);  // and can be attached again later
 </code></pre>
 <p><code>rd_node_append</code> and <code>rd_node_insert_before</code> move a node that already has a parent. They fail, returning <code>false</code>,
-when the move would create a cycle, or when either handle is stale. A detached node keeps its subtree, styles and
+when the move would create a cycle, or when either handle is stale. Appending to the root inserts before the
+<a href="#overlay-and-anchoring">overlay</a> while the overlay is the root’s child. A detached node keeps its subtree, styles and
 listeners. It isn’t laid out, drawn or hit-tested.</p>
 <h2 id="userdata"><a class="header" href="#userdata">Userdata</a></h2>
 <p>Each node carries one <code>void*</code> and an optional destroy callback that runs when the node is destroyed or the userdata
@@ -636,6 +638,9 @@ padding plus border.</li>
 </ul>
 <p><code>flex_basis: 0</code> with <code>flex_grow: 1</code> splits free space without regard to content, which is the common “fill the rest”
 pattern.</p>
+<p>Shrinking follows CSS: each item gives up overflow in proportion to <code>flex_shrink</code> times its base size less its
+padding and border. Two items with a 100px basis in a 100px row split the overflow evenly, unless one has 20px of
+padding on each side, in which case it shrinks by 37.5px and the other by 62.5px.</p>
 <h2 id="grid"><a class="header" href="#grid">Grid</a></h2>
 <pre><code class="language-c">rd_track  cols[3] = {rd_track_of(rd_px(200)), rd_track_of(rd_fr(1)), rd_track_of(rd_fr(2))};
 rd_node   grid    = add(ctx, root,
@@ -654,7 +659,8 @@ refer to. The list lives until the context is destroyed. C++ builds them with
 CSS. <code>rd_track_minmax</code> builds any other pair.</p>
 <p>Placement uses <code>grid_{column,row}_{start,end}</code>: <code>rd_line(n)</code> is a 1-based line, negative from the end of the
 explicit grid; <code>rd_span(n)</code> spans tracks. Items without placement are auto-placed in <code>grid_auto_flow</code> order into
-implicit tracks sized by <code>grid_auto_rows</code> and <code>grid_auto_columns</code>.</p>
+implicit tracks sized by <code>grid_auto_rows</code> and <code>grid_auto_columns</code>. Items with only a row (or, in column flow, only a
+column) go there first, each after the ones before it in the same row, adding implicit columns when the row is full.</p>
 <p>The algorithm follows <a href="https://www.w3.org/TR/css-grid-1/#layout-algorithm">CSS Grid §11</a>. Named lines, named areas
 and <code>dense</code> packing are not implemented.</p>
 <h3 id="auto-repeated-tracks"><a class="header" href="#auto-repeated-tracks">Auto-repeated tracks</a></h3>
@@ -707,8 +713,9 @@ rd_rect h = rd_node_bounds(ctx, header);  // relative to the root, after scrolli
                                .height   = rd_px(12)});
 </code></pre>
 <p>An absolute node is positioned against its parent’s padding box using <code>inset</code>. With both insets on an axis and
-no size, it stretches between them. It takes no space in the parent’s
-flex or grid layout.</p>
+no size, it stretches between them. With both insets and a size, <code>auto</code> margins share the space left over, so
+<code>inset: 0</code> with a width, a height and <code>margin: auto</code> centers it. It takes no space in the parent’s flex or grid
+layout.</p>
 <h2 id="scrolling"><a class="header" href="#scrolling">Scrolling</a></h2>
 <pre><code class="language-c">rd_node list = add(ctx, root, (rd_style){.height = rd_px(200), .overflow_y = RD_OVERFLOW_SCROLL});
 for (int i = 0; i &lt; 50; i++) add(ctx, list, (rd_style){.height = rd_px(24)});
@@ -775,7 +782,8 @@ rd_node_append(ctx, root, code);
 </code></pre>
 <p><code>rd_font_load</code> takes TrueType or OpenType data in memory. With <code>copy = false</code> the data must outlive the context;
 with <code>true</code> raydom copies it. <code>rd_font_load_file</code> reads and copies a file. Both return a null handle (<code>id == 0</code>) on
-failure. The first font loaded becomes the default; <code>rd_ctx_set_default_font</code> changes it. In a style,
+failure. The first font loaded becomes the default; <code>rd_ctx_set_default_font</code> changes it. Either way, text already
+in the tree is measured again with the new default at the next layout. In a style,
 <code>(rd_font){0, true}</code> means “the default font”.</p>
 <p><code>font</code> and <code>font_size</code> are inherited, so setting them on a container applies them to all the text inside it.
 Glyphs are rasterized on demand into an atlas per font size and display scale.</p>
@@ -871,7 +879,8 @@ free(rgba);
 <p><code>rd_image_load</code> and <code>rd_image_load_file</code> recognize SVG documents by their content and parse them with a vendored
 copy of nanosvg. An SVG’s natural size comes from its <code>width</code> and <code>height</code>, or its <code>viewBox</code>. It is rasterized when
 drawn, at the size it’s drawn at times the display scale, so it stays sharp at any size; when drawn larger later,
-it’s rasterized again. Smaller uses sample the larger raster.</p>
+it’s rasterized again. The raster’s scale goes up in steps of 1.25, so an SVG growing a little each frame, as in a
+pane being resized, is rasterized every few steps rather than every frame. Smaller uses sample the larger raster.</p>
 <pre><code class="language-c">rd_image icon = rd_image_load(ctx, icon_svg, sizeof icon_svg - 1);
 rd_node  n    = rd_node_create(ctx);
 rd_node_set_image(ctx, n, icon);
@@ -985,7 +994,7 @@ list.append(row);
 <tr><th>Type</th><th>Target</th><th>Bubbles</th><th>Default action</th></tr>
 </thead>
 <tbody>
-<tr><td><code>POINTER_DOWN</code>, <code>_UP</code>, <code>_MOVE</code></td><td>Node under the pointer, or the capturing node</td><td>Yes</td><td>Down: focus, start selection</td></tr>
+<tr><td><code>POINTER_DOWN</code>, <code>_UP</code>, <code>_MOVE</code></td><td>Node under the pointer, or the capturing node; back and forward over a disabled node: the root</td><td>Yes</td><td>Down: focus, start selection</td></tr>
 <tr><td><code>POINTER_ENTER</code>, <code>_LEAVE</code></td><td>Each node entered or left</td><td>No</td><td></td></tr>
 <tr><td><code>CLICK</code></td><td>Common ancestor of the press and release targets</td><td>Yes</td><td></td></tr>
 <tr><td><code>WHEEL</code></td><td>Node under the pointer</td><td>Yes</td><td>Scroll the nearest scroll container</td></tr>
@@ -1002,7 +1011,15 @@ list.append(row);
 <p>Event fields: <code>x</code>, <code>y</code> in root coordinates; <code>local_x</code>, <code>local_y</code> relative to <code>current</code>’s border box; <code>wheel_x</code>,
 <code>wheel_y</code> in notches; <code>button</code> (the button that changed) and <code>buttons</code> (held mask); <code>clicks</code> for <code>CLICK</code>; <code>key</code>, <code>mods</code>, <code>repeat</code>;
 <code>codepoint</code> for text; <code>related</code> for focus events.</p>
-<p><code>CLICK</code> fires for the primary button only. <code>ev-&gt;clicks</code> counts rapid clicks on the same node: 1, then 2 for a double
+<p>Buttons are <code>RD_BUTTON_PRIMARY</code>, <code>SECONDARY</code>, <code>MIDDLE</code>, and a mouse’s side buttons <code>RD_BUTTON_BACK</code> and
+<code>RD_BUTTON_FORWARD</code>; <a href="#router">the router</a> takes the side buttons for history. A disabled node gets no
+pointer events, but the side buttons over one, or over nothing, go to the root instead, so a router there still hears
+them. In the browser,
+Emscripten’s GLFW reports every button past the middle one as the right button. So <code>rd_update</code> reads the right and
+side buttons from the canvas’s own events there. <code>CLICK</code> fires for the
+primary button only. If a listener destroys or detaches the pressed node before the release, the press counts as
+being on its nearest ancestor that is still in the tree, as in browsers, so rebuilding a button’s content on press
+doesn’t lose the click. <code>ev-&gt;clicks</code> counts rapid clicks on the same node: 1, then 2 for a double
 click and 3 for a triple, when each follows the last within half a second and four pixels. Keyboard activation
 (Enter or Space) is always 1.</p>
 <h2 id="pointer-capture"><a class="header" href="#pointer-capture">Pointer capture</a></h2>
@@ -1063,7 +1080,12 @@ save.on_click([&amp;] { ++saves; });  // also fires on Enter or Space while focu
 </code></pre>
 <p>Tab and Shift+Tab move through <code>TAB</code> nodes in tree order, wrapping, skipping hidden and disabled subtrees.
 <code>rd_node_focus(ctx, node)</code> focuses from code; a null node clears focus. <code>rd_ctx_focus_next</code> steps like Tab. A focus
-change fires <code>BLUR</code>, <code>FOCUS_OUT</code>, <code>FOCUS</code>, <code>FOCUS_IN</code>, in that order.</p>
+change fires <code>BLUR</code>, <code>FOCUS_OUT</code>, <code>FOCUS</code>, <code>FOCUS_IN</code>, in that order, after <code>CHANGE</code> when the input losing focus was
+edited. A listener in that sequence that moves focus again takes over: its own change runs in full and the rest of
+the outer sequence is skipped, so no node is blurred twice.</p>
+<p>A focused node that is destroyed, detached, hidden with <code>display: none</code> or disabled (itself or an ancestor) loses
+focus at the end of the next <code>rd_ctx_layout</code>, with the same <code>CHANGE</code>, <code>BLUR</code> and <code>FOCUS_OUT</code> events, and its <code>FOCUS</code> and <code>FOCUS_WITHIN</code>
+states are cleared. <code>rd_ctx_focused</code> returns null for it at once.</p>
 <p><code>rd_ctx_set_focus_scope(ctx, node)</code> keeps Tab and Shift+Tab inside a subtree, as a modal dialog needs; null
 restores the whole tree, and so does destroying the scope node. Pointer and programmatic focus aren’t restricted.</p>
 <p>Enter and Space on a focused node that isn’t an input fire <code>CLICK</code>, so keyboard users can activate buttons without
@@ -1110,7 +1132,12 @@ elsewhere:</p>
 </tbody>
 </table>
 </div>
-<p>Consecutive typed characters form one undo step.</p>
+<p>Consecutive typed characters form one undo step. Moving the caret, <code>rd_input_select</code>, blur and <code>rd_node_set_text</code>
+end the step. <code>rd_node_set_text</code> on an input is itself an undo step: undo after it returns to the value before it,
+and typing after it undoes back to the value it set.</p>
+<p>Text from <code>TEXT</code> events is code points. A UTF-16 high surrogate followed by a low one is joined into one code
+point; lone halves are dropped. Pasted text drops control characters other than tab and, in a multi-line input,
+newline (a single-line input turns newlines into spaces), and invalid UTF-8 becomes U+FFFD.</p>
 <h2 id="clipboard"><a class="header" href="#clipboard">Clipboard</a></h2>
 <p>Inputs use an in-memory clipboard by default. <code>rd_update</code> installs raylib’s system clipboard. Without raylib, provide
 one:</p>
@@ -1268,20 +1295,28 @@ toast = rd_node_create(ctx);
 rd_node_append(ctx, rd_ctx_root(ctx), toast);
 // In: from transparent and 24px lower, to its place.
 rd_node_animate(ctx, toast, &amp;(rd_style){.opacity = rd_num(0), .margin.top = rd_px(24)},
-                &amp;(rd_style){.opacity = rd_num(1), .margin.top = rd_px(0)}, 0.2, RD_EASING_EASE_OUT, NULL, NULL);
-// ... later, out: fade, then remove it when the animation ends.
-rd_node_animate(ctx, toast, NULL, &amp;(rd_style){.opacity = rd_num(0)}, 0.15, RD_EASING_EASE_IN, remove_node, &amp;toast);
+                &amp;(rd_style){.opacity = rd_num(1), .margin.top = rd_px(0)}, 0.2, RD_EASING_EASE_OUT);
+// ... later, out: fade, then remove it when the animation ends, with a timer for the same time.
+rd_node_animate(ctx, toast, NULL, &amp;(rd_style){.opacity = rd_num(0)}, 0.15, RD_EASING_EASE_IN);
+rd_node* doomed = malloc(sizeof *doomed);
+*doomed         = toast;
+rd_ctx_set_timer(ctx, 0.15, 0, remove_node, doomed, free);  // freed when it fires, or if cleared
 </code></pre>
 <p><code>rd_node_animate</code> merges <code>to</code> into the node’s inline style and animates the properties it sets, from what the node
 shows, over the given seconds and easing, whatever the node’s transition properties say. <code>from</code> sets starting values
-for some properties, which is how a node that was just created animates in. <code>done</code> runs once the time is up; it’s a
-<a href="#timers">timer</a>, so it may destroy the node.</p>
-<p>C++: <code>node.animate(to, 0.2)</code>, <code>node.animate(from, to, 0.2)</code>, and <code>node.animate(to, 0.15, RD_EASING_EASE_IN, [&amp;] { ... })</code>.</p>
+for some properties, which is how a node that was just created animates in. Several calls before the next frame add
+up, each property keeping its own duration and easing. To act when the animation ends, for example to destroy a node
+it faded out, set a <a href="#timers">timer</a> for the same seconds: it runs on the same
+clock, can be cleared if the node is shown again, and frees its data with its destroy function.</p>
+<p>C++: <code>node.animate(to, 0.2)</code> and <code>node.animate(from, to, 0.2)</code> return false if nothing could start; for the end, <code>ctx.set_timeout(0.2, [=] { ... })</code> returns the <code>rd_timer</code> to clear.</p>
 <h2 id="clock-and-frames"><a class="header" href="#clock-and-frames">Clock and frames</a></h2>
 <p>Animations advance in <code>rd_ctx_layout</code>, on the context’s clock (<code>rd_ctx_set_time</code>, which <code>rd_update</code> sets from
-raylib). <code>rd_ctx_animating</code> is true while anything moves. With
+raylib); <code>rd_ctx_time</code> reads it. <code>rd_ctx_animating</code> is true while anything moves. With
 <a href="#event-waiting"><code>rd_set_event_waiting</code></a>, frames keep running while anything
 animates and wait for input once everything is still.</p>
+<p>For motion you compute yourself, such as a canvas drawing an algorithm’s state, run a repeating timer while it
+moves and advance by the difference in <code>rd_ctx_time</code> between calls. The timer keeps frames coming, and the motion
+stays on the same clock as everything else, so a test can drive it with <code>rd_ctx_set_time</code>.</p>
 <p>Animating layout costs one layout pass per frame for the animating parts of the tree, which is the same cost as
 resizing the window.</p>
 <div style="break-before: page; page-break-before: always;"></div>
@@ -1298,7 +1333,8 @@ rd_node_set_anchor(ctx, menu, &amp;(rd_anchor){.node = button, .offset = 4});  /
 <p><code>rd_ctx_overlay</code> returns the overlay node, creating it on first use. It is a child of the root with special rules:</p>
 <ul>
 <li><strong>Always last.</strong> It stays the root’s last child: appending to the root inserts before it. So it draws after,
-and is hit-tested before, everything else.</li>
+and is hit-tested before, everything else. If code moves it out of the root, or away from the end, appends to
+the root go to the end as usual until the next <code>rd_ctx_overlay</code> call, which puts it back as the last child.</li>
 <li><strong>Never clipped.</strong> It always covers the root, and no other node is its ancestor, so overflow containers don’t
 clip what’s inside it. Its position, inset, margin and size can’t be changed by styles; padding, background and
 layout properties can.</li>
@@ -1336,8 +1372,9 @@ rd_ctx_layout(ctx, 800, 600);
 rd_side side = rd_node_anchor_side(ctx, menu);  // RD_SIDE_TOP: no room below, so it flipped
 </code></pre>
 <p><code>rd_node_anchor_side</code> reports the side actually used, for drawing an arrow that points at the anchor.</p>
-<p>The anchor is followed every layout, including when it scrolls. Anchored nodes are placed in the order they were
-anchored, so a submenu anchored to an item of an anchored menu lands next to the item’s final position. If the
+<p>The anchor is followed every layout, including when it scrolls. Anchored nodes are placed in tree order, whatever
+order they were anchored in, so a submenu anchored to an item of an anchored menu lands next to the item’s final
+position when the submenu comes after the menu in the tree. If the
 anchor is destroyed or detached, the node stays where it was last placed.</p>
 <h2 id="opening-and-closing"><a class="header" href="#opening-and-closing">Opening and closing</a></h2>
 <p>The overlay has no notion of open or closed. Show and hide popups with <code>display</code>, or create and destroy them:</p>
@@ -1376,7 +1413,22 @@ rd_node_set_paint(ctx, plot, paint_chart, &amp;data, NULL);  // NULL: nothing to
 rd_node_append(ctx, rd_ctx_root(ctx), plot);
 </code></pre>
 <p>The callback runs inside <code>rd_draw</code>, after the node’s background and border and before its children, so children
-draw on top. raydom flushes raylib’s batch before the call, with no scissor or shader active.</p>
+draw on top. raydom flushes raylib’s batch before the call, with no scissor or shader active. Blending is raydom’s: colors
+blend as usual, and alpha accumulates toward opaque. raylib’s default blends alpha like color, so a translucent
+fill over an opaque pixel leaves it translucent; the desktop ignores that, but a browser composites the canvas over
+the page, which would show through. A callback may change the blend mode; raydom sets its own again afterwards.
+raydom sets its blending directly in GL rather than through rlgl, and when <code>rd_draw</code> returns, GL’s blend factors and
+equations are as the app left them, as are rlgl’s mode and custom factors (<code>rlSetBlendFactorsSeparate</code>): blending
+set with <code>BeginBlendMode</code> before <code>rd_draw</code> still applies after it. One consequence inside a callback: rlgl still
+believes the app’s mode is current, so <code>BeginBlendMode</code> with that same mode does nothing; another mode applies as
+usual. On a GL without these entry points, raydom leaves <code>BLEND_ALPHA</code>, as <code>EndBlendMode</code> does. rlgl doesn’t
+expose the active shader, so <code>rd_draw</code> returns with raylib’s default shader active; begin a custom shader after it.</p>
+<p>A callback may replace or clear its own node’s painter (<code>rd_node_set_paint</code>), or destroy the node: the old data’s
+destroy function runs once the callback returns, so the callback can still use its data. In C++, a lambda can call
+<code>node.paint(...)</code> or <code>node.destroy()</code> on its own node and keep using its captures.</p>
+<p>A context may be drawn from another’s paint callback with <code>rd_draw</code>. It draws under the transform it finds,
+including the outer context’s pixel ratio, and clips and rasterizes for that transform; the same holds under a
+raylib camera (<code>BeginMode2D</code>).</p>
 <p><code>rd_paint_info</code> has:</p>
 <div class="table-wrapper">
 <table>
@@ -1394,8 +1446,23 @@ draw on top. raydom flushes raylib’s batch before the call, with no scissor or
 <p><code>rd_paint_scissor(info)</code> clips raylib drawing to the content box within <code>clip</code>; raydom ends the scissor after the
 callback. Restore any other raylib state you change. Rendering to a texture with <code>BeginTextureMode</code> inside the
 callback is safe: size the texture and draw into it in device pixels (<code>content</code> times <code>dpi</code>), then call
-<code>rd_paint_restore(info)</code> after <code>EndTextureMode</code>, which resets the transform raydom drew with. raydom restores it
-again after the callback.</p>
+<code>rd_paint_restore(info)</code> after <code>EndTextureMode</code>, which resets the transform raydom drew with, whatever the pixel
+ratio. raydom restores it again after the callback.</p>
+<h2 id="text"><a class="header" href="#text">Text</a></h2>
+<p><code>rd_paint_text(ctx, info, font, size, x, baseline, utf8, len, color)</code> draws a line of text from the callback with
+raydom’s fonts, rasterized for the display’s density like the rest of the UI. That keeps labels on a canvas
+sharp and in the same typeface as the interface around it. <code>x</code> is the left edge and <code>baseline</code> the baseline, in
+logical coordinates. To center a label in a box, measure it with <code>rd_font_measure</code> and place the baseline with
+<code>rd_font_get_metrics</code>:</p>
+<pre><code class="language-c">rd_font_metrics m = rd_font_get_metrics(ctx, (rd_font){0}, 18);  // {0}: the default font
+float           w = rd_font_measure(ctx, (rd_font){0}, 18, label, RD_TEXT_NUL);
+rd_paint_text(ctx, info, (rd_font){0}, 18, box.x + (box.width - w) / 2,
+              box.y + (box.height + m.ascent - m.descent) / 2, label, RD_TEXT_NUL, rd_hex(0xe4e7ee));
+</code></pre>
+<p>Text draws over whatever the callback drew before it and under what it draws after, with the shader the callback
+has active, as raylib’s <code>DrawText</code> does; it changes no state. It doesn’t wrap. In C++:
+<code>ctx.paint_text(info, size, x, baseline, label, color, font)</code>, in the C function’s order with the font last and
+optional, with <code>ctx.measure_text</code> and <code>ctx.font_metrics</code>.</p>
 <h2 id="pixel-ratio"><a class="header" href="#pixel-ratio">Pixel ratio</a></h2>
 <p><code>rd_set_pixel_ratio(ctx, r)</code> makes a logical pixel <code>r</code> raylib screen pixels: <code>rd_update</code> divides the pointer and
 the screen size by <code>r</code>, and <code>rd_draw</code> scales its drawing by <code>r</code> and rasterizes text and shapes for it. raylib’s web
@@ -1412,7 +1479,8 @@ rd_set_pixel_ratio(ctx, (float)r);
 <code>FLAG_WINDOW_HIGHDPI</code>, whose scissor scaling raylib applies on the web without rendering at high density. On the
 desktop, raylib’s own <code>FLAG_WINDOW_HIGHDPI</code> handles density and the ratio works as a zoom. Pass logical sizes when
 calling <code>rd_ctx_layout</code> yourself.</p>
-<p>C++: <code>node.paint([](const rd_paint_info&amp; info) { ... })</code>, with the callable owned by the node.</p>
+<p>C++: <code>node.paint([](const rd_paint_info&amp; info) { ... })</code>, with the callable owned by the node, and
+<code>node.clear_paint()</code> to remove it.</p>
 <p>Pair a canvas with listeners on the same node for interaction: pointer events carry <code>local_x</code> and <code>local_y</code>
 relative to the node’s border box. Use the paint callback for drawing only; it must not change the tree.</p>
 <p>The <a href="#network-view">network view</a> is built on this.</p>
@@ -1467,6 +1535,27 @@ callable is moved into a heap allocation owned by raydom and deleted when the li
 destroyed. Captured references must outlive the node, or the listener must be removed first. Callbacks run from C,
 so they are <code>noexcept</code>: an exception escaping one terminates the program rather than unwinding through C frames.</p>
 <p><code>node.emplace_userdata&lt;T&gt;(args...)</code> constructs a <code>T</code> owned by the node; <code>node.userdata&lt;T&gt;()</code> returns it.</p>
+<p><code>node.clear_paint()</code> and <code>node.clear_measure()</code> remove a callable. <code>ctx.on_layout(f)</code> runs <code>f()</code> after every
+layout for the context’s lifetime; <code>node.on_layout(f)</code> for the node’s. <code>node.animate(to, seconds, easing, done)</code>
+returns false, without scheduling <code>done</code>, when the animation can’t start.</p>
+<h2 id="context"><a class="header" href="#context">Context</a></h2>
+<p>Besides creating nodes, the context wraps the rest of the C API that takes an <code>rd_ctx</code>:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>C++</th><th>C</th></tr>
+</thead>
+<tbody>
+<tr><td><code>ctx.select(anchor, offset, focus, offset)</code></td><td><code>rd_ctx_select</code></td></tr>
+<tr><td><code>ctx.clear_selection()</code></td><td><code>rd_ctx_clear_selection</code></td></tr>
+<tr><td><code>ctx.selection()</code>: a <code>std::optional&lt;Context::Selection&gt;</code></td><td><code>rd_ctx_selection</code></td></tr>
+<tr><td><code>ctx.selection_text()</code>: a <code>std::string</code></td><td><code>rd_ctx_selection_text</code></td></tr>
+<tr><td><code>ctx.set_focus_scope(node)</code>, <code>ctx.focus_scope()</code></td><td><code>rd_ctx_set_focus_scope</code>, <code>rd_ctx_focus_scope</code></td></tr>
+<tr><td><code>ctx.set_event_waiting(on)</code></td><td><code>rd_set_event_waiting</code></td></tr>
+<tr><td><code>ctx.paint_text(info, size, x, baseline, text, color, font)</code></td><td><code>rd_paint_text</code>, font last and optional</td></tr>
+</tbody>
+</table>
+</div>
 <h2 id="the-quickstart-annotated"><a class="header" href="#the-quickstart-annotated">The quickstart, annotated</a></h2>
 <pre><code class="language-cpp">#include &lt;raydom/raydom.hh&gt;
 #include &lt;raylib.h&gt;
@@ -1672,7 +1761,9 @@ Space chooses, and Tab closes the menu. Hovering an item highlights it.</p>
                   [&amp;](int index) { log = "context " + std::to_string(index); });
 </code></pre>
 <p><code>rdx_context_menu_attach</code> opens the menu at the pointer when the node is pressed with the secondary button. The items
-are copied, and the callback lives as long as the node.</p>
+are copied, and the callback lives as long as the node. A menu still open when the node is destroyed stays open, and
+choosing from it does nothing. Likewise a select’s list that outlives its select ignores the choice, and closes at
+the next press, key or pointer move.</p>
 <h2 id="select"><a class="header" href="#select">Select</a></h2>
 <pre><code class="language-cpp">rd::Node theme = rdx::select(ctx, {"System", "Light", "Dark"}, "Theme");
 theme.on(RD_EVENT_CHANGE, [&amp;] { log = "theme " + std::to_string(rdx::selected(theme)); });
@@ -1721,7 +1812,7 @@ again replaces the text. The tooltip ignores the pointer, so it never covers wha
 </div>
 <p>Menu items highlight on <code>RD_STATE_FOCUS</code> as well as hover, so keyboard and pointer show the same highlight.</p>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="tabs-splitters-lists-tables-and-trees"><a class="header" href="#tabs-splitters-lists-tables-and-trees">Tabs, splitters, lists, tables and trees</a></h1>
+<h1 id="tabs-splitters-lists-tables-trees-and-breadcrumbs"><a class="header" href="#tabs-splitters-lists-tables-trees-and-breadcrumbs">Tabs, splitters, lists, tables, trees and breadcrumbs</a></h1>
 <pre><code class="language-cpp">#include &lt;raydom/extras/views.hh&gt;  // C: views.h
 </code></pre>
 <p>Each of these fires <code>CHANGE</code> on its node when the user changes it; the setters fire nothing.</p>
@@ -1832,7 +1923,17 @@ tree.on(RD_EVENT_CHANGE, [&amp;] { /* rdx::tree_label(tree, rdx::tree_selected(t
 <p>Items are added under a parent (-1 for the top level) and get an id. The tree shows the expanded items as an
 indented, virtualized list with disclosure chevrons. Right expands an item, or moves to its first child; Left
 collapses it, or moves to its parent; Enter toggles. Selecting a hidden item with <code>rdx_tree_select</code> expands its
-ancestors, and collapsing an ancestor of the selection moves the selection to the ancestor.</p>
+ancestors, and collapsing an ancestor of the selection moves the selection to the ancestor. Adding and expanding
+items doesn’t rebuild the rows; the tree does that once, at the next layout or the next call that needs them, so
+building a tree of any size is linear in its items.</p>
+<h2 id="breadcrumb"><a class="header" href="#breadcrumb">Breadcrumb</a></h2>
+<pre><code class="language-cpp">rdx::Breadcrumb crumbs = rdx::breadcrumb(ctx, {"Home", "Projects", "Loom"});
+crumbs.on(RD_EVENT_CHANGE, [] { /* go to item rdx::Breadcrumb::clicked() */ });
+</code></pre>
+<p>A row of items separated by chevrons, the last one the current page. A click on an earlier item, or Enter on it,
+fires <code>CHANGE</code>, and <code>rdx_breadcrumb_clicked</code> says which item. Earlier items are links; the current one isn’t
+interactive. <code>rdx_breadcrumb_set</code> replaces every item. With the <a href="#breadcrumbs">router</a>, fill it
+from the router’s trail.</p>
 <h2 id="restyling-2"><a class="header" href="#restyling-2">Restyling</a></h2>
 <div class="table-wrapper">
 <table>
@@ -1845,6 +1946,7 @@ ancestors, and collapsing an ancestor of the selection moves the selection to th
 <tr><td><code>list</code>, <code>list_row</code></td><td>Lists, and the rows of tables and trees</td></tr>
 <tr><td><code>table</code>, <code>table_header</code>, <code>table_header_cell</code>, <code>table_cell</code></td><td>Tables</td></tr>
 <tr><td><code>tree_toggle</code>, <code>tree_label</code></td><td>Tree rows</td></tr>
+<tr><td><code>breadcrumb</code>, <code>breadcrumb_item</code>, <code>breadcrumb_current</code>, <code>breadcrumb_separator</code></td><td>Breadcrumbs</td></tr>
 </tbody>
 </table>
 </div>
@@ -1866,7 +1968,9 @@ graph.label_class().set(rd::Style().font_size(12_px).color(rd::hex(0xe4e7ee)));
 ctx.root().append(canvas);
 </code></pre>
 <p><code>rdx_graph_create(ctx, host)</code> turns <code>host</code> into the view. The graph lives until the host node is destroyed; there is
-no separate destroy call. Node labels are text nodes under the host, styled with the class returned by
+no separate destroy call. A host holds one graph: creating a second on the same host returns null and leaves the
+first as it was, so to rebuild the view, destroy the host and create the graph on a new one. Replacing the host’s
+paint callback stops the graph drawing but doesn’t free it. Node labels are text nodes under the host, styled with the class returned by
 <code>label_class()</code>.</p>
 <h2 id="nodes-and-edges"><a class="header" href="#nodes-and-edges">Nodes and edges</a></h2>
 <pre><code class="language-cpp">std::vector&lt;rdx_node&gt; nodes;
@@ -1982,6 +2086,178 @@ with a message saying so. The API is always present, so code compiles everywhere
 <code>pkg-config</code>. At run time, the desktop must provide xdg-desktop-portal, which current GNOME, KDE and most other
 desktops do. Set <code>RAYDOM_FILE_DIALOG=OFF</code> to build without either.</p>
 <div style="break-before: page; page-break-before: always;"></div>
+<h1 id="router"><a class="header" href="#router">Router</a></h1>
+<pre><code class="language-cpp">#include &lt;raydom/router/router.hh&gt;  // C: router.h
+</code></pre>
+<p><code>raydom::router</code> is a separate library, linked as <code>raydom::router</code>, that shows one page at a time chosen by a
+path, with a history, links, nested routers and transitions between pages. It depends only on the core;
+the <a href="#breadcrumb">breadcrumb</a> in <code>raydom::extras</code> is the usual companion.</p>
+<pre><code class="language-cmake">target_link_libraries(your_app PRIVATE raydom::router)  # RAYDOM_BUILD_ROUTER, on by default
+</code></pre>
+<h2 id="routes"><a class="header" href="#routes">Routes</a></h2>
+<pre><code class="language-cpp">rdr::Router app = rdr::router(ctx, {.transition = RDR_TRANSITION_SLIDE});
+app.style(rd::Style().flex(1));
+app.route("/", [&amp;](rdr::Router) { return ctx.create_text("Home"); }, {.title = "Home"});
+app.route("users", [&amp;](rdr::Router) { return ctx.create_text("Everyone"); }, {.title = "Users"});
+app.route("users/:id", [&amp;](rdr::Router r) {
+  return ctx.create_text("User " + std::string(r.param("id")));
+}, {.title = "User :id", .title_fn = user_title});
+app.route("*", [&amp;](rdr::Router) { return ctx.create_text("Not found"); });
+app.go("/");
+</code></pre>
+<p>A router is a node. Give it a size, like any node; it is a flex column that clips its pages. Each route has a
+pattern and a builder that returns the page. Routes take effect at the next navigation, so add them all and then
+navigate.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Pattern segment</th><th>Matches</th></tr>
+</thead>
+<tbody>
+<tr><td><code>users</code></td><td>That literal</td></tr>
+<tr><td><code>:id</code></td><td>Any one segment, as the parameter <code>id</code></td></tr>
+<tr><td><code>:id?</code>, <code>edit?</code></td><td>Optionally, a parameter or a literal</td></tr>
+<tr><td><code>*</code>, <code>*rest</code></td><td>Last only: the remaining segments, zero or more. <code>*rest</code> is a parameter, the segments joined with <code>/</code></td></tr>
+</tbody>
+</table>
+</div>
+<p>When several routes match, the most specific wins. Segment by segment, a literal beats a parameter and a
+parameter beats a wildcard. Then a route without a wildcard wins, and then the route added first. <code>users/new</code>
+beats <code>users/:id</code> for <code>/users/new</code>, and <code>*</code> catches whatever nothing else matches.</p>
+<p><code>rdr_param(ctx, node, name)</code> (C++ <code>router.param(name)</code> or <code>rdr::param(node, name)</code>) reads a parameter from the
+router or any node inside its pages. A nested router sees its parents’ parameters too.</p>
+<h2 id="navigation-and-history"><a class="header" href="#navigation-and-history">Navigation and history</a></h2>
+<p><code>go</code> pushes a history entry and drops any entries after the current one. <code>replace</code> overwrites the current entry.
+<code>back</code> and <code>forward</code> move through the history, which keeps the last 100 entries (<code>history_limit</code>). A path is
+absolute (<code>/users/7</code>) or relative to the router’s base (<code>profile</code>, <code>.</code>, <code>..</code>), and is normalized. <code>go</code> returns
+false, and changes nothing, when no route matches.</p>
+<p>Every navigation resolves the whole tree of routers, then fires <code>CHANGE</code> on the root router, once. Navigating from
+a builder or from a <code>CHANGE</code> listener is queued until the current navigation finishes. A builder that redirects
+should call <code>replace</code>, so that back doesn’t lead to the redirect again.</p>
+<p>The root router also takes these inputs, while the pointer or focus is inside it, or for the router used last:</p>
+<ul>
+<li>the mouse’s back and forward side buttons (<code>RD_BUTTON_BACK</code>, <code>RD_BUTTON_FORWARD</code>);</li>
+<li>Cmd+[ and Cmd+] on macOS, or Super elsewhere;</li>
+<li>Alt+Left and Alt+Right outside macOS and iOS. There Option+Left moves by word, so it isn’t taken. In a browser
+the router checks the browser’s platform, so a web build on a Mac leaves Option+Left alone too.</li>
+</ul>
+<p>In a browser these inputs also mean “leave this page”. Browsers act on them as they happen, before raydom sees
+them on the next frame. So on the web, creating a router cancels the browser’s handling: of the side buttons over
+the canvas, and of the shortcuts while nothing else on the page has focus. The router’s history doesn’t sync with
+the browser’s yet.</p>
+<h2 id="page-lifetime"><a class="header" href="#page-lifetime">Page lifetime</a></h2>
+<p>A page is built when its route is entered and destroyed when it’s left. A page is also left, and rebuilt, when
+its parameters change: <code>/users/1</code> to <code>/users/2</code> builds a new page.</p>
+<p><code>keep_alive</code> (C <code>RDR_ROUTE_KEEP_ALIVE</code>) hides the page instead of destroying it. The page is shown again,
+with its state, when the route is next entered, and lives as long as the router. A kept page isn’t rebuilt
+when its parameters change, including while it shows: <code>/kept/1</code> to <code>/kept/2</code> leaves the page in place, with
+no transition and its focus kept. It reads the new values on the root router’s <code>CHANGE</code>.</p>
+<h2 id="nested-routers"><a class="header" href="#nested-routers">Nested routers</a></h2>
+<pre><code class="language-cpp">// /settings, /settings/profile, ...: the outer page holds a router for the rest of the path.
+app.route("settings/*", [&amp;](rdr::Router outer) {
+  rdr::Router inner = rdr::router(outer, {.transition = RDR_TRANSITION_FADE});
+  inner.route("", [&amp;](rdr::Router) { return ctx.create_text("General"); });
+  inner.route("profile", [&amp;](rdr::Router) { return ctx.create_text("Profile"); }, {.title = "Profile"});
+  rd::Node tabs = ctx.create(rd::Style().flex_direction(RD_FLEX_ROW).column_gap(8_px));
+  tabs.append(rdr::link(ctx, "General", ".", inner, RDR_LINK_EXACT)).append(rdr::link(ctx, "Profile", "profile", inner));
+  return ctx.create().append(tabs).append(inner.style(rd::Style().flex(1)));
+}, {.title = "Settings", .keep_alive = true});
+</code></pre>
+<p>A router created with a parent is nested. It sits inside a page whose route ends in an unnamed <code>*</code>, and matches
+what that <code>*</code> captured. A named wildcard would make the remainder a parameter, so changing it would rebuild
+the page. The nested router’s routes are relative to its base (<code>/settings</code> here), so <code>""</code> matches <code>/settings</code>
+itself. One history, in the root router, covers the whole tree, and any router in it navigates it.</p>
+<h2 id="links"><a class="header" href="#links">Links</a></h2>
+<pre><code class="language-cpp">rd::Node nav = ctx.create(rd::Style().width(160_px));
+nav.append(rdr::link(ctx, "Home", "/", app));
+nav.append(rdr::link(ctx, "Users", "/users", app));  // checked on /users and /users/7
+nav.append(rdr::link(ctx, "Settings", "/settings", app));
+</code></pre>
+<p><code>rdr::link</code> (C <code>rdr_link_create</code>) makes a focusable text node with the link role. <code>rdr_link_attach</code> turns any node
+into a link. A click or Enter navigates. A link without a router uses the nearest router above it, or the router
+used last.</p>
+<p>A link has <code>RD_STATE_CHECKED</code> while the current path is its target or lies under it. A link to <code>/users</code> is
+checked on <code>/users/7</code>. A link to <code>/</code>, or one with <code>RDR_LINK_EXACT</code>, is checked only on its exact path. Style
+the checked state to mark the current section.</p>
+<h2 id="transitions-1"><a class="header" href="#transitions-1">Transitions</a></h2>
+<pre><code class="language-c">rd_node app = rdr_router_create(ctx, &amp;(rdr_router_desc){.transition = RDR_TRANSITION_SLIDE, .duration = 0.25});
+</code></pre>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Transition</th><th>Does</th></tr>
+</thead>
+<tbody>
+<tr><td><code>RDR_TRANSITION_NONE</code></td><td>Pages swap at once</td></tr>
+<tr><td><code>RDR_TRANSITION_FADE</code></td><td>A crossfade: the old page fades out as the new one fades in, together</td></tr>
+<tr><td><code>RDR_TRANSITION_SLIDE</code></td><td>Forward slides in from the right, back from the left</td></tr>
+</tbody>
+</table>
+</div>
+<p>During a transition both pages are in the tree. The old one is positioned over the router, doesn’t take pointer
+input (<code>pointer_events: none</code> and <code>RD_STATE_DISABLED</code>), and loses focus. A navigation during a transition ends
+it at once and starts the next one. Each router animates only its own page changes, so a nested router can fade
+while its parent slides. The first page of a router never animates. Animations run on the context’s clock, like
+every <a href="#animation">animation</a>.</p>
+<h2 id="breadcrumbs"><a class="header" href="#breadcrumbs">Breadcrumbs</a></h2>
+<pre><code class="language-cpp">rdx::Breadcrumb crumbs = rdx::breadcrumb(ctx);
+app.on(RD_EVENT_CHANGE, [app, crumbs] {
+  std::vector&lt;std::string&gt; labels;
+  for (const rdr::Crumb&amp; c : app.trail()) labels.emplace_back(c.title);
+  crumbs.set(labels);
+});
+crumbs.on(RD_EVENT_CHANGE, [app, crumbs] {
+  auto trail = app.trail();
+  app.go(std::string(trail[static_cast&lt;size_t&gt;(crumbs.clicked())].path));
+});
+</code></pre>
+<p><code>trail()</code> (C <code>rdr_router_trail</code>) lists one crumb per level of the current path. Each crumb has a title and the
+absolute path to navigate to. Strings are valid until the next navigation.</p>
+<ul>
+<li><strong>One crumb per prefix.</strong> For each prefix of the path, the route that matches that prefix exactly gives a
+crumb, if it has a title. With routes <code>/</code>, <code>projects</code>, <code>projects/:id</code> and <code>projects/:id/files/:file</code>, the path
+<code>/projects/loom/files/main.c</code> gives Home, Projects, loom and main.c. <code>/projects/loom/files</code> has no route of its
+own, so it gets no crumb. Every crumb is a real route.</li>
+<li><strong>Wildcards.</strong> A prefix that matches only because a wildcard swallowed part of it gets no crumb, and neither
+does a pattern that starts with a wildcard. A titled <code>*</code> catch-all names the page it shows, not every level
+above it.</li>
+<li><strong>Nested routers.</strong> The parent names the prefixes up to its wildcard, and the nested router names the rest.
+A crumb whose path repeats the previous one is dropped, so a nested <code>""</code> route doesn’t repeat its parent.</li>
+<li><strong>Titles.</strong> <code>:name</code> in a title is replaced by the parameter matched at that prefix. To show data instead of
+the raw parameter, give the route a title function. It runs for ancestor crumbs too, whose pages aren’t
+built:</li>
+</ul>
+<pre><code class="language-cpp">// Crumbs show names, not ids. An empty result falls back to the static title, "User :id".
+std::map&lt;std::string, std::string, std::less&lt;&gt;&gt; names = {{"7", "Ada"}, {"8", "Grace"}};
+
+std::string user_title(const rdr::Match&amp; m) {
+  auto it = names.find(m.param("id"));
+  return it != names.end() ? it-&gt;second : std::string();
+}
+</code></pre>
+<p>In C, <code>rdr_title_fn</code> gets an <code>rdr_match</code> (<code>rdr_match_param</code>, <code>rdr_match_path</code>) and returns a string the router
+copies. Null falls back to <code>title</code>.</p>
+<h2 id="reference"><a class="header" href="#reference">Reference</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>C</th><th>C++</th><th>Returns</th></tr>
+</thead>
+<tbody>
+<tr><td><code>rdr_router_path</code></td><td><code>path()</code></td><td>The tree’s current path</td></tr>
+<tr><td><code>rdr_router_base</code></td><td><code>base()</code></td><td>Where the router is mounted: <code>/</code> for a root</td></tr>
+<tr><td><code>rdr_router_route</code></td><td><code>matched_route()</code></td><td>The matched pattern, or null</td></tr>
+<tr><td><code>rdr_router_page</code></td><td><code>page()</code></td><td>The page’s wrapper; the page is its child</td></tr>
+<tr><td><code>rdr_router_root</code></td><td><code>root()</code></td><td>The root router</td></tr>
+<tr><td><code>rdr_router_can_back</code>, <code>_can_forward</code></td><td><code>can_back()</code>, <code>can_forward()</code></td><td>Whether there’s history that way</td></tr>
+<tr><td><code>rdr_router_transitioning</code></td><td><code>transitioning()</code></td><td>Whether pages are changing places</td></tr>
+<tr><td><code>rdr_router_set_transition</code></td><td><code>set_transition()</code></td><td>Changes the transition; ends a running one</td></tr>
+</tbody>
+</table>
+</div>
+<p>Browser history and URL sync for WebAssembly builds aren’t implemented yet. In the browser, the router keeps its
+own history like it does on the desktop.</p>
+<div style="break-before: page; page-break-before: always;"></div>
 <h1 id="style-properties"><a class="header" href="#style-properties">Style properties</a></h1>
 <p>Every field of <code>rd_style</code>, generated from the <code>RD_STYLE_PROPS</code> X-macro in <code>include/raydom/style.h</code> and the defaults
 in <code>src/style.c</code> at this version.</p>
@@ -2082,7 +2358,7 @@ example <code>RD_DISPLAY_GRID</code>.</p>
 </tbody>
 </table>
 </div>
-<h2 id="text"><a class="header" href="#text">Text</a></h2>
+<h2 id="text-1"><a class="header" href="#text-1">Text</a></h2>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -2131,7 +2407,7 @@ example <code>RD_DISPLAY_GRID</code>.</p>
 </tbody>
 </table>
 </div>
-<h2 id="transitions-1"><a class="header" href="#transitions-1">Transitions</a></h2>
+<h2 id="transitions-2"><a class="header" href="#transitions-2">Transitions</a></h2>
 <div class="table-wrapper">
 <table>
 <thead>
@@ -2245,8 +2521,11 @@ that must sit above everything goes in the <a href="#overlay-and-anchoring">over
 <li>No <code>aspect_ratio</code>, no <code>transform</code>. Animate <code>inset</code> to move a node without reflowing its neighbors.</li>
 <li>Transitions don’t animate <code>width: auto</code>, unit changes (px to %), or <code>display</code>; those change at once.</li>
 <li><code>min_width</code>/<code>min_height</code> <code>auto</code> is 0, not the content size.</li>
+<li>Lengths, sizes and flex factors are clamped to ±1e9 (pixels, or the factor itself); a NaN length means <code>auto</code>.</li>
+<li>In WebAssembly builds, Emscripten’s default 64 KB stack holds about 200 levels of nested flex containers, or 340
+of nested grids. Deeper trees need a larger <code>-sSTACK_SIZE</code>.</li>
 </ul>
-<h2 id="text-1"><a class="header" href="#text-1">Text</a></h2>
+<h2 id="text-2"><a class="header" href="#text-2">Text</a></h2>
 <ul>
 <li>One font per text node. No rich text inside a node; use several text nodes in a row.</li>
 <li>No shaping: no ligatures, no contextual forms, no bidirectional text. Pair kerning from the font is applied. Latin, Cyrillic,
@@ -2269,6 +2548,11 @@ fractions (<code>x2="1"</code>) render as a flat color; use percentages (<code>x
 <li>Shadows are outer box shadows only.</li>
 <li>No gradients.</li>
 </ul>
+<h2 id="router-1"><a class="header" href="#router-1">Router</a></h2>
+<p>Paths have no query strings or fragments, and segments aren’t percent-decoded. In WebAssembly builds the router
+doesn’t read or write the browser’s URL or history; it keeps the browser from leaving the page on back and forward
+input instead. There are no transforms, so slide transitions move pages
+with <code>inset</code>. Layout caches keep that cheap: a page’s contents aren’t measured again while it slides.</p>
 <h2 id="threads"><a class="header" href="#threads">Threads</a></h2>
 <p>A context is single-threaded. Separate contexts on separate threads don’t share state, but raylib drawing must
 happen on the thread that owns the window.</p>
@@ -2291,7 +2575,7 @@ raydom code, in a form that is cheap to retrieve.</p>
 </table>
 </div>
 <p>Use the copy under the version that matches the project’s <code>GIT_TAG</code> or <code>find_package</code> version, for example
-<code>/v0.2.5/llms-full.txt</code>. <code>/latest/</code> follows the newest release; <code>/dev/</code> follows the main branch and may
+<code>/v0.3.0/llms-full.txt</code>. <code>/latest/</code> follows the newest release; <code>/dev/</code> follows the main branch and may
 describe unreleased API.</p>
 <p>The headers are the ground truth. <code>include/raydom/*.h</code> documents every function in a comment above it, and
 <code>include/raydom/style.h</code> defines every style property in the <code>RD_STYLE_PROPS</code> X-macro.</p>

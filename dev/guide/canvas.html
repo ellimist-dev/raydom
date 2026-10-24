@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-46055788.js";
+            window.path_to_searchindex_js = "../searchindex-bd641951.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-c393df87.js"></script>
+        <script src="../toc-1e1dc0b8.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -204,7 +204,22 @@ rd_node_set_paint(ctx, plot, paint_chart, &amp;data, NULL);  // NULL: nothing to
 rd_node_append(ctx, rd_ctx_root(ctx), plot);
 </code></pre>
 <p>The callback runs inside <code>rd_draw</code>, after the node’s background and border and before its children, so children
-draw on top. raydom flushes raylib’s batch before the call, with no scissor or shader active.</p>
+draw on top. raydom flushes raylib’s batch before the call, with no scissor or shader active. Blending is raydom’s: colors
+blend as usual, and alpha accumulates toward opaque. raylib’s default blends alpha like color, so a translucent
+fill over an opaque pixel leaves it translucent; the desktop ignores that, but a browser composites the canvas over
+the page, which would show through. A callback may change the blend mode; raydom sets its own again afterwards.
+raydom sets its blending directly in GL rather than through rlgl, and when <code>rd_draw</code> returns, GL’s blend factors and
+equations are as the app left them, as are rlgl’s mode and custom factors (<code>rlSetBlendFactorsSeparate</code>): blending
+set with <code>BeginBlendMode</code> before <code>rd_draw</code> still applies after it. One consequence inside a callback: rlgl still
+believes the app’s mode is current, so <code>BeginBlendMode</code> with that same mode does nothing; another mode applies as
+usual. On a GL without these entry points, raydom leaves <code>BLEND_ALPHA</code>, as <code>EndBlendMode</code> does. rlgl doesn’t
+expose the active shader, so <code>rd_draw</code> returns with raylib’s default shader active; begin a custom shader after it.</p>
+<p>A callback may replace or clear its own node’s painter (<code>rd_node_set_paint</code>), or destroy the node: the old data’s
+destroy function runs once the callback returns, so the callback can still use its data. In C++, a lambda can call
+<code>node.paint(...)</code> or <code>node.destroy()</code> on its own node and keep using its captures.</p>
+<p>A context may be drawn from another’s paint callback with <code>rd_draw</code>. It draws under the transform it finds,
+including the outer context’s pixel ratio, and clips and rasterizes for that transform; the same holds under a
+raylib camera (<code>BeginMode2D</code>).</p>
 <p><code>rd_paint_info</code> has:</p>
 <div class="table-wrapper">
 <table>
@@ -222,8 +237,23 @@ draw on top. raydom flushes raylib’s batch before the call, with no scissor or
 <p><code>rd_paint_scissor(info)</code> clips raylib drawing to the content box within <code>clip</code>; raydom ends the scissor after the
 callback. Restore any other raylib state you change. Rendering to a texture with <code>BeginTextureMode</code> inside the
 callback is safe: size the texture and draw into it in device pixels (<code>content</code> times <code>dpi</code>), then call
-<code>rd_paint_restore(info)</code> after <code>EndTextureMode</code>, which resets the transform raydom drew with. raydom restores it
-again after the callback.</p>
+<code>rd_paint_restore(info)</code> after <code>EndTextureMode</code>, which resets the transform raydom drew with, whatever the pixel
+ratio. raydom restores it again after the callback.</p>
+<h2 id="text"><a class="header" href="#text">Text</a></h2>
+<p><code>rd_paint_text(ctx, info, font, size, x, baseline, utf8, len, color)</code> draws a line of text from the callback with
+raydom’s fonts, rasterized for the display’s density like the rest of the UI. That keeps labels on a canvas
+sharp and in the same typeface as the interface around it. <code>x</code> is the left edge and <code>baseline</code> the baseline, in
+logical coordinates. To center a label in a box, measure it with <code>rd_font_measure</code> and place the baseline with
+<code>rd_font_get_metrics</code>:</p>
+<pre><code class="language-c">rd_font_metrics m = rd_font_get_metrics(ctx, (rd_font){0}, 18);  // {0}: the default font
+float           w = rd_font_measure(ctx, (rd_font){0}, 18, label, RD_TEXT_NUL);
+rd_paint_text(ctx, info, (rd_font){0}, 18, box.x + (box.width - w) / 2,
+              box.y + (box.height + m.ascent - m.descent) / 2, label, RD_TEXT_NUL, rd_hex(0xe4e7ee));
+</code></pre>
+<p>Text draws over whatever the callback drew before it and under what it draws after, with the shader the callback
+has active, as raylib’s <code>DrawText</code> does; it changes no state. It doesn’t wrap. In C++:
+<code>ctx.paint_text(info, size, x, baseline, label, color, font)</code>, in the C function’s order with the font last and
+optional, with <code>ctx.measure_text</code> and <code>ctx.font_metrics</code>.</p>
 <h2 id="pixel-ratio"><a class="header" href="#pixel-ratio">Pixel ratio</a></h2>
 <p><code>rd_set_pixel_ratio(ctx, r)</code> makes a logical pixel <code>r</code> raylib screen pixels: <code>rd_update</code> divides the pointer and
 the screen size by <code>r</code>, and <code>rd_draw</code> scales its drawing by <code>r</code> and rasterizes text and shapes for it. raylib’s web
@@ -240,7 +270,8 @@ rd_set_pixel_ratio(ctx, (float)r);
 <code>FLAG_WINDOW_HIGHDPI</code>, whose scissor scaling raylib applies on the web without rendering at high density. On the
 desktop, raylib’s own <code>FLAG_WINDOW_HIGHDPI</code> handles density and the ratio works as a zoom. Pass logical sizes when
 calling <code>rd_ctx_layout</code> yourself.</p>
-<p>C++: <code>node.paint([](const rd_paint_info&amp; info) { ... })</code>, with the callable owned by the node.</p>
+<p>C++: <code>node.paint([](const rd_paint_info&amp; info) { ... })</code>, with the callable owned by the node, and
+<code>node.clear_paint()</code> to remove it.</p>
 <p>Pair a canvas with listeners on the same node for interaction: pointer events carry <code>local_x</code> and <code>local_y</code>
 relative to the node’s border box. Use the paint callback for drawing only; it must not change the tree.</p>
 <p>The <a href="../extras/graph.html">network view</a> is built on this.</p>

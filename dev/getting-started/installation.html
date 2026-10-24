@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-46055788.js";
+            window.path_to_searchindex_js = "../searchindex-bd641951.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-c393df87.js"></script>
+        <script src="../toc-1e1dc0b8.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -190,13 +190,13 @@ Clang, which take their fixed-type enums as an extension; or C++20 for the C++ l
 <pre><code class="language-cmake">include(FetchContent)
 FetchContent_Declare(raydom
     GIT_REPOSITORY https://github.com/ellimist-dev/raydom.git
-    GIT_TAG        v0.2.5)
+    GIT_TAG        v0.3.0)
 FetchContent_MakeAvailable(raydom)
 
 target_link_libraries(your_app PRIVATE raydom::raydom)
 </code></pre>
 <p>Link <code>raydom::extras</code> instead to get the <a href="../extras/graph.html">network view</a> and <a href="../extras/dialog.html">file dialogs</a>;
-it links <code>raydom::raydom</code> for you.</p>
+it links <code>raydom::raydom</code> for you. Link <code>raydom::router</code> for <a href="../router/router.html">the router</a>.</p>
 <p>raylib is resolved in this order: an existing <code>raylib</code> target in the project, an installed raylib found with
 <code>find_package</code>, then a download. Set <code>RAYDOM_FETCH_RAYLIB=OFF</code> to require one of the first two.</p>
 <h2 id="installed-package"><a class="header" href="#installed-package">Installed package</a></h2>
@@ -204,7 +204,7 @@ it links <code>raydom::raydom</code> for you.</p>
 cmake --build build
 cmake --install build --prefix /your/prefix
 </code></pre>
-<pre><code class="language-cmake">find_package(raydom 0.2 CONFIG REQUIRED)
+<pre><code class="language-cmake">find_package(raydom 0.3 CONFIG REQUIRED)
 target_link_libraries(your_app PRIVATE raydom::raydom)
 </code></pre>
 <p>The package’s version check accepts any patch release of the requested minor version while raydom is below 1.0.
@@ -217,6 +217,7 @@ After 1.0 it accepts any later release with the same major version.</p>
 </thead>
 <tbody>
 <tr><td><code>RAYDOM_BUILD_EXTRAS</code></td><td><code>ON</code></td><td>Build <code>raydom::extras</code></td></tr>
+<tr><td><code>RAYDOM_BUILD_ROUTER</code></td><td><code>ON</code></td><td>Build <code>raydom::router</code></td></tr>
 <tr><td><code>RAYDOM_FILE_DIALOG</code></td><td><code>ON</code></td><td>Native <a href="../extras/dialog.html">file dialogs</a> in extras; needs libdbus on Linux</td></tr>
 <tr><td><code>RAYDOM_FETCH_RAYLIB</code></td><td><code>ON</code></td><td>Download raylib when it can’t be found</td></tr>
 <tr><td><code>RAYDOM_INSTALL</code></td><td>top-level only</td><td>Generate install rules and the CMake package</td></tr>

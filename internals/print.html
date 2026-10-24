@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-bd9e8e22.js";
+            window.path_to_searchindex_js = "searchindex-23463021.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-0c2227d3.js"></script>
+        <script src="toc-a1b31a27.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -193,9 +193,11 @@ text shaping and wrapping, event dispatch, animation, and a renderer on raylib. 
 styles, and lambda callbacks. No exceptions.</li>
 <li><strong>Extras</strong> (<code>extras/</code>): components built only on the public core API (controls, popups, views, toasts, a network
 view, native file dialogs), in a second library, <code>raydom::extras</code>.</li>
+<li><strong>Router</strong> (<code>router/</code>): path routing, history, nested routers and page transitions, in a third library,
+<code>raydom::router</code>, also built only on the public core API. It doesn’t depend on extras.</li>
 <li><strong>Docs</strong> (<code>docs/</code>): the user book, whose code samples are programs compiled and run by the test suite.</li>
-<li><strong>The showcase</strong> (<code>examples/showcase/</code>): one application with a feature tour, a desktop messaging app and a
-Paxos simulation, used as the integration test you look at.</li>
+<li><strong>The showcase</strong> (<code>examples/showcase/</code>): one application with a feature tour, a desktop messaging app, a
+Paxos simulation and a routed app, used as the integration test you look at.</li>
 </ul>
 <h2 id="map-of-the-repository"><a class="header" href="#map-of-the-repository">Map of the repository</a></h2>
 <div class="table-wrapper">
@@ -208,6 +210,7 @@ Paxos simulation, used as the integration test you look at.</li>
 <tr><td><code>src/</code></td><td>The core; <code>*_internal.h</code> are private headers</td></tr>
 <tr><td><code>src/external/</code></td><td>Vendored stb_truetype, stb_image, nanosvg</td></tr>
 <tr><td><code>extras/</code></td><td><code>raydom::extras</code>: headers, sources, vendored nativefiledialog</td></tr>
+<tr><td><code>router/</code></td><td><code>raydom::router</code>: headers and source</td></tr>
 <tr><td><code>tests/</code></td><td>One test program per subsystem, and <code>consumer/</code> for packaging</td></tr>
 <tr><td><code>docs/</code></td><td>The user book, its example programs and its tools</td></tr>
 <tr><td><code>devdocs/</code></td><td>This book</td></tr>
@@ -307,7 +310,8 @@ skipped.</p>
 <tr><td><code>rd__</code></td><td>Internal to the core, shared between core files (<code>src/*_internal.h</code>)</td></tr>
 <tr><td><code>rdx_</code>, <code>RDX_</code></td><td>Public extras API</td></tr>
 <tr><td><code>rdx__</code></td><td>Internal to extras (<code>extras/src/extras_internal.h</code>)</td></tr>
-<tr><td><code>rd::</code>, <code>rdx::</code></td><td>C++ layers</td></tr>
+<tr><td><code>rdr_</code>, <code>RDR_</code></td><td>Public router API</td></tr>
+<tr><td><code>rd::</code>, <code>rdx::</code>, <code>rdr::</code></td><td>C++ layers</td></tr>
 </tbody>
 </table>
 </div>
@@ -328,6 +332,11 @@ stays <code>static</code>.</li>
 section an algorithm follows. Don’t narrate code.</li>
 <li>Public headers document each function in one or two lines above it: what it does, what it returns on failure,
 who owns what.</li>
+<li>Keep stack frames small. Emscripten’s default stack is 64 KB, and an overflow there corrupts memory silently
+rather than crashing where it happens. Each <code>rd_style</code> is about 500 bytes, and every compound literal takes its
+own slot, so a function building many styles adds up: extras’ theme definitions are split into non-inlined
+parts for this. Check with <code>emcc -O3 -Wframe-larger-than=16384</code>. The vendored <code>stbi__load_main</code> takes 38 KB,
+which is acceptable only because image loading runs from shallow call stacks.</li>
 </ul>
 <h2 id="errors"><a class="header" href="#errors">Errors</a></h2>
 <p>The core never aborts on bad input. A function that can fail returns <code>false</code>, a null handle, or does nothing, and
@@ -363,10 +372,11 @@ instead (see <a href="#vendored-code-stays-unmodified">Design decisions</a>).</p
 <tbody>
 <tr><td><code>raydom</code></td><td><code>raydom::raydom</code></td><td>The core: <code>src/*.c</code> plus vendored stb and nanosvg, compiled in</td></tr>
 <tr><td><code>raydom_extras</code></td><td><code>raydom::extras</code></td><td><code>extras/src/*.c</code>, the file dialog backend; links <code>raydom</code></td></tr>
+<tr><td><code>raydom_router</code></td><td><code>raydom::router</code></td><td><code>router/src/router.c</code>; links <code>raydom</code></td></tr>
 </tbody>
 </table>
 </div>
-<p>Both are static libraries. <code>raydom</code> publicly requires <code>c_std_23</code> and <code>cxx_std_20</code>, links raylib publicly, and on
+<p>All are static libraries. <code>raydom</code> publicly requires <code>c_std_23</code> and <code>cxx_std_20</code>, links raylib publicly, and on
 macOS the frameworks raylib needs. Warnings (<code>-Wall -Wextra</code>) are private; the sanitizer link flag is
 <code>BUILD_INTERFACE</code> only, for the tests and examples, and never part of the installed package.</p>
 <h2 id="raylib"><a class="header" href="#raylib">raylib</a></h2>
@@ -400,12 +410,12 @@ missing for targets in that directory).</li>
 compiles a stub that returns errors, so the API stays available.</li>
 </ul>
 <h2 id="options"><a class="header" href="#options">Options</a></h2>
-<p><code>RAYDOM_BUILD_EXTRAS</code>, <code>RAYDOM_FILE_DIALOG</code>, <code>RAYDOM_FETCH_RAYLIB</code>, <code>RAYDOM_INSTALL</code>, <code>RAYDOM_BUILD_TESTS</code>,
+<p><code>RAYDOM_BUILD_EXTRAS</code>, <code>RAYDOM_BUILD_ROUTER</code>, <code>RAYDOM_FILE_DIALOG</code>, <code>RAYDOM_FETCH_RAYLIB</code>, <code>RAYDOM_INSTALL</code>, <code>RAYDOM_BUILD_TESTS</code>,
 <code>RAYDOM_BUILD_EXAMPLES</code>, <code>RAYDOM_SANITIZE</code>. Tests, examples and install rules default to on only when raydom is the
 top-level project, so a project embedding it with FetchContent builds just the libraries.</p>
 <h2 id="installing"><a class="header" href="#installing">Installing</a></h2>
 <p><code>RAYDOM_INSTALL=ON</code> installs the libraries, headers (including the generated <code>version.h</code>) and a CMake package:
-<code>raydomConfig.cmake</code> calls <code>find_dependency(raylib)</code> and imports <code>raydom::raydom</code> and <code>raydom::extras</code>. The version
+<code>raydomConfig.cmake</code> calls <code>find_dependency(raylib)</code> and imports <code>raydom::raydom</code>, <code>raydom::extras</code> and <code>raydom::router</code>. The version
 file uses <code>SameMinorVersion</code> while the major version is 0 and <code>SameMajorVersion</code> after.</p>
 <p>Platform libraries the extras need (AppKit, UniformTypeIdentifiers, ole32, dbus-1) are attached as plain link
 names, so they survive export without imported targets.</p>
@@ -419,6 +429,7 @@ enumerator counts as breaking.</p>
 <h2 id="layers"><a class="header" href="#layers">Layers</a></h2>
 <pre><code class="language-text"> application
      │
+     ├── raydom::router   routes, history, nested routers, links, transitions
      ├── raydom::extras   controls, popups, views, toasts, network view, file dialogs
      │        │           (public core API only, plus rd_ctx_extension and layout hooks)
      ▼        ▼
@@ -1007,6 +1018,63 @@ callbacks.</p>
 close by animating opacity, height and padding to zero (height from <code>auto</code>, so the stack closes up smoothly), then
 destroying themselves with a timer. A per-context list of live toasts lets <code>rdx_toast_close</code> find a toast’s state.</p>
 <div style="break-before: page; page-break-before: always;"></div>
+<h1 id="router"><a class="header" href="#router">Router</a></h1>
+<p><code>raydom::router</code> (<code>router/src/router.c</code>) is built only on the public core API, like extras, and doesn’t depend on
+extras. Its user-facing behavior is in the user book’s Router chapter; this page covers how it’s put together.</p>
+<h2 id="state"><a class="header" href="#state">State</a></h2>
+<p>Each router’s state is attached to its node (<code>rd_node_attach</code>). It holds the routes, the current match (route
+index, parameters, base, consumed path, the page’s wrapper), the handles of nested routers created with it as
+parent, and the transition in progress. Only the root router uses its history, path, pending navigation and trail
+fields.</p>
+<p>Nested routers find their parent by handle, not pointer, and the parent prunes dead children lazily. Destroying a
+page that holds a nested router needs no unregistration.</p>
+<p>A context-wide registry is attached to the root node. It holds the router used last and the link handles, and
+installs the two root listeners: <code>KEY_DOWN</code> for Cmd+[ / Cmd+] (Alt+Left / Alt+Right outside Apple platforms) and
+<code>POINTER_DOWN</code> for the side buttons. <code>alt_arrows</code> decides the Alt case: at compile time natively, and under
+Emscripten from the browser’s platform, read once and also passed to the JavaScript keydown filter.</p>
+<p><code>link_router</code> picks a link’s router (its own, else the one around it, else the one used last) for both clicks
+and marking. <code>apply</code> marks every link after a navigation; <code>rdr_link_attach</code> marks only the new link, and not
+at all while its root is navigating, since <code>apply</code> will.</p>
+<h2 id="navigation"><a class="header" href="#navigation">Navigation</a></h2>
+<p><code>request</code> runs a navigation on the root router, or queues it when one is already running (the <code>navigating</code>
+flag). That flag covers the builders and the <code>CHANGE</code> dispatch. The queue holds one entry, the latest, and is
+drained at most 16 times, which bounds redirect loops.</p>
+<p><code>apply</code> normalizes the path, checks that the root matches it, updates history, and calls <code>resolve</code> on the root.
+Then it rebuilds the trail, marks links, and fires <code>CHANGE</code>. <code>resolve</code> matches one router against its segments.
+It keeps the page if the route and parameters are unchanged, or if the route is kept alive and its wrapper is
+the one showing (only the parameters change then), and otherwise swaps pages through <code>change_pages</code>.
+Then it recurses into the nested routers inside the current page with the segments the route’s wildcard left.
+After each builder it re-finds its state, because a builder may destroy the router.</p>
+<h2 id="matching"><a class="header" href="#matching">Matching</a></h2>
+<p>A pattern is parsed into segments: literal, parameter, or wildcard, each possibly optional. <code>bind</code> tries every
+choice of optional segments, at most 2^16, earlier ones included first. It ranks each binding by a per-path-segment
+array (literal 3, parameter 2, wildcard 1), compared lexicographically. A binding without a wildcard wins ties.
+A binding’s arrays are heap-allocated, sized for the router’s longest pattern and the path, so neither has a
+segment limit; <code>best_route</code> and <code>router_crumbs</code> allocate them once per call and <code>bind</code> reuses a scratch one.
+Across routes, ties go to the route added first.</p>
+<h2 id="trail"><a class="header" href="#trail">Trail</a></h2>
+<p><code>build_trail</code> walks the chain of current routers from the root. Each router stores the segments it resolved
+against (<code>sub</code>) and how many its route consumed. <code>router_crumbs</code> re-runs <code>bind</code> for each prefix of <code>sub</code>. It
+goes up to the consumed count when a nested router continues the trail, and up to the full length otherwise.
+For each prefix it keeps the best route that matches without a wildcard capturing anything and that doesn’t
+start with a wildcard. The current route is skipped there and named last.</p>
+<p>Each crumb gets an <code>rdr_match</code> for that prefix, holding its parameters with the router above for inherited
+ones. That match is passed to the title function, or used to substitute <code>:name</code> in the static title. Crumbs
+whose path equals the previous crumb’s are dropped. A route with a title function can name ancestors from
+data even though their pages aren’t built.</p>
+<h2 id="transitions-1"><a class="header" href="#transitions-1">Transitions</a></h2>
+<p>Each page sits in a wrapper (<code>SLOT</code>): a relative flex column that grows to fill the router. On a change, the old
+wrapper becomes absolute at inset 0 and is disabled and made pointer-transparent. Both wrappers are animated
+with <code>rd_node_animate</code>: opacity for fade, <code>inset</code> percentages for slide. The leaving wrapper gets an explicit
+<code>from</code>, because an unset inset doesn’t interpolate. A kept-alive wrapper coming back from <code>display: none</code> gets
+<code>display</code> in its <code>from</code>, since the animation system doesn’t animate out of a hidden state.</p>
+<p>The end is a context timer, not the animation’s <code>done</code> callback, so it can carry a destroy function. Its data is
+<code>{router handle, sequence}</code>. A timer that fires after the router is gone, or after a newer transition started,
+does nothing. <code>finish</code> ends a transition at once. It’s called at the start of every page change and by
+<code>rdr_router_set_transition</code>, so at most one old page exists per router.</p>
+<h2 id="not-yet"><a class="header" href="#not-yet">Not yet</a></h2>
+<p>Browser history and URL hash sync for Emscripten builds; the router keeps its own history there.</p>
+<div style="break-before: page; page-break-before: always;"></div>
 <h1 id="documentation"><a class="header" href="#documentation">Documentation</a></h1>
 <p>There are two books:</p>
 <div class="table-wrapper">
@@ -1166,6 +1234,7 @@ sample means writing a small test program.</p>
 <tr><td>Images</td><td>GIFs show the first frame; SVG lacks text, filters, masks, clip paths and patterns</td></tr>
 <tr><td>Input</td><td>No touch or gestures beyond raylib’s mouse</td></tr>
 <tr><td>Views</td><td>Fixed row heights; no column resizing; tree items are added up front</td></tr>
+<tr><td>Router</td><td>No browser history or URL sync on the web; no query strings or percent-decoding; slide moves <code>inset</code> (no transforms in the core); cached layout keeps it to the wrapper and its ancestors per frame</td></tr>
 <tr><td>Threads</td><td>A context is single-threaded</td></tr>
 </tbody>
 </table>
@@ -1180,10 +1249,12 @@ destroyed. Auto-repeated tracks cover the common case (columns that follow the w
 hold counted references.</li>
 <li><strong>Class changes scan every node.</strong> <code>invalidate_class</code> is O(nodes). Fine at startup; a per-class node list would
 fix it if classes start changing at runtime.</li>
-<li><strong>Linear registries.</strong> <code>rdx__lookup</code> and the popup and toast lists are linear scans. Fine for the numbers of
-components a UI has; controls already use an O(1) index.</li>
-<li><strong>Glyph atlas resets when full.</strong> A UI showing many sizes of many glyphs at once could thrash it. Multiple atlas
-pages would fix it.</li>
+<li><strong>Linear registries.</strong> The popup and toast lists are linear scans. Fine for the numbers of popups a UI has open.</li>
+<li><strong>Glyph atlas cap.</strong> When a frame overflows the 2048² atlas it is emptied once, then grown to 4096² (64 MB as
+RGBA). Glyphs that still don’t fit are skipped, and an empty atlas is retried every 60 frames. Pages, or a
+single-channel atlas, would lift the cap and quarter the memory.</li>
+<li><strong>Shader after rd_draw.</strong> rlgl keeps the active shader private, so <code>rd_draw</code> can’t restore an app’s shader and
+exits with raylib’s default. Blend state is read from GL and restored.</li>
 <li><strong><code>rd_ctx</code> padding.</strong> clang-tidy’s opt-in padding check flags 33 bytes; reorder fields when convenient.</li>
 <li><strong>nanosvg gradients</strong> with unitless fractional coordinates render as a flat color (upstream bug; use
 percentages).</li>

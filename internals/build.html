@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-bd9e8e22.js";
+            window.path_to_searchindex_js = "searchindex-23463021.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-0c2227d3.js"></script>
+        <script src="toc-a1b31a27.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -187,10 +187,11 @@
 <tbody>
 <tr><td><code>raydom</code></td><td><code>raydom::raydom</code></td><td>The core: <code>src/*.c</code> plus vendored stb and nanosvg, compiled in</td></tr>
 <tr><td><code>raydom_extras</code></td><td><code>raydom::extras</code></td><td><code>extras/src/*.c</code>, the file dialog backend; links <code>raydom</code></td></tr>
+<tr><td><code>raydom_router</code></td><td><code>raydom::router</code></td><td><code>router/src/router.c</code>; links <code>raydom</code></td></tr>
 </tbody>
 </table>
 </div>
-<p>Both are static libraries. <code>raydom</code> publicly requires <code>c_std_23</code> and <code>cxx_std_20</code>, links raylib publicly, and on
+<p>All are static libraries. <code>raydom</code> publicly requires <code>c_std_23</code> and <code>cxx_std_20</code>, links raylib publicly, and on
 macOS the frameworks raylib needs. Warnings (<code>-Wall -Wextra</code>) are private; the sanitizer link flag is
 <code>BUILD_INTERFACE</code> only, for the tests and examples, and never part of the installed package.</p>
 <h2 id="raylib"><a class="header" href="#raylib">raylib</a></h2>
@@ -224,12 +225,12 @@ missing for targets in that directory).</li>
 compiles a stub that returns errors, so the API stays available.</li>
 </ul>
 <h2 id="options"><a class="header" href="#options">Options</a></h2>
-<p><code>RAYDOM_BUILD_EXTRAS</code>, <code>RAYDOM_FILE_DIALOG</code>, <code>RAYDOM_FETCH_RAYLIB</code>, <code>RAYDOM_INSTALL</code>, <code>RAYDOM_BUILD_TESTS</code>,
+<p><code>RAYDOM_BUILD_EXTRAS</code>, <code>RAYDOM_BUILD_ROUTER</code>, <code>RAYDOM_FILE_DIALOG</code>, <code>RAYDOM_FETCH_RAYLIB</code>, <code>RAYDOM_INSTALL</code>, <code>RAYDOM_BUILD_TESTS</code>,
 <code>RAYDOM_BUILD_EXAMPLES</code>, <code>RAYDOM_SANITIZE</code>. Tests, examples and install rules default to on only when raydom is the
 top-level project, so a project embedding it with FetchContent builds just the libraries.</p>
 <h2 id="installing"><a class="header" href="#installing">Installing</a></h2>
 <p><code>RAYDOM_INSTALL=ON</code> installs the libraries, headers (including the generated <code>version.h</code>) and a CMake package:
-<code>raydomConfig.cmake</code> calls <code>find_dependency(raylib)</code> and imports <code>raydom::raydom</code> and <code>raydom::extras</code>. The version
+<code>raydomConfig.cmake</code> calls <code>find_dependency(raylib)</code> and imports <code>raydom::raydom</code>, <code>raydom::extras</code> and <code>raydom::router</code>. The version
 file uses <code>SameMinorVersion</code> while the major version is 0 and <code>SameMajorVersion</code> after.</p>
 <p>Platform libraries the extras need (AppKit, UniformTypeIdentifiers, ole32, dbus-1) are attached as plain link
 names, so they survive export without imported targets.</p>

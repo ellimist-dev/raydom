@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-46055788.js";
+            window.path_to_searchindex_js = "../searchindex-bd641951.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-c393df87.js"></script>
+        <script src="../toc-1e1dc0b8.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -189,6 +189,9 @@ that must sit above everything goes in the <a href="../guide/overlay.html">overl
 <li>No <code>aspect_ratio</code>, no <code>transform</code>. Animate <code>inset</code> to move a node without reflowing its neighbors.</li>
 <li>Transitions don’t animate <code>width: auto</code>, unit changes (px to %), or <code>display</code>; those change at once.</li>
 <li><code>min_width</code>/<code>min_height</code> <code>auto</code> is 0, not the content size.</li>
+<li>Lengths, sizes and flex factors are clamped to ±1e9 (pixels, or the factor itself); a NaN length means <code>auto</code>.</li>
+<li>In WebAssembly builds, Emscripten’s default 64 KB stack holds about 200 levels of nested flex containers, or 340
+of nested grids. Deeper trees need a larger <code>-sSTACK_SIZE</code>.</li>
 </ul>
 <h2 id="text"><a class="header" href="#text">Text</a></h2>
 <ul>
@@ -213,6 +216,11 @@ fractions (<code>x2="1"</code>) render as a flat color; use percentages (<code>x
 <li>Shadows are outer box shadows only.</li>
 <li>No gradients.</li>
 </ul>
+<h2 id="router"><a class="header" href="#router">Router</a></h2>
+<p>Paths have no query strings or fragments, and segments aren’t percent-decoded. In WebAssembly builds the router
+doesn’t read or write the browser’s URL or history; it keeps the browser from leaving the page on back and forward
+input instead. There are no transforms, so slide transitions move pages
+with <code>inset</code>. Layout caches keep that cheap: a page’s contents aren’t measured again while it slides.</p>
 <h2 id="threads"><a class="header" href="#threads">Threads</a></h2>
 <p>A context is single-threaded. Separate contexts on separate threads don’t share state, but raylib drawing must
 happen on the thread that owns the window.</p>

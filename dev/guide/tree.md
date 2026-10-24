@@ -47,7 +47,8 @@ rd_node_append(ctx, list, c);  // and can be attached again later
 ```
 
 `rd_node_append` and `rd_node_insert_before` move a node that already has a parent. They fail, returning `false`,
-when the move would create a cycle, or when either handle is stale. A detached node keeps its subtree, styles and
+when the move would create a cycle, or when either handle is stale. Appending to the root inserts before the
+[overlay](overlay.md) while the overlay is the root's child. A detached node keeps its subtree, styles and
 listeners. It isn't laid out, drawn or hit-tested.
 
 ## Userdata

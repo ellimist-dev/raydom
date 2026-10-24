@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-46055788.js";
+            window.path_to_searchindex_js = "../searchindex-bd641951.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-c393df87.js"></script>
+        <script src="../toc-1e1dc0b8.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -214,7 +214,8 @@ rd_node_detach(ctx, c);        // c stays alive, owned by the context, outside t
 rd_node_append(ctx, list, c);  // and can be attached again later
 </code></pre>
 <p><code>rd_node_append</code> and <code>rd_node_insert_before</code> move a node that already has a parent. They fail, returning <code>false</code>,
-when the move would create a cycle, or when either handle is stale. A detached node keeps its subtree, styles and
+when the move would create a cycle, or when either handle is stale. Appending to the root inserts before the
+<a href="overlay.html">overlay</a> while the overlay is the root’s child. A detached node keeps its subtree, styles and
 listeners. It isn’t laid out, drawn or hit-tested.</p>
 <h2 id="userdata"><a class="header" href="#userdata">Userdata</a></h2>
 <p>Each node carries one <code>void*</code> and an optional destroy callback that runs when the node is destroyed or the userdata

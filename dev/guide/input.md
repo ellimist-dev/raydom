@@ -18,7 +18,13 @@ save.on_click([&] { ++saves; });  // also fires on Enter or Space while focused
 
 Tab and Shift+Tab move through `TAB` nodes in tree order, wrapping, skipping hidden and disabled subtrees.
 `rd_node_focus(ctx, node)` focuses from code; a null node clears focus. `rd_ctx_focus_next` steps like Tab. A focus
-change fires `BLUR`, `FOCUS_OUT`, `FOCUS`, `FOCUS_IN`, in that order.
+change fires `BLUR`, `FOCUS_OUT`, `FOCUS`, `FOCUS_IN`, in that order, after `CHANGE` when the input losing focus was
+edited. A listener in that sequence that moves focus again takes over: its own change runs in full and the rest of
+the outer sequence is skipped, so no node is blurred twice.
+
+A focused node that is destroyed, detached, hidden with `display: none` or disabled (itself or an ancestor) loses
+focus at the end of the next `rd_ctx_layout`, with the same `CHANGE`, `BLUR` and `FOCUS_OUT` events, and its `FOCUS` and `FOCUS_WITHIN`
+states are cleared. `rd_ctx_focused` returns null for it at once.
 
 `rd_ctx_set_focus_scope(ctx, node)` keeps Tab and Shift+Tab inside a subtree, as a modal dialog needs; null
 restores the whole tree, and so does destroying the scope node. Pointer and programmatic focus aren't restricted.
@@ -72,7 +78,13 @@ elsewhere:
 | Shortcut + Y                | Redo                                    |
 | Enter                       | Newline in multi-line; `CHANGE` in single-line |
 
-Consecutive typed characters form one undo step.
+Consecutive typed characters form one undo step. Moving the caret, `rd_input_select`, blur and `rd_node_set_text`
+end the step. `rd_node_set_text` on an input is itself an undo step: undo after it returns to the value before it,
+and typing after it undoes back to the value it set.
+
+Text from `TEXT` events is code points. A UTF-16 high surrogate followed by a low one is joined into one code
+point; lone halves are dropped. Pasted text drops control characters other than tab and, in a multi-line input,
+newline (a single-line input turns newlines into spaces), and invalid UTF-8 becomes U+FFFD.
 
 ## Clipboard
 

@@ -36,10 +36,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-46055788.js";
+            window.path_to_searchindex_js = "../searchindex-bd641951.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-c393df87.js"></script>
+        <script src="../toc-1e1dc0b8.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -205,6 +205,9 @@ padding plus border.</li>
 </ul>
 <p><code>flex_basis: 0</code> with <code>flex_grow: 1</code> splits free space without regard to content, which is the common “fill the rest”
 pattern.</p>
+<p>Shrinking follows CSS: each item gives up overflow in proportion to <code>flex_shrink</code> times its base size less its
+padding and border. Two items with a 100px basis in a 100px row split the overflow evenly, unless one has 20px of
+padding on each side, in which case it shrinks by 37.5px and the other by 62.5px.</p>
 <h2 id="grid"><a class="header" href="#grid">Grid</a></h2>
 <pre><code class="language-c">rd_track  cols[3] = {rd_track_of(rd_px(200)), rd_track_of(rd_fr(1)), rd_track_of(rd_fr(2))};
 rd_node   grid    = add(ctx, root,
@@ -223,7 +226,8 @@ refer to. The list lives until the context is destroyed. C++ builds them with
 CSS. <code>rd_track_minmax</code> builds any other pair.</p>
 <p>Placement uses <code>grid_{column,row}_{start,end}</code>: <code>rd_line(n)</code> is a 1-based line, negative from the end of the
 explicit grid; <code>rd_span(n)</code> spans tracks. Items without placement are auto-placed in <code>grid_auto_flow</code> order into
-implicit tracks sized by <code>grid_auto_rows</code> and <code>grid_auto_columns</code>.</p>
+implicit tracks sized by <code>grid_auto_rows</code> and <code>grid_auto_columns</code>. Items with only a row (or, in column flow, only a
+column) go there first, each after the ones before it in the same row, adding implicit columns when the row is full.</p>
 <p>The algorithm follows <a href="https://www.w3.org/TR/css-grid-1/#layout-algorithm">CSS Grid §11</a>. Named lines, named areas
 and <code>dense</code> packing are not implemented.</p>
 <h3 id="auto-repeated-tracks"><a class="header" href="#auto-repeated-tracks">Auto-repeated tracks</a></h3>
@@ -276,8 +280,9 @@ rd_rect h = rd_node_bounds(ctx, header);  // relative to the root, after scrolli
                                .height   = rd_px(12)});
 </code></pre>
 <p>An absolute node is positioned against its parent’s padding box using <code>inset</code>. With both insets on an axis and
-no size, it stretches between them. It takes no space in the parent’s
-flex or grid layout.</p>
+no size, it stretches between them. With both insets and a size, <code>auto</code> margins share the space left over, so
+<code>inset: 0</code> with a width, a height and <code>margin: auto</code> centers it. It takes no space in the parent’s flex or grid
+layout.</p>
 <h2 id="scrolling"><a class="header" href="#scrolling">Scrolling</a></h2>
 <pre><code class="language-c">rd_node list = add(ctx, root, (rd_style){.height = rd_px(200), .overflow_y = RD_OVERFLOW_SCROLL});
 for (int i = 0; i &lt; 50; i++) add(ctx, list, (rd_style){.height = rd_px(24)});

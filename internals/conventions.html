@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-bd9e8e22.js";
+            window.path_to_searchindex_js = "searchindex-23463021.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-0c2227d3.js"></script>
+        <script src="toc-a1b31a27.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -190,7 +190,8 @@
 <tr><td><code>rd__</code></td><td>Internal to the core, shared between core files (<code>src/*_internal.h</code>)</td></tr>
 <tr><td><code>rdx_</code>, <code>RDX_</code></td><td>Public extras API</td></tr>
 <tr><td><code>rdx__</code></td><td>Internal to extras (<code>extras/src/extras_internal.h</code>)</td></tr>
-<tr><td><code>rd::</code>, <code>rdx::</code></td><td>C++ layers</td></tr>
+<tr><td><code>rdr_</code>, <code>RDR_</code></td><td>Public router API</td></tr>
+<tr><td><code>rd::</code>, <code>rdx::</code>, <code>rdr::</code></td><td>C++ layers</td></tr>
 </tbody>
 </table>
 </div>
@@ -211,6 +212,11 @@ stays <code>static</code>.</li>
 section an algorithm follows. Don’t narrate code.</li>
 <li>Public headers document each function in one or two lines above it: what it does, what it returns on failure,
 who owns what.</li>
+<li>Keep stack frames small. Emscripten’s default stack is 64 KB, and an overflow there corrupts memory silently
+rather than crashing where it happens. Each <code>rd_style</code> is about 500 bytes, and every compound literal takes its
+own slot, so a function building many styles adds up: extras’ theme definitions are split into non-inlined
+parts for this. Check with <code>emcc -O3 -Wframe-larger-than=16384</code>. The vendored <code>stbi__load_main</code> takes 38 KB,
+which is acceptable only because image loading runs from shallow call stacks.</li>
 </ul>
 <h2 id="errors"><a class="header" href="#errors">Errors</a></h2>
 <p>The core never aborts on bad input. A function that can fail returns <code>false</code>, a null handle, or does nothing, and

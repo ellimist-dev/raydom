@@ -35,10 +35,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-bd9e8e22.js";
+            window.path_to_searchindex_js = "searchindex-23463021.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-0c2227d3.js"></script>
+        <script src="toc-a1b31a27.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -192,6 +192,7 @@
 <tr><td>Images</td><td>GIFs show the first frame; SVG lacks text, filters, masks, clip paths and patterns</td></tr>
 <tr><td>Input</td><td>No touch or gestures beyond raylib’s mouse</td></tr>
 <tr><td>Views</td><td>Fixed row heights; no column resizing; tree items are added up front</td></tr>
+<tr><td>Router</td><td>No browser history or URL sync on the web; no query strings or percent-decoding; slide moves <code>inset</code> (no transforms in the core); cached layout keeps it to the wrapper and its ancestors per frame</td></tr>
 <tr><td>Threads</td><td>A context is single-threaded</td></tr>
 </tbody>
 </table>
@@ -206,10 +207,12 @@ destroyed. Auto-repeated tracks cover the common case (columns that follow the w
 hold counted references.</li>
 <li><strong>Class changes scan every node.</strong> <code>invalidate_class</code> is O(nodes). Fine at startup; a per-class node list would
 fix it if classes start changing at runtime.</li>
-<li><strong>Linear registries.</strong> <code>rdx__lookup</code> and the popup and toast lists are linear scans. Fine for the numbers of
-components a UI has; controls already use an O(1) index.</li>
-<li><strong>Glyph atlas resets when full.</strong> A UI showing many sizes of many glyphs at once could thrash it. Multiple atlas
-pages would fix it.</li>
+<li><strong>Linear registries.</strong> The popup and toast lists are linear scans. Fine for the numbers of popups a UI has open.</li>
+<li><strong>Glyph atlas cap.</strong> When a frame overflows the 2048² atlas it is emptied once, then grown to 4096² (64 MB as
+RGBA). Glyphs that still don’t fit are skipped, and an empty atlas is retried every 60 frames. Pages, or a
+single-channel atlas, would lift the cap and quarter the memory.</li>
+<li><strong>Shader after rd_draw.</strong> rlgl keeps the active shader private, so <code>rd_draw</code> can’t restore an app’s shader and
+exits with raylib’s default. Blend state is read from GL and restored.</li>
 <li><strong><code>rd_ctx</code> padding.</strong> clang-tidy’s opt-in padding check flags 33 bytes; reorder fields when convenient.</li>
 <li><strong>nanosvg gradients</strong> with unitless fractional coordinates render as a flat color (upstream bug; use
 percentages).</li>
