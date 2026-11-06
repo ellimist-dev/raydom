@@ -38,5 +38,20 @@ int main() {
   CHECK(save.focused() && saves == 1);
   ctx.press(RD_KEY_ESCAPE);
   CHECK(ctx.focused().handle().index == 0);
+
+  // Lines of a value, scrolling them and any node into view.
+  rd::Node scroller = ctx.create(rd::Style().height(50_px).overflow_y(RD_OVERFLOW_SCROLL).line_height(20_px));
+  rd::Node editor   = ctx.create(rd::Style().flex_shrink(rd::num(0))).make_input(true);
+  rd::Node end      = ctx.create(rd::Style().height(10_px).flex_shrink(rd::num(0)));
+  form.append(scroller.append(editor).append(end));
+  editor.text("a\nb\nc\nd\ne");
+  CHECK(!editor.line_rect(0));  // not laid out yet
+  ctx.layout(400, 300);
+  auto line = editor.line_rect(2);
+  CHECK(line && line->y == 40 && line->height == 20);
+  CHECK(!editor.line_rect(5) && !editor.scroll_to_line(5));
+  CHECK(editor.scroll_to_line(3) && scroller.scroll().y == 30);
+  end.scroll_into_view(5);
+  CHECK(scroller.scroll().y == 60);
   return TEST_RESULT();
 }

@@ -50,10 +50,11 @@ Stopping at the target doesn't undo capture listeners that already ran on ancest
 | `INPUT`                      | The input                  | Yes     |                                    |
 | `CHANGE`                     | The input                  | Yes     |                                    |
 | `SELECTION_CHANGE`           | The root                   | No      |                                    |
+| `FILE_DROP`                  | Node under the drop; over a disabled node or nothing, the root | Yes | |
 
 Event fields: `x`, `y` in root coordinates; `local_x`, `local_y` relative to `current`'s border box; `wheel_x`,
 `wheel_y` in notches; `button` (the button that changed) and `buttons` (held mask); `clicks` for `CLICK`; `key`, `mods`, `repeat`;
-`codepoint` for text; `related` for focus events.
+`codepoint` for text; `related` for focus events; `paths`, `path_count` for dropped files.
 
 Buttons are `RD_BUTTON_PRIMARY`, `SECONDARY`, `MIDDLE`, and a mouse's side buttons `RD_BUTTON_BACK` and
 `RD_BUTTON_FORWARD`; [the router](../router/router.md) takes the side buttons for history. A disabled node gets no
@@ -88,6 +89,19 @@ released or `rd_node_release_pointer_capture` is called. Use it for drags, slide
 current pointer position and modifiers. Components use it to announce their own `INPUT` and `CHANGE`, so
 applications listen to them the same way as to built-in inputs. It returns false if a listener called
 `rd_event_prevent_default`.
+
+## Dropped files
+
+Files dropped on the window fire `RD_EVENT_FILE_DROP` at the node under them:
+
+```cpp
+{{#include ../../examples/events.cc:drop}}
+```
+
+The paths are valid during dispatch; copy what you keep. `rd_update` takes the files from raylib and unloads them, so
+`IsFileDropped` is false after it: an application reading raylib's list itself does so before `rd_update`. In tests, or
+without raylib, `rd_ctx_drop_files` fires the event. raylib reports a drop only as it happens, so there's no event for a
+drag passing over the window. In a browser the paths are in Emscripten's in-memory filesystem, readable with `fopen`.
 
 ## Hit-testing
 

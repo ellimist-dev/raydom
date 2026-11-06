@@ -54,5 +54,10 @@ int main() {
   CHECK(a == a && std::hash<rd::Class>{}(a) == std::hash<rd::Class>{}(a));
   rd::Node chained = ctx.create().style(rd::Style().width(5_px)).add_class(a);
   CHECK(chained.has_class(a));
+
+  // A heading entry: copied through to C, and not an item.
+  rd::Node headed = rdx::menu(ctx, {{.label = "Group", .heading = true}, {.label = "Item"}}, {.x = 1, .y = 1}, [](int) {});
+  CHECK(headed && headed.first_child().role() == RD_ROLE_HEADING);
+  CHECK(headed.last_child().role() == RD_ROLE_MENU_ITEM);
   return TEST_RESULT();
 }

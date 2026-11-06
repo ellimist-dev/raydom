@@ -34,8 +34,9 @@ static float space_width(rd__font* f, float scale) {
   return (float)adv * scale;
 }
 
-static bool tokenize(rd_text* t, rd__font* f, float size, rd_white_space ws) {
-  if (t->tok_valid && t->tok_font == f && t->tok_size == size && t->tok_ws == ws) return true;
+// Letter spacing goes after every codepoint, spaces included, as in CSS.
+static bool tokenize(rd_text* t, rd__font* f, float size, float spacing, rd_white_space ws) {
+  if (t->tok_valid && t->tok_font == f && t->tok_size == size && t->tok_spacing == spacing && t->tok_ws == ws) return true;
   t->token_count  = 0;
   t->lines_valid  = false;
   float    scale  = rd__font_scale(f, size);
@@ -49,7 +50,7 @@ static bool tokenize(rd_text* t, rd__font* f, float size, rd_white_space ws) {
 #define FLUSH_WORD()                                                                    \
   do {                                                                                  \
     if (wstart != UINT32_MAX) {                                                         \
-      ok &= push_token(t, (rd__token){wstart, j, (float)units * scale, RD_TOKEN_WORD}); \
+      ok &= push_token(t, (rd__token){wstart, j, (float)units * scale + (float)(j - wstart) * spacing, RD_TOKEN_WORD}); \
       wstart = UINT32_MAX;                                                              \
       units  = 0;                                                                       \
       prev   = -1;                                                                      \
@@ -64,8 +65,9 @@ static bool tokenize(rd_text* t, rd__font* f, float size, rd_white_space ws) {
     } else if (is_space(c)) {
       FLUSH_WORD();
       if (c == '\r' && !coll) continue;
-      float      w    = coll ? sw : c == '\t' ? 4 * sw
-                                              : sw;
+      float      w    = (coll ? sw : c == '\t' ? 4 * sw
+                                               : sw) +
+                  spacing;
       rd__token* last = t->token_count ? &t->tokens[t->token_count - 1] : NULL;
       if (last && last->kind == RD_TOKEN_SPACE && last->end == j) {
         last->end = j + 1;
@@ -77,7 +79,7 @@ static bool tokenize(rd_text* t, rd__font* f, float size, rd_white_space ws) {
       int32_t adv, g = rd__font_glyph(f, c, &adv);
       if (is_cjk(c)) {
         FLUSH_WORD();
-        ok &= push_token(t, (rd__token){j, j + 1, (float)adv * scale, RD_TOKEN_WORD});
+        ok &= push_token(t, (rd__token){j, j + 1, (float)adv * scale + spacing, RD_TOKEN_WORD});
         continue;
       }
       if (wstart == UINT32_MAX) wstart = j;
@@ -91,6 +93,7 @@ static bool tokenize(rd_text* t, rd__font* f, float size, rd_white_space ws) {
 
   t->tok_font  = f;
   t->tok_size  = size;
+  t->tok_spacing = spacing;
   t->tok_ws    = ws;
   t->tok_valid = ok;
   return ok;
@@ -180,12 +183,28 @@ static float line_height(const rd_style* st) {
   }
 }
 
+// In pixels: rd_px, or rd_num or rd_pct of the font size, like line_height.
+static float letter_spacing(const rd_style* st) {
+  float v = st->letter_spacing.value;
+  if (!isfinite(v)) return 0;
+  switch (st->letter_spacing.unit) {
+    case RD_UNIT_PX:
+      return v;
+    case RD_UNIT_PCT:
+      return v * st->font_size.value / 100.0f;
+    case RD_UNIT_NUM:
+      return v * st->font_size.value;
+    default:
+      return 0;
+  }
+}
+
 static const rd_style* text_style(const rd_text* t) { return &t->ctx->styles[t->node].computed; }
 
 static rd__font* prepare(rd_text* t) {
   const rd_style* st = text_style(t);
   rd__font*       f  = rd__font_get(t->ctx, st->font);
-  if (!f || !tokenize(t, f, st->font_size.value, text_ws(t, st))) return NULL;
+  if (!f || !tokenize(t, f, st->font_size.value, letter_spacing(st), text_ws(t, st))) return NULL;
   return f;
 }
 
@@ -337,6 +356,7 @@ bool rd__text_layout_get(rd_ctx* ctx, uint32_t i, float width, rd__text_layout* 
       .baseline    = first_baseline(f, st),
       .units       = rd__font_scale(f, st->font_size.value),
       .space_width = space_width(f, rd__font_scale(f, st->font_size.value)),
+      .letter_spacing = letter_spacing(st),
       .cp_count    = t->cp_count,
       .collapse    = coll,
   };
@@ -419,11 +439,11 @@ static void walk_line(const rd__text_layout* tl, uint32_t li, cp_visit fn, void*
     for (uint32_t j = tok->start; j < tok->end; j++) {
       float w;
       if (tok->kind == RD_TOKEN_SPACE) {
-        w = tl->collapse ? (j == tok->start ? tok->width : 0) : tl->cps[j] == '\t' ? 4 * tl->space_width
-                                                                                   : tl->space_width;
+        w = tl->collapse ? (j == tok->start ? tok->width : 0)
+                         : (tl->cps[j] == '\t' ? 4 * tl->space_width : tl->space_width) + tl->letter_spacing;
       } else {
         int32_t adv, g = rd__font_glyph(tl->font, tl->cps[j], &adv);
-        w    = ((float)adv + (prev >= 0 ? (float)rd__font_kern(tl->font, prev, g) : 0)) * tl->units;
+        w    = ((float)adv + (prev >= 0 ? (float)rd__font_kern(tl->font, prev, g) : 0)) * tl->units + tl->letter_spacing;
         prev = g;
       }
       if (!fn(user, j, x, w)) return;

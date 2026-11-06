@@ -29,6 +29,9 @@ struct rd__input {
   bool      typing;   // the last edit was typed text, so the next one joins its undo step
   bool      editing;  // inside an edit's own rd_node_set_text
   uint32_t  high;     // a UTF-16 high surrogate waiting for its low half
+  uint32_t* starts;   // codepoint each line of the value starts at, built when asked for
+  uint32_t  start_count;
+  bool      starts_valid;
 };
 
 #ifdef __APPLE__
@@ -51,6 +54,7 @@ void rd__input_free(rd__input* in) {
   free(in->undo.items);
   free(in->redo.items);
   free(in->placeholder);
+  free(in->starts);
   free(in);
 }
 
@@ -60,6 +64,7 @@ static size_t snap_byte(const rd_text* t, size_t b) {
 }
 
 void rd__input_clamp(rd_text* t) {
+  t->input->starts_valid = false;
   t->input->anchor = snap_byte(t, t->input->anchor);
   t->input->caret  = snap_byte(t, t->input->caret);
 }
@@ -461,6 +466,57 @@ void rd__input_text(rd_ctx* ctx, uint32_t i, uint32_t cp) {
   size_t lo = in->anchor < in->caret ? in->anchor : in->caret;
   size_t hi = in->anchor < in->caret ? in->caret : in->anchor;
   replace(t, lo, hi, buf, n, cp != ' ');
+}
+
+// Lines of the value.
+
+static bool line_starts(rd_text* t) {
+  rd__input* in = t->input;
+  if (in->starts_valid) return true;
+  uint32_t n = 1;
+  for (uint32_t j = 0; j < t->cp_count; j++) n += t->cps[j] == '\n';
+  uint32_t* p = realloc(in->starts, n * sizeof *p);
+  if (!p) return false;
+  in->starts      = p;
+  in->start_count = 0;
+  p[in->start_count++] = 0;
+  for (uint32_t j = 0; j < t->cp_count; j++)
+    if (t->cps[j] == '\n') p[in->start_count++] = j + 1;
+  in->starts_valid = true;
+  return true;
+}
+
+// The multi-line input with that line, or null.
+static rd_text* with_line(const rd_ctx* ctx, rd_node node, uint32_t line) {
+  rd_text* t = rd__slot(ctx, node) ? rd__text_get(ctx, node.index) : NULL;
+  if (!t || !t->input || !rd__input_multiline(t->input) || !line_starts(t)) return NULL;
+  return line < t->input->start_count ? t : NULL;
+}
+
+bool rd_input_line_rect(rd_ctx* ctx, rd_node node, uint32_t line, rd_rect* out) {
+  rd_text* t = with_line(ctx, node, line);
+  if (!t || !out || !ctx->layouts[node.index].layout.valid) return false;
+  rd__text_layout tl;
+  if (!text_layout(t, &tl) || !tl.line_count) return false;
+  const rd__input*      in    = t->input;
+  const rd_node_layout* L     = &ctx->layouts[node.index];
+  const rd_style*       st    = &ctx->styles[node.index].computed;
+  float                 width = content_width(ctx, node.index);
+  uint32_t              end   = line + 1 < in->start_count ? in->starts[line + 1] - 1 : t->cp_count;  // its newline
+  uint32_t              first = rd__text_line_of(&tl, in->starts[line]), last = rd__text_line_of(&tl, end);
+  float                 left = INFINITY, right = -INFINITY;
+  for (uint32_t r = first; r <= last; r++) {
+    float off = rd__text_align_offset(st, width, tl.lines[r].width);
+    left      = fminf(left, off);
+    right     = fmaxf(right, off + tl.lines[r].width);
+  }
+  *out = (rd_rect){L->border[EDGE_L] + L->padding[EDGE_L] + left, L->border[EDGE_T] + L->padding[EDGE_T] + (float)first * tl.line_height,
+                   right - left, (float)(last - first + 1) * tl.line_height};
+  return true;
+}
+
+bool rd_input_scroll_to_line(rd_ctx* ctx, rd_node node, uint32_t line) {
+  return with_line(ctx, node, line) && rd__request_scroll(ctx, node, line, 0);
 }
 
 // Pointer: (x, y) in root coordinates.

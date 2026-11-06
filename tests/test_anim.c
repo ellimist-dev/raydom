@@ -238,6 +238,23 @@ static void reinserted(void) {
   rd_ctx_destroy(ctx);
 }
 
+
+static void test_letter_spacing_transition(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_node n   = rd_node_create(ctx);
+  rd_node_append(ctx, rd_ctx_root(ctx), n);
+  rd_node_set_style(ctx, n, &(rd_style){.transition_duration = rd_s(1), .transition_easing = RD_EASING_LINEAR, .letter_spacing = rd_px(0)});
+  rd_ctx_set_time(ctx, 0);
+  rd_ctx_layout(ctx, 100, 100);
+  rd_node_set_style(ctx, n, &(rd_style){.transition_duration = rd_s(1), .transition_easing = RD_EASING_LINEAR, .letter_spacing = rd_px(4)});
+  rd_ctx_layout(ctx, 100, 100);
+  rd_ctx_set_time(ctx, 0.5);
+  rd_ctx_layout(ctx, 100, 100);
+  float mid = rd_node_computed_style(ctx, n)->letter_spacing.value;
+  CHECK(mid > 1.5f && mid < 2.5f);
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   separate_timings();
   inserted_after_detached_compute();
@@ -246,5 +263,6 @@ int main(void) {
   layout();
   auto_height();
   explicit_and_inherited();
+  test_letter_spacing_transition();
   return TEST_RESULT();
 }

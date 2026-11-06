@@ -160,6 +160,43 @@ static void build_input(rd_ctx* ctx, uint32_t i, const rd_style* st, rd_rect con
 
 static void build_scrollbars(rd_ctx* ctx, uint32_t i, const rd_style* st, rd_rect r, float op);
 
+// A corner's radius for a box inset from the border box: the radius less the inset on the adjacent sides.
+static void inset_radii(const rd_node_layout* L, bool padding, const float radii[4], float out[4]) {
+  const int sides[4][2] = {{EDGE_T, EDGE_L}, {EDGE_T, EDGE_R}, {EDGE_B, EDGE_R}, {EDGE_B, EDGE_L}};
+  for (int j = 0; j < 4; j++) {
+    float a = L->border[sides[j][0]] + (padding ? L->padding[sides[j][0]] : 0);
+    float b = L->border[sides[j][1]] + (padding ? L->padding[sides[j][1]] : 0);
+    out[j]  = fmaxf(0, radii[j] - fmaxf(a, b));
+  }
+}
+
+// Tiles from the padding box's top left, sized by background_width and height: auto is the image's
+// size, or keeps its aspect ratio against the other one. Inside the border, so a translucent border
+// doesn't show the image.
+static void build_background(rd_ctx* ctx, uint32_t i, const rd_style* st, const rd_node_layout* L, rd_rect pad,
+                             const float radii[4], rd_rect clip, float op) {
+  const rd__image* im = rd__image_get(ctx, st->background_image.image.id);
+  if (!im || im->natural_w <= 0 || im->natural_h <= 0 || pad.width <= 0 || pad.height <= 0) return;
+  float w = resolve(st->background_width, pad.width), h = resolve(st->background_height, pad.height);
+  if (isnan(w) && isnan(h)) {
+    w = im->natural_w;
+    h = im->natural_h;
+  } else if (isnan(w)) {
+    w = h * im->natural_w / im->natural_h;
+  } else if (isnan(h)) {
+    h = w * im->natural_h / im->natural_w;
+  }
+  if (!(w > 0) || !(h > 0)) return;
+  rd__cmd* c = push(ctx, RD_CMD_TILES, i);
+  c->rect    = pad;
+  c->clip    = clip;
+  c->image   = st->background_image.image.id;
+  c->dest    = (rd_rect){pad.x, pad.y, w, h};
+  c->repeat  = st->background_repeat;
+  c->fill    = fade(im->current_color ? st->color : rd_rgba(255, 255, 255, 255), op);
+  inset_radii(L, false, radii, c->radii);
+}
+
 // Places an image in the content box by object_fit: scaled about the center, then cropped to the box.
 static void build_image(rd_ctx* ctx, uint32_t i, const rd_style* st, const rd_node_layout* L, rd_rect box,
                         const float radii[4], float op, uint32_t id) {
@@ -194,12 +231,7 @@ static void build_image(rd_ctx* ctx, uint32_t i, const rd_style* st, const rd_no
   c->dest    = (rd_rect){x0, y0, x1 - x0, y1 - y0};
   c->src     = (rd_rect){(x0 - full.x) / sx, (y0 - full.y) / sy, (x1 - x0) / sx, (y1 - y0) / sy};
   c->fill    = fade(im->current_color ? st->color : rd_rgba(255, 255, 255, 255), op);  // currentColor SVGs are tinted
-  // The content box's corners: the border radius less the border and padding on the adjacent sides.
-  const int sides[4][2] = {{EDGE_T, EDGE_L}, {EDGE_T, EDGE_R}, {EDGE_B, EDGE_R}, {EDGE_B, EDGE_L}};
-  for (int j = 0; j < 4; j++) {
-    float in = fmaxf(L->border[sides[j][0]] + L->padding[sides[j][0]], L->border[sides[j][1]] + L->padding[sides[j][1]]);
-    c->radii[j] = fmaxf(0, radii[j] - in);
-  }
+  inset_radii(L, true, radii, c->radii);
 }
 
 static void build(rd_ctx* ctx, uint32_t i, float ox, float oy, float opacity, rd_rect clip) {
@@ -242,6 +274,7 @@ static void build(rd_ctx* ctx, uint32_t i, float ox, float oy, float opacity, rd
   }
 
   rd_rect        pad     = padding_box(r, L);
+  if (visible) build_background(ctx, i, st, L, pad, radii, clip, op);
   rd_rect        content = {pad.x + L->padding[EDGE_L], pad.y + L->padding[EDGE_T],
                             fmaxf(0, pad.width - L->padding[EDGE_L] - L->padding[EDGE_R]),
                             fmaxf(0, pad.height - L->padding[EDGE_T] - L->padding[EDGE_B])};
@@ -375,23 +408,83 @@ bool rd__scroll_by(rd_ctx* ctx, uint32_t i, float dx, float dy) {
   return moved;
 }
 
-void rd__scroll_into_view(rd_ctx* ctx, uint32_t i) {
+// How far to scroll to show [pos, pos + size] with a margin in a view starting at 0: the least distance.
+// The margin gives way to what it surrounds; something larger than the view shows its start, unless
+// it fills the view already.
+static float reveal(float pos, float size, float view, float margin) {
+  float m  = fminf(margin, fmaxf(0, (view - size) / 2));
+  float lo = pos - m, hi = pos + size + m;
+  if (lo < 0 && hi > view) return 0;
+  if (lo < 0) return lo;
+  if (hi > view) return fminf(hi - view, lo);
+  return 0;
+}
+
+// local: the part of node i to show, relative to its border box.
+static void scroll_into_view(rd_ctx* ctx, uint32_t i, rd_rect local, float margin) {
   for (uint32_t p = ctx->slots[i].parent; p; p = ctx->slots[p].parent) {
-    const rd_style* st = &ctx->styles[p].computed;
-    if (st->overflow_x != RD_OVERFLOW_SCROLL && st->overflow_y != RD_OVERFLOW_SCROLL) continue;
+    const rd_style* st        = &ctx->styles[p].computed;
+    bool            scrolls[2] = {st->overflow_x == RD_OVERFLOW_SCROLL, st->overflow_y == RD_OVERFLOW_SCROLL};
+    if (!scrolls[0] && !scrolls[1]) continue;
     rd_node_layout* L      = &ctx->layouts[p];
-    rd_rect         n      = rd_node_bounds(ctx, rd__handle(ctx, i));
+    rd_rect         n      = rd_node_bounds(ctx, rd__handle(ctx, i));  // after the inner containers moved it
     rd_rect         box    = padding_box(rd_node_bounds(ctx, rd__handle(ctx, p)), L);
-    float           pos[2] = {n.x - box.x, n.y - box.y}, size[2] = {n.width, n.height}, view[2] = {box.width, box.height};
-    for (int a = 0; a < 2; a++) {
-      if (pos[a] < 0)
-        L->scroll[a] += pos[a];
-      else if (pos[a] + size[a] > view[a])
-        L->scroll[a] += fminf(pos[a] + size[a] - view[a], pos[a]);
-    }
+    float           pos[2] = {n.x + local.x - box.x, n.y + local.y - box.y}, size[2] = {local.width, local.height};
+    float           view[2] = {box.width, box.height};
+    for (int a = 0; a < 2; a++)
+      if (scrolls[a]) L->scroll[a] += reveal(pos[a], size[a], view[a], margin);
     rd__clamp_scroll(L);
     ctx->paint_dirty = true;
   }
+}
+
+typedef struct rd__scroll_request {
+  rd_node  node;
+  uint32_t line;  // of a multi-line input, or RD__WHOLE_NODE
+  float    margin;
+} rd__scroll_request;
+
+static bool in_tree_displayed(const rd_ctx* ctx, uint32_t i) {
+  for (;; i = ctx->slots[i].parent) {
+    if (ctx->styles[i].computed.display == RD_DISPLAY_NONE) return false;
+    if (!ctx->slots[i].parent) return i == ctx->root;
+  }
+}
+
+static void scroll_request_apply(rd_ctx* ctx, const rd__scroll_request* r) {
+  if (!rd__slot(ctx, r->node) || !in_tree_displayed(ctx, r->node.index)) return;
+  const rd_node_layout* L     = &ctx->layouts[r->node.index];
+  rd_rect               local = {0, 0, L->rect.width, L->rect.height};
+  if (r->line != RD__WHOLE_NODE && !rd_input_line_rect(ctx, r->node, r->line, &local)) return;
+  scroll_into_view(ctx, r->node.index, local, r->margin);
+}
+
+bool rd__request_scroll(rd_ctx* ctx, rd_node node, uint32_t line, float margin) {
+  rd__scroll_request r = {node, line, margin > 0 ? margin : 0};
+  if (!rd__tree_dirty(ctx) && in_tree_displayed(ctx, node.index)) {
+    scroll_request_apply(ctx, &r);
+    return true;
+  }
+  if (ctx->scroll_request_count == ctx->scroll_request_cap) {
+    uint32_t            cap = ctx->scroll_request_cap ? ctx->scroll_request_cap * 2 : 4;
+    rd__scroll_request* p   = realloc(ctx->scroll_requests, cap * sizeof *p);
+    if (!p) return false;
+    ctx->scroll_requests    = p;
+    ctx->scroll_request_cap = cap;
+  }
+  ctx->scroll_requests[ctx->scroll_request_count++] = r;
+  return true;
+}
+
+bool rd__scroll_requests_run(rd_ctx* ctx) {
+  uint32_t n = ctx->scroll_request_count;
+  for (uint32_t j = 0; j < n; j++) scroll_request_apply(ctx, &ctx->scroll_requests[j]);
+  ctx->scroll_request_count = 0;
+  return n != 0;
+}
+
+bool rd_node_scroll_into_view(rd_ctx* ctx, rd_node node, float margin) {
+  return rd__slot(ctx, node) && rd__request_scroll(ctx, node, RD__WHOLE_NODE, margin);
 }
 
 bool rd_node_set_paint(rd_ctx* ctx, rd_node node, rd_paint_fn fn, void* data, rd_destroy_fn destroy) {

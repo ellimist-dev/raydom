@@ -58,6 +58,19 @@ int main() {
   ctx.pointer(h.x + 300, h.y + 5, 0);
   assert(dragged == 300);
 
+  // ANCHOR: drop
+  rd::Node                 zone = ctx.create(rd::Style().height(100_px));
+  std::vector<std::string> files;
+  zone.on(RD_EVENT_FILE_DROP, [&](rd::Event& e) {
+    for (std::string_view path : e.paths()) files.emplace_back(path);  // valid only in the listener
+  });
+  // ANCHOR_END: drop
+  ctx.root().append(zone);
+  ctx.layout(800, 600);
+  rd_rect zone_at = zone.bounds();
+  ctx.drop_files(zone_at.x + 1, zone_at.y + 1, {"/tmp/photo.png"});
+  assert(files.size() == 1 && files[0] == "/tmp/photo.png");
+
   // ANCHOR: wheel
   rd::Node canvas = ctx.create(rd::Style().height(100_px).overflow_y(RD_OVERFLOW_SCROLL));
   canvas.on(RD_EVENT_WHEEL, [](rd::Event& e) { e.prevent_default(); });  // handle the wheel yourself, no scrolling

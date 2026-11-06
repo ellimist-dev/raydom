@@ -33,5 +33,12 @@ int main() {
   rd_corners c = rd::Style().border_radius(1_px, 2_px, 3_px, 4_px).get().border_radius;
   CHECK(c.top_left.value == 1 && c.top_right.value == 2 && c.bottom_right.value == 3 && c.bottom_left.value == 4);
   CHECK(rs->height.unit == rd::auto_.unit);
+
+  rd_image   tile = {3};
+  rd::Style  bg   = rd::Style().background_image(tile).background_repeat(RD_BACKGROUND_REPEAT_X).background_width(16_px).letter_spacing(2_px);
+  CHECK(bg.get().background_image.image.id == 3 && bg.get().background_image.set);
+  CHECK(bg.get().background_repeat == RD_BACKGROUND_REPEAT_X && bg.get().background_width.value == 16);
+  CHECK(bg.get().letter_spacing.value == 2);
+  CHECK(rd::Style().background_image(rd_bg_none()).get().background_image.set);
   return TEST_RESULT();
 }

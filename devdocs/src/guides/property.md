@@ -1,6 +1,6 @@
 # Adding a style property
 
-Example: a `letter_spacing` length, inherited, affecting layout.
+Example: `letter_spacing`, a length, inherited, affecting layout.
 
 1. **Declare it.** Add a line to `RD_STYLE_PROPS` in `include/raydom/style.h`:
 

@@ -90,6 +90,12 @@ public:
 #define RD_HH_SETTER_COLOR(name, type)  RD_HH_SETTER_ENUM(name, type)
 #define RD_HH_SETTER_TRACKS(name, type) RD_HH_SETTER_ENUM(name, type)
 #define RD_HH_SETTER_FONT(name, type)   RD_HH_SETTER_ENUM(name, type)
+#define RD_HH_SETTER_IMAGE(name, type) \
+  RD_HH_SETTER_ENUM(name, type)        \
+  Style& name(rd_image v) {            \
+    s_.name = rd_bg_image(v);          \
+    return *this;                      \
+  }
 #define RD_HH_SETTER_SHADOW(name, type)                                     \
   RD_HH_SETTER_ENUM(name, type)                                             \
   Style& name(float x, float y, float blur, rd_color c, float spread = 0) { \
@@ -136,6 +142,7 @@ public:
 #undef RD_HH_SETTER_COLOR
 #undef RD_HH_SETTER_TRACKS
 #undef RD_HH_SETTER_FONT
+#undef RD_HH_SETTER_IMAGE
 #undef RD_HH_SETTER_SHADOW
 #undef RD_HH_SETTER_GRID_LINE
 #undef RD_HH_SETTER_TRACK
@@ -245,6 +252,11 @@ public:
   bool           repeat() const { return ev_->repeat; }
   std::uint32_t  codepoint() const { return ev_->codepoint; }
   Node           related() const;
+  // RD_EVENT_FILE_DROP: the dropped paths, valid only inside the listener.
+  std::vector<std::string_view> paths() const {
+    return ev_->paths ? std::vector<std::string_view>(ev_->paths, ev_->paths + ev_->path_count)
+                      : std::vector<std::string_view>();
+  }
 
   void stop_propagation() { rd_event_stop_propagation(ev_); }
   void stop_immediate_propagation() { rd_event_stop_immediate_propagation(ev_); }
@@ -325,6 +337,11 @@ public:
   rd_vec2 scroll() const { return rd_node_scroll(ctx_, handle_); }
   Node          scroll_to(float x, float y) const {
     rd_node_set_scroll(ctx_, handle_, x, y);
+    return *this;
+  }
+  // Scrolls enclosing containers to show the node, now or at the next layout. See rd_node_scroll_into_view.
+  Node scroll_into_view(float margin = 0) const {
+    rd_node_scroll_into_view(ctx_, handle_, margin);
     return *this;
   }
 
@@ -429,6 +446,14 @@ public:
     rd_input_select(ctx_, handle_, anchor, caret);
     return *this;
   }
+  // A line of a multi-line input's value: its box relative to the node, empty if there's none, and
+  // scrolling it into view, false if there's none. See rd_input_line_rect.
+  std::optional<rd_rect> line_rect(std::uint32_t line) const {
+    rd_rect r;
+    if (!rd_input_line_rect(ctx_, handle_, line, &r)) return std::nullopt;
+    return r;
+  }
+  bool scroll_to_line(std::uint32_t line) const { return rd_input_scroll_to_line(ctx_, handle_, line); }
   // Null clears it. See rd_node_set_anchor.
   Node anchor(const rd_anchor& a) const {
     rd_node_set_anchor(ctx_, handle_, &a);
@@ -723,6 +748,13 @@ public:
       rd_ctx_text(ctx_, c);
       i += static_cast<std::size_t>(n);
     }
+  }
+  // Files dropped at a point: fires RD_EVENT_FILE_DROP. rd_update does this for raylib's drops.
+  void drop_files(float x, float y, const std::vector<std::string>& paths) const {
+    std::vector<const char*> c;
+    c.reserve(paths.size());
+    for (const std::string& p : paths) c.push_back(p.c_str());
+    rd_ctx_drop_files(ctx_, x, y, c.data(), static_cast<std::uint32_t>(c.size()));
   }
   Node node_at(float x, float y) const { return {ctx_, rd_node_at(ctx_, x, y)}; }
   void pointer(float x, float y, std::uint8_t buttons, float wheel_x = 0, float wheel_y = 0) const {

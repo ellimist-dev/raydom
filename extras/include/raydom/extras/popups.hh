@@ -16,6 +16,7 @@ struct MenuItem {
   std::string label{};  // empty for a separator
   std::string shortcut{};
   bool        disabled = false;
+  bool        heading  = false;  // a title for the items after it; see rdx_menu_item
 };
 
 namespace detail {
@@ -26,7 +27,7 @@ inline std::vector<rdx_menu_item> c_items(const std::vector<MenuItem>& items) {
   out.reserve(items.size());
   for (const MenuItem& i : items)
     out.push_back({i.label.empty() ? nullptr : i.label.c_str(), i.shortcut.empty() ? nullptr : i.shortcut.c_str(),
-                   i.disabled});
+                   i.disabled, i.heading});
   return out;
 }
 inline void call_menu(rd_ctx*, int index, void* data) noexcept { (*static_cast<MenuFn*>(data))(index); }

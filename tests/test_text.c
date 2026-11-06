@@ -4,6 +4,7 @@
 
 #include "check.h"
 #include "render_internal.h"
+#include "text_internal.h"
 
 static bool near(float a, float b) { return fabsf(a - b) < 0.01f; }
 
@@ -234,6 +235,61 @@ static void test_no_font(void) {
   rd_ctx_destroy(ctx);
 }
 
+
+static void test_letter_spacing(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_font_load_file(ctx, RAYDOM_TEST_FONT);
+  rd_node root = rd_ctx_root(ctx);
+  rd_node_set_style(ctx, root, &(rd_style){.align_items = RD_ALIGN_START, .font_size = rd_px(20)});
+  rd_node plain = add_text(ctx, root, (rd_style){0}, "ab cd");
+  rd_node wide  = add_text(ctx, root, (rd_style){.letter_spacing = rd_px(3)}, "ab cd");
+  rd_ctx_layout(ctx, 800, 600);
+  float w = rd_node_rect(ctx, plain).width;
+  CHECK(w > 0);
+  CHECK(near(rd_node_rect(ctx, wide).width, w + 15));  // after all five characters, the space too
+  CHECK(near(rd_node_rect(ctx, wide).height, rd_node_rect(ctx, plain).height));
+
+  // Units follow line_height, in font sizes; it inherits, and a change relays out.
+  rd_node_set_style(ctx, wide, &(rd_style){.letter_spacing = rd_num(0.25f)});
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_rect(ctx, wide).width, w + 25));
+  rd_node_set_style(ctx, wide, &(rd_style){.letter_spacing = rd_pct(10)});
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_rect(ctx, wide).width, w + 10));
+  rd_node_set_style(ctx, wide, &(rd_style){.letter_spacing = rd_px(-1)});
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_rect(ctx, wide).width, w - 5));
+  rd_node_set_style(ctx, wide, &(rd_style){0});
+  rd_node_merge_style(ctx, root, &(rd_style){.letter_spacing = rd_px(2)});
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_rect(ctx, wide).width, w + 10));
+  rd_node_set_style(ctx, wide, &(rd_style){.letter_spacing = rd_px(NAN)});  // no spacing, not a NaN width
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_rect(ctx, wide).width, w));
+  rd_node_merge_style(ctx, root, &(rd_style){.letter_spacing = rd_px(0)});
+
+  // It wraps by the spaced width.
+  float   one  = rd_font_measure(ctx, (rd_font){0, true}, 20, "ab", RD_TEXT_NUL);
+  rd_node wrap = add_text(ctx, root, (rd_style){.width = rd_px(2 * one + 30), .letter_spacing = rd_px(0)}, "ab ab");
+  rd_ctx_layout(ctx, 800, 600);
+  float single = rd_node_rect(ctx, wrap).height;
+  rd_node_merge_style(ctx, wrap, &(rd_style){.letter_spacing = rd_px(30)});
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_rect(ctx, wrap).height, 2 * single));
+
+  // Selection and hit-testing see the same positions as drawing.
+  rd_node hit = add_text(ctx, root, (rd_style){.letter_spacing = rd_px(50)}, "abcd");
+  rd_ctx_layout(ctx, 800, 600);
+  rd_rect         b = rd_node_bounds(ctx, hit);
+  rd__text_layout tl;
+  CHECK(rd__text_layout_get(ctx, hit.index, b.width, &tl));
+  CHECK(tl.letter_spacing == 50);
+  float adv = rd_font_measure(ctx, (rd_font){0, true}, 20, "a", RD_TEXT_NUL);
+  CHECK(near(rd__text_cp_x(&tl, 0, 2), 2 * adv + 100));
+  CHECK(rd__text_byte_at(ctx, hit.index, b.x + 2 * adv + 100 + 1, b.y + 1, 0) == 2);
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   test_font();
   test_max_content_and_wrap();
@@ -245,5 +301,6 @@ int main(void) {
   test_clamp_and_highlights();
   test_shift_wheel_scrolls_horizontally();
   test_no_font();
+  test_letter_spacing();
   return TEST_RESULT();
 }

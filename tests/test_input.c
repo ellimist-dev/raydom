@@ -526,6 +526,105 @@ static void test_surrogates_and_paste(void) {
   rd_ctx_destroy(ctx);
 }
 
+
+static void test_line_rects(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_font_load_file(ctx, RAYDOM_TEST_FONT);
+  rd_node root = rd_ctx_root(ctx);
+  rd_node_set_style(ctx, root, &(rd_style){.align_items = RD_ALIGN_START, .font_size = rd_px(20), .line_height = rd_px(30)});
+  float   a  = rd_font_measure(ctx, (rd_font){0, true}, 20, "a", RD_TEXT_NUL);
+  rd_node in = add(ctx, root, (rd_style){.width = rd_px(a * 10 + 16), .padding = rd_edges_all(rd_px(5)), .border_width = rd_edges_all(rd_px(3))});
+  rd_rect r;
+
+  CHECK(rd_node_make_input(ctx, in, RD_INPUT_MULTILINE));
+  // "aaaaa", empty, 20 characters wrapping to two rows of 10 (with a break at the space), then an empty last.
+  const char* value = "aaaaa\n\naaaaaaaaa aaaaaaaaa\n";
+  rd_node_set_text(ctx, in, value, RD_TEXT_NUL);
+  CHECK(!rd_input_line_rect(ctx, in, 0, &r));  // before the first layout
+  rd_ctx_layout(ctx, 800, 600);
+
+  CHECK(rd_input_line_rect(ctx, in, 0, &r));
+  CHECK(near(r.x, 8) && near(r.y, 8) && near(r.width, 5 * a) && near(r.height, 30));
+  CHECK(rd_input_line_rect(ctx, in, 1, &r));
+  CHECK(near(r.x, 8) && near(r.y, 38) && near(r.width, 0) && near(r.height, 30));
+  CHECK(rd_input_line_rect(ctx, in, 2, &r));  // one line, two rows
+  CHECK(near(r.y, 68) && near(r.height, 60) && near(r.width, 9 * a));
+  CHECK(rd_input_line_rect(ctx, in, 3, &r));  // after the final newline
+  CHECK(near(r.y, 128) && near(r.height, 30) && near(r.width, 0));
+  CHECK(!rd_input_line_rect(ctx, in, 4, &r));
+  CHECK(!rd_input_line_rect(ctx, in, 0, NULL));
+  CHECK(near(rd_node_rect(ctx, in).height, 5 * 30 + 16));
+
+  // A new value is seen at once, and an edit too.
+  rd_node_set_text(ctx, in, "one", RD_TEXT_NUL);
+  CHECK(rd_input_line_rect(ctx, in, 0, &r) && near(r.width, 3 * a));
+  CHECK(!rd_input_line_rect(ctx, in, 1, &r));
+  rd_ctx_layout(ctx, 800, 600);
+  rd_node_focus(ctx, in);
+  rd_input_select(ctx, in, 3, 3);
+  press(ctx, RD_KEY_ENTER, 0);
+  type(ctx, "xy");
+  CHECK(rd_input_line_rect(ctx, in, 1, &r) && near(r.width, 2 * a));
+  press(ctx, RD_KEY_Z, SC);
+  rd_ctx_layout(ctx, 800, 600);
+  rd_node_set_text(ctx, in, "", 0);
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(rd_input_line_rect(ctx, in, 0, &r) && near(r.y, 8) && near(r.width, 0) && near(r.height, 30));  // empty value: one line
+  CHECK(!rd_input_line_rect(ctx, in, 1, &r));
+
+  // Centered text: the box is where the text is.
+  rd_node_set_text(ctx, in, "aa\naaaa", RD_TEXT_NUL);
+  rd_node_merge_style(ctx, in, &(rd_style){.text_align = RD_TEXT_ALIGN_CENTER});
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(rd_input_line_rect(ctx, in, 1, &r) && near(r.x, 8 + 3 * a) && near(r.width, 4 * a));
+
+  // Not for single-line inputs or other nodes.
+  rd_node single = add(ctx, root, (rd_style){.width = rd_px(100)}), text = add(ctx, root, (rd_style){0}), gone = rd_node_create(ctx);
+  rd_node_make_input(ctx, single, 0);
+  rd_node_set_text(ctx, text, "t", 1);
+  rd_node_destroy(ctx, gone);
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(!rd_input_line_rect(ctx, single, 0, &r) && !rd_input_scroll_to_line(ctx, single, 0));
+  CHECK(!rd_input_line_rect(ctx, text, 0, &r) && !rd_input_scroll_to_line(ctx, text, 0));
+  CHECK(!rd_input_line_rect(ctx, gone, 0, &r) && !rd_input_scroll_to_line(ctx, gone, 0));
+  rd_ctx_destroy(ctx);
+}
+
+static void test_scroll_to_line(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_font_load_file(ctx, RAYDOM_TEST_FONT);
+  rd_node scroll = add(ctx, rd_ctx_root(ctx), (rd_style){.width = rd_px(300), .height = rd_px(100), .overflow_y = RD_OVERFLOW_SCROLL,
+                                                         .line_height = rd_px(20), .font_size = rd_px(14)});
+  rd_node in     = add(ctx, scroll, (rd_style){.padding.top = rd_px(10), .flex_shrink = rd_num(0)});
+  rd_node_make_input(ctx, in, RD_INPUT_MULTILINE);
+  char value[100 * 3 + 1];
+  for (char* at = value; at < value + 300; at += 3) memcpy(at, "ab\n", 3);
+  value[299] = 0;  // 100 lines, no trailing newline
+
+  // Called right after setting the value, before layout: waits for it.
+  rd_node_set_text(ctx, in, value, RD_TEXT_NUL);
+  CHECK(rd_input_scroll_to_line(ctx, in, 50));
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_scroll(ctx, scroll).y, 10 + 51 * 20 - 100));
+  // Laid out: at once, and the least distance.
+  CHECK(rd_input_scroll_to_line(ctx, in, 49));
+  CHECK(near(rd_node_scroll(ctx, scroll).y, 10 + 51 * 20 - 100));
+  CHECK(rd_input_scroll_to_line(ctx, in, 10));
+  CHECK(near(rd_node_scroll(ctx, scroll).y, 10 + 10 * 20));
+  CHECK(rd_input_scroll_to_line(ctx, in, 99));
+  CHECK(near(rd_node_scroll(ctx, scroll).y, 10 + 100 * 20 - 100));
+  CHECK(!rd_input_scroll_to_line(ctx, in, 100));
+
+  // A value replaced before the layout that would run it, leaving no such line: nothing happens.
+  rd_node_set_scroll(ctx, scroll, 0, 0);
+  rd_node_set_text(ctx, in, value, RD_TEXT_NUL);
+  CHECK(rd_input_scroll_to_line(ctx, in, 90));
+  rd_node_set_text(ctx, in, "short", RD_TEXT_NUL);
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_scroll(ctx, scroll).y, 0));
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   test_tab_order_and_states();
   test_pointer_focus_and_activation();
@@ -539,5 +638,7 @@ int main(void) {
   test_focus_dropped_when_unfocusable();
   test_programmatic_value_undo();
   test_surrogates_and_paste();
+  test_line_rects();
+  test_scroll_to_line();
   return TEST_RESULT();
 }

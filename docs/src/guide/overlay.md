@@ -41,6 +41,7 @@ Events from them bubble through the overlay to the root, and they're in Tab orde
 | `no_flip`     | Keep `side` even when the node only fits on the opposite side        |
 | `no_shift`    | Don't slide the node to keep it inside the root                      |
 | `match_width` | Lay the node out at the anchor's width                               |
+| `min_width_anchor` | Lay it out at least at the anchor's width, and wider for its content, up to the root's width. `match_width` wins if both are set |
 
 A zero-initialized `rd_anchor` places the node below its anchor, start-aligned, flipping to the other side when it
 doesn't fit and shifting to stay inside the window:

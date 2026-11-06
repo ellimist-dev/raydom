@@ -173,6 +173,8 @@ struct rd_ctx {
   rd_node         overlay;
   rd_node         focus_scope;  // Tab stays inside it; null for the whole tree   // created by rd_ctx_overlay; kept as root's last child
   rd__chain       anchored;
+  struct rd__scroll_request* scroll_requests;  // waiting for the next layout
+  uint32_t        scroll_request_count, scroll_request_cap;
   rd__chain       animating;  // nodes with an rd__anim
   struct rd__hook* hooks;
   uint32_t         hook_count;
@@ -276,7 +278,13 @@ float    rd__scroll_max(const rd_ctx* ctx, uint32_t i, int axis);
 uint32_t rd__hit(const rd_ctx* ctx, float x, float y);
 uint32_t rd__scroll_target(const rd_ctx* ctx, uint32_t i, int axis, float delta);
 bool     rd__scroll_by(rd_ctx* ctx, uint32_t i, float dx, float dy);
-void     rd__scroll_into_view(rd_ctx* ctx, uint32_t i);
+enum : uint32_t { RD__WHOLE_NODE = UINT32_MAX };
+// Scrolls enclosing containers to show the node, or line of a multi-line input: now if the tree is laid
+// out, otherwise at the next layout. False if it can't be recorded.
+bool     rd__request_scroll(rd_ctx* ctx, rd_node node, uint32_t line, float margin);
+// Runs the waiting requests, from layout. True if there were any.
+bool     rd__scroll_requests_run(rd_ctx* ctx);
+bool     rd__tree_dirty(const rd_ctx* ctx);
 void     rd__events_slot_free(rd_ctx* ctx, uint32_t i);
 void     rd__events_ctx_free(rd_ctx* ctx);
 bool     rd__chain_push(rd__chain* c, rd_node n);

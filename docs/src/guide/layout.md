@@ -118,6 +118,18 @@ rd_node_merge_style(ctx, list, &(rd_style){
 
 Leave room with `padding` if content shouldn't sit under the bar.
 
+`rd_node_scroll_into_view` scrolls every enclosing scroll container, innermost first, by the least distance that shows
+a node:
+
+```c
+{{#include ../../examples/layout.c:reveal}}
+```
+
+The margin keeps that much of the surroundings in view, and gives way when it doesn't fit. Of a node larger than the
+view, the start shows, and nothing moves if the node already fills the view. Only axes set to `RD_OVERFLOW_SCROLL` move.
+With the tree laid out it happens at once. Otherwise it waits for the end of the next `rd_ctx_layout`, before the layout
+hooks, so it works on a node just created; a node not displayed by then is skipped.
+
 ## Layout hooks
 
 Layout hooks run after every layout, with that layout's geometry and scroll offsets. They're for content that

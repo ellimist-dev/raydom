@@ -26,6 +26,7 @@ RD_ENUM typedef enum rd_event_type : uint8_t {
   RD_EVENT_INPUT,             // An input's text changed through editing.
   RD_EVENT_CHANGE,            // An input's edits were committed: Enter on a single-line input, or blur.
   RD_EVENT_SELECTION_CHANGE,  // The document text selection changed. Fired on the root.
+  RD_EVENT_FILE_DROP,         // Files were dropped on the window: to the node under them. See ev->paths.
   RD_EVENT_TYPE_COUNT,
 } rd_event_type;
 
@@ -132,6 +133,8 @@ typedef struct rd_event {
   bool           repeat;
   uint32_t       codepoint;  // RD_EVENT_TEXT
   rd_node        related;    // focus events: the node losing or gaining focus
+  const char* const* paths;  // RD_EVENT_FILE_DROP: path_count UTF-8 paths, valid during dispatch: copy to keep
+  uint32_t       path_count;
   bool           stopped, stopped_immediate, default_prevented;
 } rd_event;
 
@@ -199,6 +202,11 @@ bool rd_ctx_focus_next(rd_ctx* ctx, bool backward);
 // the whole tree. Pointer and programmatic focus aren't restricted.
 void    rd_ctx_set_focus_scope(rd_ctx* ctx, rd_node scope);
 rd_node rd_ctx_focus_scope(const rd_ctx* ctx);
+
+// Fires RD_EVENT_FILE_DROP at the node under (x, y), in root coordinates, as of the last layout. It
+// bubbles. Over a disabled node or nothing, it goes to the root. The paths are read during the call only.
+// rd_update calls this for raylib's dropped files, and unloads them: IsFileDropped is false after it.
+void rd_ctx_drop_files(rd_ctx* ctx, float x, float y, const char* const* paths, uint32_t count);
 
 // Clipboard used by inputs. Defaults to an in-memory buffer; rd_update installs raylib's.
 typedef const char* (*rd_clipboard_get_fn)(void* data);

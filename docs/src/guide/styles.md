@@ -82,7 +82,7 @@ Only class variants see shared states; `rd_node_states` still returns the node's
 {{#include ../../examples/styles.c:inherit}}
 ```
 
-Inherited properties: `color`, `font`, `font_size`, `line_height`, `white_space`, `user_select`, `pointer_events`,
+Inherited properties: `color`, `font`, `font_size`, `line_height`, `letter_spacing`, `white_space`, `user_select`, `pointer_events`,
 `caret_color`, `selection_color`, `text_align`. The rest start from the default on every node.
 
 ## Computed styles

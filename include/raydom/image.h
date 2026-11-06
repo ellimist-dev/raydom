@@ -2,17 +2,15 @@
 #define RAYDOM_IMAGE_H
 
 #include <raydom/layout.h>
+#include <raydom/style.h>
 #include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-// An image owned by the context. Zero is null. Images are decoded when loaded and uploaded to the
-// GPU on first draw, so loading and layout work without a window.
-typedef struct rd_image {
-  uint32_t id;
-} rd_image;
+// Images are owned by the context (rd_image is in style.h). They're decoded when loaded and uploaded
+// to the GPU on first draw, so loading and layout work without a window.
 
 // PNG, JPEG, BMP, GIF (first frame), TGA, PSD and SVG, from memory or a file; SVG is recognized by
 // content. SVGs are rasterized at the size they're drawn, and ones using currentColor are tinted by the

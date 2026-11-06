@@ -52,9 +52,14 @@ static const rd_style default_style = {
     .opacity               = {1, RD_UNIT_NUM},
     .box_shadow            = {PX0, PX0, PX0, PX0, {0, 0, 0, 0, true}},
     .object_fit            = RD_OBJECT_FIT_FILL,
+    .background_image      = {{0}, true},
+    .background_repeat     = RD_BACKGROUND_REPEAT,
+    .background_width      = AUTO,
+    .background_height     = AUTO,
     .color                 = {0, 0, 0, 255, true},
     .font_size             = {16, RD_UNIT_PX},
     .line_height           = {1.2f, RD_UNIT_NUM},
+    .letter_spacing        = PX0,
     .text_align            = RD_TEXT_ALIGN_START,
     .font                  = {0, true},
     .white_space           = RD_WHITE_SPACE_NORMAL,
@@ -112,7 +117,12 @@ static void merge_shadow(rd_shadow* d, const rd_shadow* s) {
   if (s->color.set) *d = *s;
 }
 
+static void merge_image(rd_background_image* d, const rd_background_image* s) {
+  if (s->set) *d = *s;
+}
+
 #define MERGE_FONT(d, s)      merge_font(&(d), &(s));
+#define MERGE_IMAGE(d, s)     merge_image(&(d), &(s));
 #define MERGE_SHADOW(d, s)    merge_shadow(&(d), &(s));
 #define MERGE_TRACKS(d, s)    merge_tracks(&(d), &(s));
 #define MERGE_TRACK(d, s)     merge_track(&(d), &(s));
@@ -155,7 +165,10 @@ static bool eq_shadow(rd_shadow a, rd_shadow b) {
          eq_color(a.color, b.color);
 }
 
+static bool eq_image(rd_background_image a, rd_background_image b) { return a.image.id == b.image.id && a.set == b.set; }
+
 #define EQ_SHADOW(a, b)    eq_shadow(a, b)
+#define EQ_IMAGE(a, b)     eq_image(a, b)
 #define EQ_FONT(a, b)      eq_font(a, b)
 #define EQ_TRACKS(a, b)    eq_tracks(a, b)
 #define EQ_TRACK(a, b)     eq_track(a, b)
@@ -196,6 +209,7 @@ static bool corners_set(rd_corners c) {
 
 #define SET_SHADOW(v)    (val_set((v).x) && val_set((v).y) && val_set((v).blur) && val_set((v).spread) && (v).color.set)
 #define SET_FONT(v)      ((v).set)
+#define SET_IMAGE(v)     ((v).set)
 #define SET_TRACKS(v)    ((v).set)
 #define SET_TRACK(v)     (val_set((v).min) && val_set((v).max))
 #define SET_GRID_LINE(v) ((v).kind != RD_GRID_LINE_UNSET)

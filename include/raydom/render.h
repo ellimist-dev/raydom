@@ -17,6 +17,13 @@ rd_node rd_node_at(const rd_ctx* ctx, float x, float y);
 // Scroll offset of an overflow container, clamped to its scrollable range.
 void    rd_node_set_scroll(rd_ctx* ctx, rd_node node, float x, float y);
 rd_vec2 rd_node_scroll(const rd_ctx* ctx, rd_node node);
+// Scrolls the node's enclosing scroll containers, innermost first, along their scrolling axes, by the
+// least distance that shows it with margin pixels around it. The margin shrinks when it doesn't fit;
+// of a node larger than the view, the start shows, or nothing moves if the node already fills the view.
+// With the tree laid out, it happens now. Otherwise it happens at the end of the next rd_ctx_layout,
+// before the layout hooks, so a node just created or changed can be passed; a node not displayed
+// then is skipped. False only for a dead node, or out of memory.
+bool    rd_node_scroll_into_view(rd_ctx* ctx, rd_node node, float margin);
 
 typedef struct rd_paint_info {
   rd_node node;

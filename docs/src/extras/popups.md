@@ -24,6 +24,13 @@ A menu takes a list of items: a label, an optional shortcut hint shown at the ri
 disabled flag. An item with no label is a separator. The callback gets the index into the list of the chosen item,
 after the menu has closed, so it can open a modal or another menu. Dismissing the menu calls nothing.
 
+A heading titles the items after it. The keyboard and the pointer pass over it, and it counts in the index like a
+separator does:
+
+```cpp
+{{#include ../../examples/popups.cc:headings}}
+```
+
 The menu takes focus when it opens. Up and Down move through the enabled items and wrap, Home and End jump, Enter or
 Space chooses, and Tab closes the menu. Hovering an item highlights it.
 
@@ -45,7 +52,7 @@ the next press, key or pointer move.
 ```
 
 A select shows the chosen option, or the placeholder, with a chevron. Clicking it, or Enter or Space, opens a list
-as wide as the select, with the chosen option checked and focused; clicking the select again closes it. Up and Down
+as wide as the select, or wider if an option needs it, with the chosen option checked and focused; clicking the select again closes it. Up and Down
 on the closed select change the choice directly. `CHANGE` fires on the select when the user chooses;
 `rdx::set_selected` (`rdx_select_set`) doesn't fire it.
 
@@ -81,7 +88,7 @@ The popups' classes are in `rdx_theme(ctx)` with the other extras classes:
 
 | Classes                                                         | Parts                               |
 | --------------------------------------------------------------- | ----------------------------------- |
-| `menu`, `menu_item`, `menu_label`, `menu_shortcut`, `menu_separator` | Menus and select lists          |
+| `menu`, `menu_item`, `menu_label`, `menu_shortcut`, `menu_separator`, `menu_heading` | Menus and select lists |
 | `menu_check`                                                    | The checkmark column of select lists |
 | `select`, `select_value`, `select_chevron`                      | The select button                   |
 | `modal_backdrop`, `modal`, `modal_header`, `modal_title`, `modal_close`, `modal_body` | Modal parts  |

@@ -226,6 +226,186 @@ static void test_text_cull(void) {
   rd_ctx_destroy(ctx);
 }
 
+
+// A column of 100px rows in a 100px tall scroller at the top left of the root.
+static rd_node scroller_of(rd_ctx* ctx, rd_node parent, rd_node rows[5]) {
+  rd_node s = add(ctx, parent, (rd_style){.width = rd_px(200), .height = rd_px(100), .overflow_y = RD_OVERFLOW_SCROLL, .flex_shrink = rd_num(0)});
+  for (int j = 0; j < 5; j++) rows[j] = add(ctx, s, (rd_style){.height = rd_px(100), .flex_shrink = rd_num(0)});
+  return s;
+}
+
+static void test_scroll_into_view(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_node rows[5];
+  rd_node s = scroller_of(ctx, rd_ctx_root(ctx), rows);
+  rd_ctx_layout(ctx, 800, 600);
+
+  // Laid out: it happens now, by the least distance, in both directions.
+  CHECK(rd_node_scroll_into_view(ctx, rows[2], 0));
+  CHECK(near(rd_node_scroll(ctx, s).y, 200));
+  CHECK(rd_node_scroll_into_view(ctx, rows[2], 0));
+  CHECK(near(rd_node_scroll(ctx, s).y, 200));  // already showing
+  rd_node_set_scroll(ctx, s, 0, 150);
+  rd_node_scroll_into_view(ctx, rows[0], 0);
+  CHECK(near(rd_node_scroll(ctx, s).y, 0));
+
+  // The margin shows beyond the node, as far as the view has room: none for a row as tall as the view.
+  rd_node small = add(ctx, rows[3], (rd_style){.height = rd_px(20), .margin.top = rd_px(40)});  // 340 to 360
+  rd_ctx_layout(ctx, 800, 600);
+  rd_node_scroll_into_view(ctx, small, 10);
+  CHECK(near(rd_node_scroll(ctx, s).y, 370 - 100));
+  rd_node_scroll_into_view(ctx, small, 10);
+  CHECK(near(rd_node_scroll(ctx, s).y, 270));
+  rd_node_set_scroll(ctx, s, 0, 345);
+  rd_node_scroll_into_view(ctx, small, 10);
+  CHECK(near(rd_node_scroll(ctx, s).y, 330));
+  rd_node_set_scroll(ctx, s, 0, 0);
+  rd_node_scroll_into_view(ctx, small, 1000);  // shrinks to center it at most
+  CHECK(near(rd_node_scroll(ctx, s).y, 360 - 60));
+  rd_node_scroll_into_view(ctx, rows[4], 50);
+  CHECK(near(rd_node_scroll(ctx, s).y, 400));
+  rd_node_set_scroll(ctx, s, 0, 0);
+  rd_node_scroll_into_view(ctx, small, -5);  // a negative margin is none
+  CHECK(near(rd_node_scroll(ctx, s).y, 260));
+
+  // A node not laid out yet waits for the layout; the scroll range then includes it.
+  rd_node late = add(ctx, s, (rd_style){.height = rd_px(100), .flex_shrink = rd_num(0)});
+  rd_node_set_scroll(ctx, s, 0, 0);
+  CHECK(rd_node_scroll_into_view(ctx, late, 0));
+  CHECK(near(rd_node_scroll(ctx, s).y, 0));
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_scroll(ctx, s).y, 500));
+  rd_ctx_layout(ctx, 800, 600);  // once
+  rd_node_set_scroll(ctx, s, 0, 0);
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_scroll(ctx, s).y, 0));
+
+  // Waiting requests skip nodes that went away or don't show by then, and a dead one fails at once.
+  rd_node doomed = add(ctx, s, (rd_style){.height = rd_px(100), .flex_shrink = rd_num(0)});
+  rd_node hidden = add(ctx, s, (rd_style){.height = rd_px(100), .flex_shrink = rd_num(0)});
+  rd_node_scroll_into_view(ctx, doomed, 0);
+  rd_node_scroll_into_view(ctx, hidden, 0);
+  rd_node_destroy(ctx, doomed);
+  rd_node_set_style(ctx, hidden, &(rd_style){.display = RD_DISPLAY_NONE});
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_scroll(ctx, s).y, 0));
+  CHECK(!rd_node_scroll_into_view(ctx, doomed, 0));
+  rd_node detached = rd_node_create(ctx);
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(rd_node_scroll_into_view(ctx, detached, 0));  // its turn comes at the next layout: not in the tree, skipped
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_scroll(ctx, s).y, 0));
+  rd_ctx_destroy(ctx);
+}
+
+static void test_scroll_into_view_containers(void) {
+  rd_ctx* ctx  = rd_ctx_create();
+  rd_node root = rd_ctx_root(ctx);
+  // Nested: the inner container moves first, then the outer brings it into view.
+  rd_node outer = add(ctx, root, (rd_style){.width = rd_px(300), .height = rd_px(150), .overflow_y = RD_OVERFLOW_SCROLL});
+  add(ctx, outer, (rd_style){.height = rd_px(400), .flex_shrink = rd_num(0)});
+  rd_node rows[5];
+  rd_node inner = scroller_of(ctx, outer, rows);
+  rd_ctx_layout(ctx, 800, 600);
+  rd_node_scroll_into_view(ctx, rows[4], 0);
+  CHECK(near(rd_node_scroll(ctx, inner).y, 400));
+  CHECK(near(rd_node_scroll(ctx, outer).y, 500 - 150));
+  rd_rect b = rd_node_bounds(ctx, rows[4]);
+  CHECK(near(b.y, 50));
+
+  // Only axes that scroll move: this container overflows sideways but hides it.
+  rd_node wide = add(ctx, root, (rd_style){.position = RD_POSITION_ABSOLUTE, .inset = {.top = rd_px(300), .left = rd_px(0)},
+                                           .width = rd_px(100), .height = rd_px(50), .flex_direction = RD_FLEX_ROW,
+                                           .overflow_x = RD_OVERFLOW_HIDDEN, .overflow_y = RD_OVERFLOW_SCROLL});
+  rd_node far  = add(ctx, wide, (rd_style){.width = rd_px(50), .height = rd_px(200), .margin.left = rd_px(300), .flex_shrink = rd_num(0)});
+  rd_ctx_layout(ctx, 800, 600);
+  rd_node_scroll_into_view(ctx, far, 0);
+  CHECK(near(rd_node_scroll(ctx, wide).x, 0));
+
+  // A node larger than the view shows its start, and stays put once it fills the view.
+  rd_node_set_scroll(ctx, wide, 0, 0);
+  rd_node tall   = add(ctx, root, (rd_style){.position = RD_POSITION_ABSOLUTE, .inset = {.top = rd_px(400), .left = rd_px(0)},
+                                             .width = rd_px(100), .height = rd_px(50), .overflow_y = RD_OVERFLOW_SCROLL});
+  rd_node before = add(ctx, tall, (rd_style){.height = rd_px(30), .flex_shrink = rd_num(0)});
+  rd_node big    = add(ctx, tall, (rd_style){.height = rd_px(200), .flex_shrink = rd_num(0)});
+  (void)before;
+  rd_ctx_layout(ctx, 800, 600);
+  rd_node_scroll_into_view(ctx, big, 0);
+  CHECK(near(rd_node_scroll(ctx, tall).y, 30));
+  rd_node_set_scroll(ctx, tall, 0, 100);
+  rd_node_scroll_into_view(ctx, big, 0);
+  CHECK(near(rd_node_scroll(ctx, tall).y, 100));
+
+  // Hooks see the scrolled position; one that asks with the tree dirty gets it in the second pass. An anchor
+  // in the scroller follows in the same layout.
+  rd_node_set_scroll(ctx, tall, 0, 0);
+  rd_node popup = add(ctx, rd_ctx_overlay(ctx), (rd_style){.position = RD_POSITION_ABSOLUTE, .width = rd_px(10), .height = rd_px(10)});
+  rd_node_set_anchor(ctx, popup, &(rd_anchor){.node = big});
+  rd_node_scroll_into_view(ctx, add(ctx, tall, (rd_style){.height = rd_px(10), .flex_shrink = rd_num(0)}), 0);
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_scroll(ctx, tall).y, 240 - 50));
+  CHECK(near(rd_node_bounds(ctx, popup).y, 400 + 230 - 190));
+  rd_ctx_destroy(ctx);
+}
+
+static void test_background_commands(void) {
+  rd_ctx* ctx  = rd_ctx_create();
+  rd_node root = rd_ctx_root(ctx);
+  uint8_t px[4 * 8 * 4] = {0};
+  rd_image im = rd_image_from_pixels(ctx, px, 8, 4);  // 8 wide, 4 tall
+  rd_node  n  = add(ctx, root, (rd_style){.width = rd_px(100), .height = rd_px(60), .background_image = rd_bg_image(im),
+                                          .border_width = rd_edges_all(rd_px(2)), .padding = rd_edges_all(rd_px(5)),
+                                          .border_radius = rd_corners_all(rd_px(10)), .opacity = rd_num(0.5f)});
+  add(ctx, n, (rd_style){.height = rd_px(10)});
+  rd_ctx_layout(ctx, 800, 600);
+
+  uint32_t       count;
+  const rd__cmd* cmds = rd__display_list(ctx, &count);
+  const rd__cmd* c    = find(cmds, count, RD_CMD_TILES, n);
+  CHECK(c != NULL);
+  if (!c) return;
+  CHECK(near(c->rect.x, 2) && near(c->rect.y, 2) && near(c->rect.width, 96) && near(c->rect.height, 56));  // the padding box
+  CHECK(near(c->dest.x, 2) && near(c->dest.y, 2) && near(c->dest.width, 8) && near(c->dest.height, 4));  // natural size
+  CHECK(c->repeat == RD_BACKGROUND_REPEAT);
+  CHECK(near(c->radii[0], 8) && near(c->radii[3], 8));  // the border radius, less the border
+  CHECK(c->fill.a == 128);
+
+  // Sizes: px, pct of the padding box, auto keeping the aspect ratio.
+  rd_node_merge_style(ctx, n, &(rd_style){.background_width = rd_px(16)});
+  rd_ctx_layout(ctx, 800, 600);
+  c = find(rd__display_list(ctx, &count), count, RD_CMD_TILES, n);
+  CHECK(c && near(c->dest.width, 16) && near(c->dest.height, 8));
+  rd_node_merge_style(ctx, n, &(rd_style){.background_width = rd_auto(), .background_height = rd_pct(50), .background_repeat = RD_BACKGROUND_REPEAT_X});
+  rd_ctx_layout(ctx, 800, 600);
+  c = find(rd__display_list(ctx, &count), count, RD_CMD_TILES, n);
+  CHECK(c && near(c->dest.height, 28) && near(c->dest.width, 56) && c->repeat == RD_BACKGROUND_REPEAT_X);
+  rd_node_merge_style(ctx, n, &(rd_style){.background_width = rd_px(0)});  // a tile of nothing
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(!find(rd__display_list(ctx, &count), count, RD_CMD_TILES, n));
+
+  // Paint only, off-screen culled, and gone with the image or with none.
+  rd_node_merge_style(ctx, n, &(rd_style){.background_width = rd_auto(), .background_height = rd_auto()});
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(find(rd__display_list(ctx, &count), count, RD_CMD_TILES, n));
+  rd_node_merge_style(ctx, n, &(rd_style){.background_image = rd_bg_none()});
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(!find(rd__display_list(ctx, &count), count, RD_CMD_TILES, n));
+  rd_node_merge_style(ctx, n, &(rd_style){.background_image = rd_bg_image(im)});
+  rd_ctx_layout(ctx, 800, 600);
+  rd_image_unload(ctx, im);
+  CHECK(!find(rd__display_list(ctx, &count), count, RD_CMD_TILES, n));
+
+  // Below the node's children and its own text, above its background color.
+  im = rd_image_from_pixels(ctx, px, 8, 4);
+  rd_node_merge_style(ctx, n, &(rd_style){.background_image = rd_bg_image(im), .background = rd_hex(0x101010)});
+  rd_node child = add(ctx, n, (rd_style){.height = rd_px(10), .background = rd_hex(0x202020)});
+  rd_ctx_layout(ctx, 800, 600);
+  cmds = rd__display_list(ctx, &count);
+  const rd__cmd* bg = find(cmds, count, RD_CMD_RECT, n), *tiles = find(cmds, count, RD_CMD_TILES, n), *kid = find(cmds, count, RD_CMD_RECT, child);
+  CHECK(bg && tiles && kid && bg < tiles && tiles < kid);
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   test_pixel_ratio();
   test_text_cull();
@@ -233,5 +413,8 @@ int main(void) {
   test_clip_and_cull();
   test_hit_and_pointer();
   test_paint_commands();
+  test_scroll_into_view();
+  test_scroll_into_view_containers();
+  test_background_commands();
   return TEST_RESULT();
 }

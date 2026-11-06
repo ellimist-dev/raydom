@@ -21,6 +21,14 @@ int main() {
   });
   // ANCHOR_END: menu
 
+  // ANCHOR: headings
+  rd::Node recent = ctx.create_button("Recent");
+  recent.on_click([&] {
+    rdx::menu(ctx, {{.label = "Recent", .heading = true}, {.label = "notes.txt"}, {.label = "todo.txt"}},
+              {.node = recent.handle()}, [&](int index) { log = "recent " + std::to_string(index); });  // 1 or 2
+  });
+  // ANCHOR_END: headings
+
   // ANCHOR: context
   rdx::context_menu(area, {{"Copy", "Ctrl+C"}, {"Paste", "Ctrl+V", /*disabled=*/true}},
                     [&](int index) { log = "context " + std::to_string(index); });

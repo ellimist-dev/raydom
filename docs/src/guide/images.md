@@ -80,6 +80,28 @@ half its size is a round avatar. `opacity` fades it. Background and border draw 
 
 C++: `ctx.create_image(img, style)` creates an image node with the image [role](roles.md).
 
+## Background images
+
+Any node can draw an image behind its content, tiled:
+
+```c
+{{#include ../../examples/images.c:background}}
+```
+
+| Property            | Effect                                                                           |
+| ------------------- | -------------------------------------------------------------------------------- |
+| `background_image`  | `rd_bg_image(image)`, or `rd_bg_none()` to clear one set by a class. C++: `.background_image(img)` |
+| `background_repeat` | `REPEAT` (the default), `REPEAT_X`, `REPEAT_Y` or `NO_REPEAT`                    |
+| `background_width`, `background_height` | The tile's size: `rd_px`, or `rd_pct` of the padding box. `auto` is the image's size, or keeps its aspect ratio against the other one |
+
+Tiles start at the top left of the padding box and stay inside the border, with the corners rounded to match. They draw
+over `background` and under the node's text, image and children, and don't move when the node's content scrolls. An
+SVG rasterizes at the tile's size in device pixels, so a pattern stays sharp, and one using `currentColor` takes the
+node's `color`.
+
+Each tile is a quad. They batch, so thousands are cheap, but a tile of a pixel or two over a large area is not. A tile
+is at least one device pixel. A class variant can swap the image alone, on hover, say; these properties don't animate.
+
 ## Changing and freeing
 
 ```c

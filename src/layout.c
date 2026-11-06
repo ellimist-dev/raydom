@@ -643,9 +643,10 @@ static void layout_pass(rd_ctx* ctx, float width, float height) {
   ctx->layouts[ctx->root].rect.x = 0;
   ctx->layouts[ctx->root].rect.y = 0;
   rd__place_anchored(ctx);
+  if (rd__scroll_requests_run(ctx)) rd__place_anchored(ctx);  // anchors follow what scrolled
 }
 
-static bool tree_dirty(const rd_ctx* ctx) {
+bool rd__tree_dirty(const rd_ctx* ctx) {
   const rd_slot* r = &ctx->slots[ctx->root];
   return r->flags & (RD_FLAG_LAYOUT_DIRTY | RD_FLAG_STYLE_DIRTY | RD_FLAG_SUBTREE_STYLE_DIRTY);
 }
@@ -683,7 +684,7 @@ void rd_ctx_layout(rd_ctx* ctx, float width, float height) {
   ctx->hooks_running = false;
   sweep_hooks(ctx);
   rd__focus_fixup(ctx);  // with this frame's styles: a focused node hidden or disabled loses focus now
-  if (tree_dirty(ctx)) layout_pass(ctx, width, height);
+  if (rd__tree_dirty(ctx)) layout_pass(ctx, width, height);
 }
 
 static bool add_hook(rd_ctx* ctx, rd__hook h) {

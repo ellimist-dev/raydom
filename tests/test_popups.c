@@ -1,4 +1,6 @@
+#include <math.h>
 #include <raydom/extras/popups.h>
+#include <raydom/extras/theme.h>
 #include <string.h>
 
 #include "check.h"
@@ -33,7 +35,7 @@ static rd_node nth_item(rd_ctx* ctx, rd_node menu, int k) {
   return (rd_node){0};
 }
 
-static const rdx_menu_item ITEMS[] = {{"Cut", "Ctrl+X", false}, {"Copy", NULL, true}, {NULL, NULL, false}, {"Paste", NULL, false}};
+static const rdx_menu_item ITEMS[] = {{.label = "Cut", .shortcut = "Ctrl+X"}, {.label = "Copy", .disabled = true}, {0}, {.label = "Paste"}};
 
 static void menus(void) {
   rd_ctx* ctx = rd_ctx_create();
@@ -250,7 +252,7 @@ static void count_free(void* data) {
 static void failures(void) {
   rd_ctx*             ctx    = rd_ctx_create();
   rd_node             gone   = rd_node_create(ctx);
-  const rdx_menu_item item[] = {{"Copy", NULL, false}};
+  const rdx_menu_item item[] = {{.label = "Copy"}};
   rd_node_destroy(ctx, gone);
   CHECK(!rdx_context_menu_attach(ctx, gone, item, 1, on_choose, NULL, count_free) && freed == 0);
   rd_node target = rd_node_create(ctx);
@@ -295,7 +297,7 @@ static void outlived(void) {
   rd_node row = rd_node_create(ctx);
   rd_node_set_style(ctx, row, &(rd_style){.width = rd_px(200), .height = rd_px(40)});
   rd_node_append(ctx, rd_ctx_root(ctx), row);
-  const rdx_menu_item items[] = {{"Delete", NULL, false}};
+  const rdx_menu_item items[] = {{.label = "Delete"}};
   freed                       = 0;
   CHECK(rdx_context_menu_attach(ctx, row, items, 1, on_choose, NULL, count_free));
   rd_ctx_layout(ctx, 800, 600);
@@ -315,6 +317,88 @@ static void outlived(void) {
   rd_ctx_destroy(ctx);
 }
 
+
+static void headings(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_font_load_file(ctx, RAYDOM_TEST_FONT);
+  const rdx_menu_item items[] = {{.label = "Edit", .heading = true}, {.label = "Cut"}, {0}, {.label = "View", .heading = true, .shortcut = "ignored"}, {.label = "Zoom"}};
+  chosen                      = -2;
+  rd_node menu = rdx_menu_open(ctx, &(rdx_menu_desc){items, 5, {.x = 10, .y = 10}, on_choose, NULL, NULL});
+  rd_ctx_layout(ctx, 800, 600);
+
+  // One child per entry, the heading a text of its own, not an item.
+  CHECK(rd_node_child_count(ctx, menu) == 5);
+  rd_node heading = rd_node_first_child(ctx, menu);
+  size_t  len;
+  CHECK(!strcmp(rd_node_text(ctx, heading, &len), "Edit"));
+  CHECK(rd_node_role(ctx, heading) == RD_ROLE_HEADING);
+  CHECK(rd_node_has_class(ctx, heading, rdx_theme(ctx)->menu_heading));
+
+  // The keyboard goes around it: Down from the top lands on the first real item, and wraps past the second heading.
+  press_key(ctx, RD_KEY_DOWN);
+  CHECK(rd_node_eq(rd_ctx_focused(ctx), nth_item(ctx, menu, 0)));
+  press_key(ctx, RD_KEY_DOWN);
+  CHECK(rd_node_eq(rd_ctx_focused(ctx), nth_item(ctx, menu, 1)));
+  press_key(ctx, RD_KEY_DOWN);
+  CHECK(rd_node_eq(rd_ctx_focused(ctx), nth_item(ctx, menu, 0)));
+
+  // Pressing or hovering it chooses nothing and leaves the menu open.
+  rd_rect b = rd_node_bounds(ctx, heading);
+  rd_ctx_pointer(ctx, b.x + 2, b.y + 2, 0, 0, 0);
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(rd_node_eq(rd_ctx_focused(ctx), nth_item(ctx, menu, 0)));
+  click(ctx, heading);
+  CHECK(rd_node_alive(ctx, menu) && chosen == -2);
+
+  // Indices count headings and separators: "Zoom" is the fifth entry.
+  click(ctx, nth_item(ctx, menu, 1));
+  CHECK(chosen == 4 && !rd_node_alive(ctx, menu));
+
+  // Context menus copy the flag.
+  rd_node row = rd_node_create(ctx);
+  rd_node_set_style(ctx, row, &(rd_style){.width = rd_px(200), .height = rd_px(40)});
+  rd_node_append(ctx, rd_ctx_root(ctx), row);
+  CHECK(rdx_context_menu_attach(ctx, row, items, 5, on_choose, NULL, NULL));
+  rd_ctx_layout(ctx, 800, 600);
+  rd_rect rb = rd_node_bounds(ctx, row);
+  click_at(ctx, rb.x + 5, rb.y + 5, RD_BUTTON_SECONDARY);
+  rd_ctx_layout(ctx, 800, 600);
+  rd_node open = rd_node_last_child(ctx, rd_ctx_overlay(ctx));
+  CHECK(rd_node_role(ctx, rd_node_first_child(ctx, open)) == RD_ROLE_HEADING);
+  rd_ctx_destroy(ctx);
+}
+
+static void select_list_width(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_font_load_file(ctx, RAYDOM_TEST_FONT);
+  const char* const shorts[] = {"a", "b"};
+  const char* const longs[]  = {"a", "an option much longer than the select it opens from"};
+  rd_node           narrow = rdx_select_create(ctx, shorts, 2, NULL), wide = rdx_select_create(ctx, longs, 2, NULL);
+  rd_node_append(ctx, rd_ctx_root(ctx), narrow);
+  rd_node_append(ctx, rd_ctx_root(ctx), wide);
+  rd_ctx_layout(ctx, 800, 600);
+  rd_node_set_style(ctx, wide, &(rd_style){.width = rd_px(160)});
+
+  // Short options: exactly the select's width.
+  click(ctx, narrow);
+  rd_ctx_layout(ctx, 800, 600);
+  rd_node list = rd_node_last_child(ctx, rd_ctx_overlay(ctx));
+  CHECK(fabsf(rd_node_bounds(ctx, list).width - rd_node_bounds(ctx, narrow).width) < 0.01f);
+  press_key(ctx, RD_KEY_ESCAPE);
+
+  // A long option: the list grows so that it shows whole.
+  click(ctx, wide);
+  rd_ctx_layout(ctx, 800, 600);
+  list = rd_node_last_child(ctx, rd_ctx_overlay(ctx));
+  rd_rect lb = rd_node_bounds(ctx, list);
+  CHECK(lb.width > rd_node_bounds(ctx, wide).width);
+  rd_node item  = nth_item(ctx, list, 1);
+  rd_node label = rd_node_last_child(ctx, item);
+  CHECK(rd_node_bounds(ctx, label).width >= rd_font_measure(ctx, (rd_font){0, true}, rd_node_computed_style(ctx, label)->font_size.value, longs[1], RD_TEXT_NUL) - 0.01f);
+  CHECK(rd_node_bounds(ctx, label).x + rd_node_bounds(ctx, label).width <= lb.x + lb.width);
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   failures();
   outlived();
@@ -322,5 +406,7 @@ int main(void) {
   selects();
   modals();
   tooltips();
+  headings();
+  select_list_width();
   return TEST_RESULT();
 }

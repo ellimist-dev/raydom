@@ -23,7 +23,8 @@ int main(void) {
   // ANCHOR: options
   rd_node_set_anchor(ctx, menu, &(rd_anchor){.node = button, .side = RD_SIDE_RIGHT, .align = RD_ALIGN_CENTER});
   rd_node_set_anchor(ctx, menu, &(rd_anchor){.x = 300, .y = 200});  // at a point: a context menu
-  rd_node_set_anchor(ctx, menu, &(rd_anchor){.node = button, .match_width = true});  // a dropdown
+  rd_node_set_anchor(ctx, menu, &(rd_anchor){.node = button, .min_width_anchor = true});  // a list of options
+  rd_node_set_anchor(ctx, menu, &(rd_anchor){.node = button, .match_width = true});       // exactly as wide
   // ANCHOR_END: options
   rd_ctx_layout(ctx, 800, 600);
   assert(rd_node_bounds(ctx, menu).width == 100);

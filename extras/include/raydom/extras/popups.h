@@ -21,6 +21,7 @@ typedef struct rdx_menu_item {
   const char* label RD_DEFAULT({});     // null for a separator
   const char* shortcut RD_DEFAULT({});  // optional hint at the right, such as "Ctrl+C"; it doesn't bind the key
   bool        disabled RD_DEFAULT({});
+  bool        heading RD_DEFAULT({});  // a title for the items after it: not chosen or focused; counts in the index
 } rdx_menu_item;
 
 // Called with the index into items of the chosen item, after the menu has closed. Not called when

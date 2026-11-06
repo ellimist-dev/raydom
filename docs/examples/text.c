@@ -44,6 +44,11 @@ int main(void) {
                                          .text_overflow = RD_TEXT_OVERFLOW_ELLIPSIS},
                               "A paragraph that shows at most three lines and ends the third with an ellipsis.");
   // ANCHOR_END: overflow
+
+  // ANCHOR: spacing
+  rd_node caps = add_text(ctx, root, (rd_style){.letter_spacing = rd_px(1.5f)}, "SECTION");
+  // ANCHOR_END: spacing
+  (void)caps;
   (void)log_line;
   (void)summary;
 

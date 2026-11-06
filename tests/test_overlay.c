@@ -265,11 +265,95 @@ static void anchor_order(void) {
   rd_ctx_destroy(ctx);
 }
 
+
+static void min_width_anchor(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_font_load_file(ctx, RAYDOM_TEST_FONT);
+  rd_node root   = rd_ctx_root(ctx);
+  rd_node anchor = add(ctx, root, (rd_style){.position = RD_POSITION_ABSOLUTE, .inset = {.top = rd_px(10), .left = rd_px(30)}, .width = rd_px(80), .height = rd_px(20)});
+
+  // Content narrower than the anchor: the anchor's width, and children stretch to it.
+  rd_node list  = add(ctx, rd_ctx_overlay(ctx), (rd_style){.position = RD_POSITION_ABSOLUTE, .padding = rd_edges_all(rd_px(5))});
+  rd_node label = add(ctx, list, (rd_style){.white_space = RD_WHITE_SPACE_NOWRAP});
+  rd_node_set_text(ctx, label, "ab", RD_TEXT_NUL);
+  rd_node_set_anchor(ctx, list, &(rd_anchor){.node = anchor, .min_width_anchor = true});
+  rd_ctx_layout(ctx, 800, 600);
+  rd_rect b = rd_node_bounds(ctx, list);
+  CHECK(near(b.width, 80) && near(b.x, 30) && near(b.y, 30));
+  CHECK(near(rd_node_rect(ctx, label).width, 70));
+  float h = b.height;
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_bounds(ctx, list).width, 80));  // stable
+
+  // Content wider: grows to fit, without wrapping or clipping.
+  const char* long_text = "a rather long option that doesn't fit";
+  float       own       = rd_font_measure(ctx, (rd_font){0, true}, 16, long_text, RD_TEXT_NUL);
+  CHECK(own > 80);
+  rd_node_set_text(ctx, label, long_text, RD_TEXT_NUL);
+  rd_ctx_layout(ctx, 800, 600);
+  b = rd_node_bounds(ctx, list);
+  CHECK(near(b.width, own + 10) && near(b.height, h));
+  CHECK(near(rd_node_rect(ctx, label).width, own));
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_bounds(ctx, list).width, own + 10));
+
+  // Back to narrow: follows the content down to the anchor's width, even with nothing else changing.
+  rd_node_set_text(ctx, label, "ab", RD_TEXT_NUL);
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_bounds(ctx, list).width, 80));
+
+  // It follows the anchor both ways, with the node's own layout otherwise clean.
+  rd_node_set_style(ctx, anchor, &(rd_style){.position = RD_POSITION_ABSOLUTE, .inset = {.top = rd_px(10), .left = rd_px(30)}, .width = rd_px(200), .height = rd_px(20)});
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_bounds(ctx, list).width, 200));
+  rd_node_set_style(ctx, anchor, &(rd_style){.position = RD_POSITION_ABSOLUTE, .inset = {.top = rd_px(10), .left = rd_px(30)}, .width = rd_px(50), .height = rd_px(20)});
+  rd_ctx_layout(ctx, 800, 600);
+  float small = rd_font_measure(ctx, (rd_font){0, true}, 16, "ab", RD_TEXT_NUL) + 10;
+  CHECK(near(rd_node_bounds(ctx, list).width, fmaxf(50, small)));
+
+  // No wider than the root: long content wraps there, and the node shifts in.
+  rd_node_merge_style(ctx, label, &(rd_style){.white_space = RD_WHITE_SPACE_NORMAL});
+  rd_node_set_text(ctx, label, long_text, RD_TEXT_NUL);
+  rd_ctx_layout(ctx, 120, 600);
+  b = rd_node_bounds(ctx, list);
+  CHECK(b.width > 80 && b.width <= 120 && b.x >= 0 && b.x + b.width <= 120 && b.height > h);
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_bounds(ctx, list).width, own + 10));  // and back
+
+  // End-aligned, it grows away from the anchor's end. The node's own bounds and width apply.
+  rd_node_set_anchor(ctx, list, &(rd_anchor){.node = anchor, .align = RD_ALIGN_END, .min_width_anchor = true});
+  rd_ctx_layout(ctx, 800, 600);
+  b = rd_node_bounds(ctx, list);
+  CHECK(near(b.x, fmaxf(0, 80 - b.width)));
+  rd_node_merge_style(ctx, list, &(rd_style){.max_width = rd_px(100)});
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(rd_node_bounds(ctx, list).width > 50 && rd_node_bounds(ctx, list).width <= 100);
+  rd_node_merge_style(ctx, list, &(rd_style){.max_width = rd_auto(), .width = rd_px(30)});
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_bounds(ctx, list).width, 50));  // at least the anchor
+  rd_node_merge_style(ctx, list, &(rd_style){.width = rd_px(300)});
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_bounds(ctx, list).width, 300));
+
+  // match_width wins.
+  rd_node_merge_style(ctx, list, &(rd_style){.width = rd_auto()});
+  rd_node_set_anchor(ctx, list, &(rd_anchor){.node = anchor, .match_width = true, .min_width_anchor = true});
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_bounds(ctx, list).width, 50));
+
+  // To a point there's no anchor width: the content's.
+  rd_node_set_anchor(ctx, list, &(rd_anchor){.x = 5, .y = 5, .min_width_anchor = true});
+  rd_ctx_layout(ctx, 800, 600);
+  CHECK(near(rd_node_bounds(ctx, list).width, own + 10));
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   layering();
   hooks();
   node_hooks();
   anchoring();
   anchor_order();
+  min_width_anchor();
   return TEST_RESULT();
 }

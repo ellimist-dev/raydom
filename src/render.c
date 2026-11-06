@@ -57,7 +57,7 @@ static const char* FS_BODY =
     "    vec2 q = (p - imgrect.xy) / imgrect.zw;\n"
     "    if (q.x < 0.0 || q.y < 0.0 || q.x > 1.0 || q.y > 1.0) { OUT_COLOR = vec4(0.0); return; }\n"
     "    vec4 t = TEX(texture0, mix(uvrect.xy, uvrect.zw, q));\n"
-    "    OUT_COLOR = vec4(t.rgb, t.a * fill.a * clamp(0.5 - outer * scale, 0.0, 1.0));\n"
+    "    OUT_COLOR = vec4(t.rgb * fill.rgb, t.a * fill.a * clamp(0.5 - outer * scale, 0.0, 1.0));\n"
     "    return;\n"
     "  }\n"
     "  if (blur > 0.0) {\n"
@@ -249,6 +249,7 @@ void rd__render_ctx_free(rd_ctx* ctx) {
   free(ctx->hover_chain.nodes);
   free(ctx->active_chain.nodes);
   free(ctx->anchored.nodes);
+  free(ctx->scroll_requests);
   free(ctx->animating.nodes);
 }
 
@@ -474,9 +475,9 @@ static void draw_rect(gpu* g, const rd__cmd* c, float dpi) {
   if (rt > 0) fill_quad(g, (Rectangle){r.x + r.width - rt, r.y + t, rt, r.height - t - b}, s);
 }
 
-// One unwrapped run of UTF-8, for placeholders.
+// One unwrapped run of UTF-8, for placeholders and ellipses.
 static void draw_run(gpu* g, rd__font* f, float size, const char* s, size_t len, float x, float base, Color col,
-                     float dpi) {
+                     float dpi, float spacing) {
   float   px = roundf(size * dpi * 4) / 4, units = rd__font_scale(f, size), inv = 1 / (float)g->atlas_size;
   int32_t prev = -1;
   for (size_t i = 0; i < len;) {
@@ -488,7 +489,7 @@ static void draw_run(gpu* g, rd__font* f, float size, const char* s, size_t len,
       textured_quad(g->atlas.id, (float)sl->x * inv, (float)sl->y * inv, (float)(sl->x + sl->w) * inv,
                     (float)(sl->y + sl->h) * inv, gx, gy, gx + (float)sl->w / dpi, gy + (float)sl->h / dpi, col, PLAIN);
     }
-    x += (float)adv * units;
+    x += (float)adv * units + spacing;
     prev = glyph;
   }
 }
@@ -498,7 +499,7 @@ static void draw_placeholder(gpu* g, rd_ctx* ctx, const rd__cmd* c, float dpi) {
   rd__input_view  v;
   if (!rd__text_layout_get(ctx, c->node, c->rect.width, &tl) || !rd__input_view_get(ctx, c->node, &v)) return;
   draw_run(g, tl.font, tl.size, v.placeholder, v.placeholder_len, c->rect.x + c->dx,
-           snap(c->rect.y + tl.baseline, dpi), to_color(c->fill), dpi);
+           snap(c->rect.y + tl.baseline, dpi), to_color(c->fill), dpi, tl.letter_spacing);
 }
 
 static void draw_glyph(gpu* g, const rd__text_layout* tl, int32_t glyph, float px, float x, float base, Color col,
@@ -570,7 +571,7 @@ static void draw_text(gpu* g, rd_ctx* ctx, const rd__cmd* c, float dpi) {
   bool        ellipsis = st->text_overflow == RD_TEXT_OVERFLOW_ELLIPSIS;
   int32_t     dot_adv, dots = rd__font_glyph(tl.font, 0x2026, &dot_adv);
   const char* ell   = dots ? "\xe2\x80\xa6" : "...";
-  float       ell_w = ellipsis ? rd_font_measure(ctx, st->font, tl.size, ell, RD_TEXT_NUL) : 0;
+  float       ell_w = ellipsis ? rd_font_measure(ctx, st->font, tl.size, ell, RD_TEXT_NUL) + (dots ? 1.0f : 3.0f) * tl.letter_spacing : 0;
 
   hl_colors           hl = {.base = col, .op = op, .until = UINT32_MAX, .color = col};
   const rd_highlight* few[16];
@@ -609,11 +610,11 @@ static void draw_text(gpu* g, rd_ctx* ctx, const rd__cmd* c, float dpi) {
           break;
         }
         draw_glyph(g, &tl, glyph, px, x, base, hl.count ? hl_color(&hl, tl.offsets[j]) : col, dpi);
-        x += (float)adv * tl.units;
+        x += (float)adv * tl.units + tl.letter_spacing;
         prev = glyph;
       }
     }
-    if (cut && (done || more)) draw_run(g, tl.font, tl.size, ell, strlen(ell), x, base, col, dpi);
+    if (cut && (done || more)) draw_run(g, tl.font, tl.size, ell, strlen(ell), x, base, col, dpi, tl.letter_spacing);
   }
   if (hl.list != few) free(hl.list);
 }
@@ -650,20 +651,22 @@ static bool image_texture(rd__image* im, Texture2D* out) {
   return im->tex != 0;
 }
 
+// Rasterizes an SVG for drawing at need texels per unit; only ever larger, so smaller uses take mipmaps.
+// The scale goes up in steps of 1.25, so an image growing a little every frame (a pane being dragged
+// wider) rasterizes now and then rather than every frame, minified by up to 1.25 in between. Exact
+// rasterizes at need itself: tiles keep their size, and a pattern's fine lines shouldn't blur.
+static bool svg_ready(rd__image* im, float need, bool exact) {
+  if (!im->svg) return true;
+  float most = (float)RD__MAX_RASTER / fmaxf(im->natural_w, im->natural_h);
+  need       = fminf(need, most);
+  if (need <= im->raster_scale * 1.001f) return true;
+  float step = powf(1.25f, ceilf(logf(need) / logf(1.25f) - 1e-3f));
+  return rd__image_rasterize(im, exact ? need : fminf(fmaxf(step, need), most));
+}
+
 static void draw_image(gpu* g, rd_ctx* ctx, const rd__cmd* c, float dpi) {
   rd__image* im = rd__image_get(ctx, c->image);
-  if (!im) return;
-  if (im->svg) {
-    // Rasterize at the drawn size in device pixels; only ever larger, so smaller uses take mipmaps. The
-    // scale goes up in steps of 1.25, so an image growing a little every frame (a pane being dragged
-    // wider) rasterizes now and then rather than every frame, minified by up to 1.25 in between.
-    float most = (float)RD__MAX_RASTER / fmaxf(im->natural_w, im->natural_h);
-    float need = fminf(fmaxf(c->dest.width / c->src.width, c->dest.height / c->src.height) * dpi, most);
-    if (need > im->raster_scale * 1.001f) {
-      float step = powf(1.25f, ceilf(logf(need) / logf(1.25f) - 1e-3f));
-      if (!rd__image_rasterize(im, fminf(fmaxf(step, need), most))) return;
-    }
-  }
+  if (!im || !svg_ready(im, fmaxf(c->dest.width / c->src.width, c->dest.height / c->src.height) * dpi, false)) return;
   Texture2D t;
   if (!image_texture(im, &t)) return;
   // src is in natural units; the texture holds raster_scale texels per unit.
@@ -687,6 +690,52 @@ static void draw_image(gpu* g, rd_ctx* ctx, const rd__cmd* c, float dpi) {
   textured_quad(t.id, -1, -1, box.width + 1, box.height + 1, box.x - 1, box.y - 1, box.x + box.width + 1,
                 box.y + box.height + 1, to_color(c->fill), (Vector3){box.width, box.height, k});
   (void)dpi;
+}
+
+// One quad per tile, each with the whole image, so tiling needs no texture wrapping: WebGL 1 can't repeat
+// a texture whose sides aren't powers of two, and mipmaps would seam at a shader's wrap. Tiles batch; only
+// those touching a rounded corner go through the shader's mask, and flush. Edges are snapped to device
+// pixels, each from the unsnapped grid, so that neighbors meet without gaps or drift.
+static void draw_tiles(gpu* g, rd_ctx* ctx, const rd__cmd* c, float dpi) {
+  rd__image* im = rd__image_get(ctx, c->image);
+  if (!im) return;
+  float tw = fmaxf(c->dest.width, 1 / dpi), th = fmaxf(c->dest.height, 1 / dpi);  // a device pixel at least
+  if (!svg_ready(im, fmaxf(tw / im->natural_w, th / im->natural_h) * dpi, true)) return;
+  Texture2D t;
+  if (!image_texture(im, &t)) return;
+  float     us = im->natural_w * im->raster_scale / (float)t.width, vs = im->natural_h * im->raster_scale / (float)t.height;
+  Rectangle box   = snap_rect(c->rect, dpi);
+  float     right = box.x + box.width, bottom = box.y + box.height;
+  float     vx0 = fmaxf(box.x, c->clip.x), vx1 = fminf(right, c->clip.x + c->clip.width);
+  float     vy0 = fmaxf(box.y, c->clip.y), vy1 = fminf(bottom, c->clip.y + c->clip.height);
+  if (vx1 <= vx0 || vy1 <= vy0) return;
+  bool    across = c->repeat == RD_BACKGROUND_REPEAT || c->repeat == RD_BACKGROUND_REPEAT_X;
+  bool    down   = c->repeat == RD_BACKGROUND_REPEAT || c->repeat == RD_BACKGROUND_REPEAT_Y;
+  int64_t col0 = across ? (int64_t)floorf((vx0 - c->rect.x) / tw) : 0, col1 = across ? (int64_t)ceilf((vx1 - c->rect.x) / tw) : 1;
+  int64_t row0 = down ? (int64_t)floorf((vy0 - c->rect.y) / th) : 0, row1 = down ? (int64_t)ceilf((vy1 - c->rect.y) / th) : 1;
+  Color   col  = to_color(c->fill);
+  const float* r = c->radii;
+  for (int64_t row = row0; row < row1; row++) {
+    float y0 = snap(c->rect.y + (float)row * th, dpi), y1 = snap(c->rect.y + (float)(row + 1) * th, dpi);
+    float ya = fmaxf(y0, box.y), yb = fminf(y1, bottom);
+    if (yb <= ya || y1 <= y0) continue;
+    for (int64_t k = col0; k < col1; k++) {
+      float x0 = snap(c->rect.x + (float)k * tw, dpi), x1 = snap(c->rect.x + (float)(k + 1) * tw, dpi);
+      float xa = fmaxf(x0, box.x), xb = fminf(x1, right);
+      if (xb <= xa || x1 <= x0) continue;
+      bool corner = (r[0] > 0 && xa < box.x + r[0] && ya < box.y + r[0]) || (r[1] > 0 && xb > right - r[1] && ya < box.y + r[1]) ||
+                    (r[2] > 0 && xb > right - r[2] && yb > bottom - r[2]) || (r[3] > 0 && xa < box.x + r[3] && yb > bottom - r[3]);
+      if (!corner) {
+        textured_quad(t.id, (xa - x0) / (x1 - x0) * us, (ya - y0) / (y1 - y0) * vs, (xb - x0) / (x1 - x0) * us,
+                      (yb - y0) / (y1 - y0) * vs, xa, ya, xb, yb, col, PLAIN);
+        continue;
+      }
+      box_uniforms u = {.textured = 1, .imgrect = {x0 - box.x, y0 - box.y, x1 - x0, y1 - y0}, .uvrect = {0, 0, us, vs}};
+      float        e = even_radius(r, &u);
+      box_uniforms_use(g, &u);
+      textured_quad(t.id, xa - box.x, ya - box.y, xb - box.x, yb - box.y, xa, ya, xb, yb, col, (Vector3){box.width, box.height, e});
+    }
+  }
 }
 
 float rd_pixel_ratio(const rd_ctx* ctx) { return ctx && ctx->pixel_ratio > 0 ? ctx->pixel_ratio : 1; }
@@ -872,7 +921,7 @@ void rd_paint_text(rd_ctx* ctx, const rd_paint_info* info, rd_font font, float s
   // Glyphs are plain textured quads, so they draw with whatever shader the callback has active, as
   // raylib's DrawText does, and batch with its other drawing.
   rlNormal3f(0, 0, 0);
-  draw_run(g, f, size, utf8, len, x, snap(baseline, info->dpi), to_color(color), info->dpi);
+  draw_run(g, f, size, utf8, len, x, snap(baseline, info->dpi), to_color(color), info->dpi, 0);
 }
 
 // Runs a node's paint callback. The callable may replace or destroy itself from inside (a C++ lambda
@@ -940,6 +989,9 @@ void rd_draw(rd_ctx* ctx) {
         break;
       case RD_CMD_IMAGE:
         draw_image(g, ctx, c, dpi);
+        break;
+      case RD_CMD_TILES:
+        draw_tiles(g, ctx, c, dpi);
         break;
       case RD_CMD_FILL: {
         Rectangle r = snap_rect(c->rect, dpi);
@@ -1094,6 +1146,11 @@ void rd_update(rd_ctx* ctx) {
                     (IsMouseButtonDown(MOUSE_BUTTON_EXTRA) ? RD_BUTTON_FORWARD : 0);
 #endif
   rd_ctx_pointer(ctx, m.x / ratio, m.y / ratio, buttons, w.x, w.y);
+  if (IsFileDropped()) {
+    FilePathList files = LoadDroppedFiles();
+    rd_ctx_drop_files(ctx, m.x / ratio, m.y / ratio, (const char* const*)files.paths, files.count);
+    UnloadDroppedFiles(files);
+  }
   rd_ctx_layout(ctx, (float)GetScreenWidth() / ratio, (float)GetScreenHeight() / ratio);
   apply_cursor(ctx);
   if (ctx->event_waiting) {

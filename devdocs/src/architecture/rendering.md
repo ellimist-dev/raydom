@@ -14,6 +14,7 @@
 | `CLIP`        | Sets the scissor; the enclosing clip is restored by a second `CLIP` |
 | `PAINT`       | A canvas callback                                              |
 | `IMAGE`       | An image placed by `object_fit`, with its source rectangle     |
+| `TILES`       | A background image: the padding box, the first tile and the repeat |
 
 The walk applies opacity multiplicatively down the tree, culls nodes outside the current clip, and draws scrollbars
 after a scroll container's children. Commands carry everything the renderer needs except text layout and textures,

@@ -68,6 +68,16 @@ DESCRIPTIONS = {
                        "content edge and take no layout space.",
     "scrollbar_color": "Scrollbar thumb color; brighter while hovered or dragged.",
     "scrollbar_track_color": "Color behind the thumb; transparent by default.",
+    "background_image": "An image drawn over `background`, inside the border and below the content; "
+                        "`rd_bg_image(image)`, or `rd_bg_none()`. SVGs rasterize at the tile's size, and "
+                        "`currentColor` takes the node's `color`.",
+    "background_repeat": "How `background_image` repeats from the top left of the padding box.",
+    "background_width": "Width of a `background_image` tile: `rd_px`, or `rd_pct` of the padding box. `auto` is the "
+                        "image's width, or keeps its aspect ratio against `background_height`.",
+    "background_height": "Height of a `background_image` tile: `rd_px`, or `rd_pct` of the padding box. `auto` is the "
+                         "image's height, or keeps its aspect ratio against `background_width`.",
+    "letter_spacing": "Space added after each character, or removed if negative: `rd_px`, or `rd_num` times or `rd_pct` "
+                      "of `font_size`. Animates.",
     "object_fit": "How an image node's image fills its content box: stretched, contained, covering, natural size, "
                   "or scaled down.",
     "transition_duration": "How long changes to this node's style animate, in seconds (`rd_ms(150)`, `rd_s(0.2)`); "
@@ -88,8 +98,9 @@ GROUPS = [
                             "justify_self", "row_gap", "column_gap"]),
     ("Grid", ["grid_template_columns", "grid_template_rows", "grid_auto_columns", "grid_auto_rows", "grid_auto_flow",
               "grid_column_start", "grid_column_end", "grid_row_start", "grid_row_end"]),
-    ("Paint", ["background", "border_color", "border_radius", "opacity", "box_shadow", "object_fit"]),
-    ("Text", ["color", "font", "font_size", "line_height", "white_space", "text_overflow", "line_clamp",
+    ("Paint", ["background", "border_color", "border_radius", "opacity", "box_shadow", "object_fit", "background_image",
+               "background_repeat", "background_width", "background_height"]),
+    ("Text", ["color", "font", "font_size", "line_height", "letter_spacing", "white_space", "text_overflow", "line_clamp",
               "text_align", "user_select", "caret_color", "selection_color"]),
     ("Scrolling", ["overflow_x", "overflow_y", "scrollbar_width", "scrollbar_color", "scrollbar_track_color"]),
     ("Interaction", ["pointer_events", "focusable", "cursor"]),
@@ -182,6 +193,8 @@ def fmt_default(kind, raw, prefixes):
         return "`auto`"
     if kind == "FONT":
         return "default font"
+    if kind == "IMAGE":
+        return "none"
     return "`" + raw + "`"
 
 

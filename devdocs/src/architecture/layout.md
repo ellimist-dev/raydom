@@ -90,8 +90,18 @@ reads the anchor's bounds from this layout, chooses a side (flipping when only t
 shifts into the root, and writes the node's rect relative to its parent. `match_width` re-lays out the node at the
 anchor's width, resolving the node's own height and bounds the way absolute layout does.
 
+`min_width_anchor` measures the node's own width with an `AT_MOST` key each time, rather than reading its rect, which
+may hold the anchor's width from an earlier layout when the absolute pass was skipped by a clean parent.
+
 Placing after layout means anchoring never affects other nodes' sizes, and a submenu anchored to an item of an
 anchored menu works because the menu was placed first.
+
+## Scrolling to a node
+
+`rd__request_scroll` applies at once if the root is clean and the node shows. Otherwise it queues, and `layout_pass`
+runs the queue after placing anchors, then places them again if anything ran, so popups anchored into a scroller
+follow in the same frame. Hooks therefore see the result, and a request a hook makes with the tree dirty runs in the
+second pass. Requests hold generational handles, so a node destroyed meanwhile is skipped.
 
 ## Layout hooks and the second pass
 

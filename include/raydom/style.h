@@ -181,6 +181,26 @@ RD_ENUM typedef enum rd_object_fit : uint8_t {
   RD_OBJECT_FIT_SCALE_DOWN,  // NONE or CONTAIN, whichever is smaller.
 } rd_object_fit;
 
+// An image owned by the context; see image.h. Zero is null.
+typedef struct rd_image {
+  uint32_t id;
+} rd_image;
+
+// The image of background_image. {{0}, true} is none, the default.
+typedef struct rd_background_image {
+  rd_image image;
+  bool     set;
+} rd_background_image;
+
+// How background_image repeats from the top left of the padding box.
+RD_ENUM typedef enum rd_background_repeat : uint8_t {
+  RD_BACKGROUND_REPEAT_UNSET,
+  RD_BACKGROUND_REPEAT,  // Across and down.
+  RD_BACKGROUND_REPEAT_X,
+  RD_BACKGROUND_REPEAT_Y,
+  RD_BACKGROUND_NO_REPEAT,
+} rd_background_repeat;
+
 // Timing curves for transitions and animations; the CSS cubic-bezier curves of the same names.
 RD_ENUM typedef enum rd_easing : uint8_t {
   RD_EASING_UNSET,
@@ -201,7 +221,7 @@ RD_ENUM typedef enum rd_transition : uint8_t {
   RD_TRANSITION_SIZE    = 1u << 4,  // width, height, their min and max, flex grow, shrink and basis
   RD_TRANSITION_SPACING = 1u << 5,  // margin, padding, border width, gaps
   RD_TRANSITION_INSET   = 1u << 6,
-  RD_TRANSITION_TEXT    = 1u << 7,  // font size, line height
+  RD_TRANSITION_TEXT    = 1u << 7,  // font size, line height, letter spacing
   RD_TRANSITION_ALL     = 0xff,
 } rd_transition;
 
@@ -268,10 +288,15 @@ RD_ENUM typedef enum rd_text_align : uint8_t {
   X(opacity, rd_val, VAL, 0, 0)                       \
   X(box_shadow, rd_shadow, SHADOW, 0, 0)              \
   X(object_fit, rd_object_fit, ENUM, 0, 0)            \
+  X(background_image, rd_background_image, IMAGE, 0, 0) \
+  X(background_repeat, rd_background_repeat, ENUM, 0, 0) \
+  X(background_width, rd_val, VAL, 0, 0)              \
+  X(background_height, rd_val, VAL, 0, 0)             \
   X(color, rd_color, COLOR, 1, 0)                     \
   X(font, rd_font, FONT, 1, 1)                        \
   X(font_size, rd_val, VAL, 1, 1)                     \
   X(line_height, rd_val, VAL, 1, 1)                   \
+  X(letter_spacing, rd_val, VAL, 1, 1)                \
   X(white_space, rd_white_space, ENUM, 1, 1)          \
   X(text_overflow, rd_text_overflow, ENUM, 0, 0)      \
   X(user_select, rd_user_select, ENUM, 1, 0)          \
@@ -376,6 +401,15 @@ static inline rd_color rd_rgb(uint8_t r, uint8_t g, uint8_t b) { return rd_rgba(
 // 0xRRGGBB, opaque.
 static inline rd_color rd_hex(uint32_t rgb) {
   return rd_rgba((uint8_t)(rgb >> 16), (uint8_t)(rgb >> 8), (uint8_t)rgb, 255);
+}
+
+static inline rd_background_image rd_bg_image(rd_image image) {
+  rd_background_image b = {image, true};
+  return b;
+}
+static inline rd_background_image rd_bg_none(void) {
+  rd_background_image b = {{0}, true};
+  return b;
 }
 
 static inline rd_shadow rd_shadow_of(float x, float y, float blur, rd_color color) {

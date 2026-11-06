@@ -311,6 +311,10 @@ static rd_node build_menu(rd_ctx* ctx, manager* m, pkind kind, const rdx_menu_it
       rd_node_append(ctx, menu, sep);
       continue;
     }
+    if (items[i].heading) {
+      rd_node_set_role(ctx, text_part(ctx, menu, items[i].label, cl->menu_heading), RD_ROLE_HEADING);
+      continue;
+    }
     rd_node item = rd_node_create(ctx);
     rd_node_set_role(ctx, item, RD_ROLE_MENU_ITEM);
     rd_node_add_class(ctx, item, cl->menu_item);
@@ -403,7 +407,7 @@ bool rdx_context_menu_attach(rd_ctx* ctx, rd_node target, const rdx_menu_item* i
     return false;
   }
   for (size_t i = 0; i < count; i++)
-    c->items[i] = (rdx_menu_item){dup(items[i].label), dup(items[i].shortcut), items[i].disabled};
+    c->items[i] = (rdx_menu_item){dup(items[i].label), dup(items[i].shortcut), items[i].disabled, items[i].heading};
   c->count   = count;
   c->fn      = fn;
   c->data    = data;
@@ -448,7 +452,7 @@ static void select_click(rd_ctx* ctx, rd_event* ev, void* data) {
   rdx_menu_item* items = calloc(s->count ? s->count : 1, sizeof *items);
   if (!items) return;
   for (size_t i = 0; i < s->count; i++) items[i].label = s->options[i];
-  rd_node list = build_menu(ctx, s->m, P_LIST, items, s->count, (rd_anchor){.node = s->node, .offset = 4, .match_width = true},
+  rd_node list = build_menu(ctx, s->m, P_LIST, items, s->count, (rd_anchor){.node = s->node, .offset = 4, .min_width_anchor = true},
                             (menu_state){.select = s->node}, s->node);
   free(items);
   // Focus the chosen option, or the first.

@@ -24,7 +24,7 @@ typedef struct rdx_classes {
   rd_class slider, slider_track, slider_fill, slider_thumb;
   rd_class toast_stack, toast, toast_bar, toast_title, toast_body, toast_close;
   rd_class toast_info, toast_success, toast_warning, toast_error;  // on the bar
-  rd_class menu, menu_item, menu_check, menu_label, menu_shortcut, menu_separator;  // menus and select lists
+  rd_class menu, menu_item, menu_check, menu_label, menu_shortcut, menu_separator, menu_heading;  // menus and select lists
   rd_class select, select_value, select_chevron;
   rd_class number, number_input, number_steppers, number_step;  // numeric inputs: the field, its text, the buttons
   rd_class number_step_icon;  // a stepper's chevron; steppers have their own hover, not the field's

@@ -3,6 +3,7 @@
 #include <raydom/raydom.h>
 #include <raylib.h>
 #include <rlgl.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -217,6 +218,133 @@ static void test_svg_steps(rd_ctx* ctx, rd_node root) {
   rd_image_unload(ctx, im);
 }
 
+// Background images, at the window's scale and at a pixel ratio. Tiles are 8 wide: red then blue.
+static void test_tiles(rd_ctx* ctx, rd_node root, float scale) {
+  enum { S = 8 };
+  uint8_t px[S * S * 4];
+  for (int y = 0; y < S; y++)
+    for (int x = 0; x < S; x++) {
+      uint8_t* p = &px[(y * S + x) * 4];
+      p[0]       = x < S / 2 ? 255 : 0;
+      p[1]       = 0;
+      p[2]       = x < S / 2 ? 0 : 255;
+      p[3]       = 255;
+    }
+  rd_image  im   = rd_image_from_pixels(ctx, px, S, S);
+  float     r    = rd_pixel_ratio(ctx);
+  const float X = 60, Y = 10;  // inside the window at a pixel ratio of 2 too
+  // A sheet over the rest of the tree, so that what isn't tiled reads as the sheet.
+  rd_node sheet = rd_node_create(ctx);
+  rd_node_set_style(ctx, sheet, &(rd_style){.position = RD_POSITION_ABSOLUTE, .inset = rd_edges_all(rd_px(0)), .background = rd_hex(0x102030)});
+  rd_node_append(ctx, root, sheet);
+  rd_style  base = {.position = RD_POSITION_ABSOLUTE, .inset = {.top = rd_px(Y), .left = rd_px(X)}, .width = rd_px(40), .height = rd_px(20),
+                    .background = rd_hex(0xffffff), .background_image = rd_bg_image(im)};
+  rd_node   n    = rd_node_create(ctx);
+  rd_node_set_style(ctx, n, &base);
+  rd_node_append(ctx, root, n);
+#define PIXEL(img, dx, dy) at(img, (X + (float)(dx)) * r, (Y + (float)(dy)) * r, scale)
+#define IS_RED(c)   close_to(c, 255, 0, 0)
+#define IS_BLUE(c)  close_to(c, 0, 0, 255)
+#define IS_WHITE(c) close_to(c, 255, 255, 255)
+
+  Image img = frame(ctx);  // repeats across and down, and is cut at the node's edge
+  CHECK(IS_RED(PIXEL(img, 2, 2)) && IS_BLUE(PIXEL(img, 6, 2)) && IS_RED(PIXEL(img, 10, 2)) && IS_BLUE(PIXEL(img, 38, 18)));
+  CHECK(close_to(PIXEL(img, 42, 2), 0x10, 0x20, 0x30) && close_to(PIXEL(img, 2, 22), 0x10, 0x20, 0x30));
+  UnloadImage(img);
+
+  rd_node_merge_style(ctx, n, &(rd_style){.background_repeat = RD_BACKGROUND_REPEAT_X});
+  img = frame(ctx);
+  CHECK(IS_RED(PIXEL(img, 10, 2)) && IS_WHITE(PIXEL(img, 2, 10)));
+  UnloadImage(img);
+  rd_node_merge_style(ctx, n, &(rd_style){.background_repeat = RD_BACKGROUND_REPEAT_Y});
+  img = frame(ctx);
+  CHECK(IS_WHITE(PIXEL(img, 10, 2)) && IS_RED(PIXEL(img, 2, 10)));
+  UnloadImage(img);
+  rd_node_merge_style(ctx, n, &(rd_style){.background_repeat = RD_BACKGROUND_NO_REPEAT});
+  img = frame(ctx);
+  CHECK(IS_RED(PIXEL(img, 2, 2)) && IS_BLUE(PIXEL(img, 6, 2)) && IS_WHITE(PIXEL(img, 10, 2)) && IS_WHITE(PIXEL(img, 2, 10)));
+  UnloadImage(img);
+
+  // A larger tile stretches the image.
+  rd_node_merge_style(ctx, n, &(rd_style){.background_repeat = RD_BACKGROUND_REPEAT, .background_width = rd_px(16), .background_height = rd_px(16)});
+  img = frame(ctx);
+  CHECK(IS_RED(PIXEL(img, 5, 2)) && IS_BLUE(PIXEL(img, 12, 2)) && IS_RED(PIXEL(img, 20, 2)));
+  UnloadImage(img);
+
+  // A border: tiles start inside it and it stays on top. A rounded corner masks the tiles under it.
+  rd_style round = base;
+  round.width = rd_px(44), round.height = rd_px(44), round.border_width = rd_edges_all(rd_px(2)), round.border_color = rd_hex(0x00ff00);
+  rd_node_set_style(ctx, n, &round);
+  img = frame(ctx);
+  CHECK(close_to(PIXEL(img, 1, 22), 0, 255, 0));
+  CHECK(IS_RED(PIXEL(img, 2 + 2, 22)) && IS_BLUE(PIXEL(img, 2 + 6, 22)));
+  UnloadImage(img);
+  round.border_width = rd_edges_all(rd_px(0)), round.border_radius = rd_corners_all(rd_px(16));
+  rd_node_set_style(ctx, n, &round);
+  img = frame(ctx);
+  CHECK(close_to(PIXEL(img, 1, 1), 0x10, 0x20, 0x30));  // outside the corner
+  CHECK(IS_RED(PIXEL(img, 10, 2)) && IS_BLUE(PIXEL(img, 6, 22)));  // a tile the corner masks, and one it doesn't
+  CHECK(IS_BLUE(PIXEL(img, 22, 2)));
+  UnloadImage(img);
+
+  // A currentColor SVG takes the node's color, rounded or not, rasterized at the tile's exact size.
+  static const char svg[] =
+      "<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'>"
+      "<rect width='10' height='10' fill='currentColor'/></svg>";
+  rd_image si = rd_image_load(ctx, svg, strlen(svg));
+  round.background_image = rd_bg_image(si), round.background_width = rd_px(30), round.background_height = rd_px(30), round.color = rd_hex(0x00ff00);
+  rd_node_set_style(ctx, n, &round);
+  img = frame(ctx);
+  CHECK(close_to(PIXEL(img, 20, 20), 0, 255, 0) && close_to(PIXEL(img, 10, 2), 0, 255, 0));
+  CHECK(fabsf(rd__image_get(ctx, si.id)->raster_scale - 3 * scale * r) < 0.01f);
+  UnloadImage(img);
+
+  // A clip cuts the tiles; a node with an unloaded image draws its background color.
+  rd_node clip = rd_node_create(ctx);
+  rd_node_set_style(ctx, clip, &(rd_style){.position = RD_POSITION_ABSOLUTE, .inset = {.top = rd_px(Y), .left = rd_px(X)}, .width = rd_px(20),
+                                           .height = rd_px(20), .overflow_x = RD_OVERFLOW_HIDDEN, .overflow_y = RD_OVERFLOW_HIDDEN});
+  rd_node_append(ctx, root, clip);
+  rd_node_append(ctx, clip, n);
+  rd_style inside = base;
+  inside.width = rd_px(100), inside.height = rd_px(100), inside.inset.top = rd_px(0), inside.inset.left = rd_px(0);
+  rd_node_set_style(ctx, n, &inside);
+  img = frame(ctx);
+  CHECK(IS_RED(PIXEL(img, 2, 2)) && close_to(PIXEL(img, 26, 2), 0x10, 0x20, 0x30));
+  UnloadImage(img);
+  rd_image_unload(ctx, im);
+  img = frame(ctx);
+  CHECK(IS_WHITE(PIXEL(img, 2, 2)));
+  UnloadImage(img);
+  rd_image_unload(ctx, si);
+  rd_node_destroy(ctx, clip);
+  rd_node_destroy(ctx, sheet);
+#undef PIXEL
+#undef IS_RED
+#undef IS_BLUE
+#undef IS_WHITE
+}
+
+// Glyphs land where layout says with letter spacing: ink under the last one, none in the gaps.
+static void test_letter_spacing(rd_ctx* ctx, rd_node root, float scale) {
+  rd_node sheet = rd_node_create(ctx);
+  rd_node_set_style(ctx, sheet, &(rd_style){.position = RD_POSITION_ABSOLUTE, .inset = rd_edges_all(rd_px(0)), .background = rd_hex(0x102030)});
+  rd_node_append(ctx, root, sheet);
+  rd_node text = rd_node_create(ctx);
+  rd_node_set_style(ctx, text, &(rd_style){.position = RD_POSITION_ABSOLUTE, .inset = {.top = rd_px(10), .left = rd_px(10)}, .font_size = rd_px(20),
+                                           .color = rd_hex(0xff0000), .letter_spacing = rd_px(20)});
+  rd_node_set_text(ctx, text, "MMMM", RD_TEXT_NUL);
+  rd_node_append(ctx, sheet, text);
+  Image img = frame(ctx);
+  float adv = rd_font_measure(ctx, (rd_font){0}, 20, "M", RD_TEXT_NUL), step = adv + 20;
+  CHECK(fabsf(rd_node_rect(ctx, text).width - 4 * step) < 0.01f);
+  CHECK(reds(img, (rd_rect){10, 10, adv, 24}, scale) > 0);
+  CHECK(reds(img, (rd_rect){10 + 3 * step, 10, adv, 24}, scale) > 0);
+  CHECK(reds(img, (rd_rect){10 + adv + 2, 10, 16, 24}, scale) == 0);
+  CHECK(reds(img, (rd_rect){10 + 3 * step + adv + 2, 10, 16, 24}, scale) == 0);
+  UnloadImage(img);
+  rd_node_destroy(ctx, sheet);
+}
+
 // raylib's high-DPI window: its modelview carries the display's scale, and BeginScissorMode applies it
 // again. On a 2x display (macOS Retina), clips and text must still land where they're laid out; on a 1x
 // display this is the plain case again.
@@ -341,8 +469,11 @@ int main(void) {
   CHECK(close_to(at(img, 140, 44, scale), 0x32, 0xc8, 0x32));    // the border, at twice (70, 22)
   UnloadImage(img);
   test_svg_steps(ctx, root);
+  test_tiles(ctx, root, scale);
   rd_set_pixel_ratio(ctx, 1);
   test_svg_steps(ctx, root);
+  test_tiles(ctx, root, scale);
+  test_letter_spacing(ctx, root, scale);
   test_blend_kept(ctx);
 
   rd_ctx_destroy(ctx);

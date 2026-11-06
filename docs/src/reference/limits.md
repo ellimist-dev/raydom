@@ -26,6 +26,7 @@ What raydom doesn't do in this version. Behavior outside these limits is unspeci
 ## Input
 
 - No IME composition events. Text input is one codepoint at a time from raylib.
+- A multi-line input's caret doesn't scroll its container into view as you type; call `rd_input_scroll_to_line`.
 - No touch or gesture input beyond what raylib reports as the mouse.
 - No accessibility tree.
 
@@ -33,8 +34,8 @@ What raydom doesn't do in this version. Behavior outside these limits is unspeci
 
 - SVG: no text, filters, masks, clip paths, patterns or embedded images. Gradient coordinates written as unitless
   fractions (`x2="1"`) render as a flat color; use percentages (`x2="100%"`). `currentColor` tints the whole SVG.
-- No background images; an image is its own node. Images are static (no GIF animation) unless updated with
-  `rd_image_update`.
+- Background images have no position or `cover`/`contain` sizing: tiles start at the top left of the padding box, and
+  a node has one image. Images are static (no GIF animation) unless updated with `rd_image_update`.
 - Shadows are outer box shadows only.
 - No gradients.
 

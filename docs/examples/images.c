@@ -41,6 +41,20 @@ int main(void) {
   assert(rd_node_rect(ctx, banner).width == 200 && rd_node_rect(ctx, banner).height == 100);
   assert(rd_image_size(ctx, swatch).width == 64);
 
+  // ANCHOR: background
+  rd_node panel = rd_node_create(ctx);
+  rd_node_set_style(ctx, panel, &(rd_style){.width             = rd_px(300),
+                                            .height            = rd_px(200),
+                                            .background        = rd_hex(0x101820),
+                                            .background_image  = rd_bg_image(swatch),  // over the background color
+                                            .background_width  = rd_px(16),            // the height follows the ratio
+                                            .background_repeat = RD_BACKGROUND_REPEAT_X,
+                                            .border_radius     = rd_corners_all(rd_px(12))});
+  rd_node_append(ctx, root, panel);
+  // ANCHOR_END: background
+  rd_ctx_layout(ctx, 800, 600);
+  assert(rd_node_computed_style(ctx, panel)->background_image.image.id == swatch.id);
+
   // ANCHOR: update
   unsigned char frame[16 * 16 * 4] = {0};
   rd_image_update(ctx, swatch, frame, 16, 16);  // a new size: nodes showing it relayout

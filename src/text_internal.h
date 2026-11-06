@@ -53,7 +53,7 @@ typedef struct rd_text {
   rd__token*     tokens;
   uint32_t       token_count, token_cap;
   rd__font*      tok_font;
-  float          tok_size;
+  float          tok_size, tok_spacing;
   rd_white_space tok_ws;
   bool           tok_valid;
 
@@ -79,6 +79,7 @@ typedef struct rd__text_layout {
   float            size, line_height, baseline;  // baseline: from the line top
   float            units;                        // pixels per font unit
   float            space_width;
+  float            letter_spacing;               // pixels added after each codepoint
   uint32_t         cp_count;
   bool             collapse;
 } rd__text_layout;

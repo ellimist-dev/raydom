@@ -20,6 +20,7 @@ enum { K_OTHER, K_VAL, K_COLOR, K_EDGES, K_CORNERS, K_SHADOW };
 #define K_TRACK     K_OTHER
 #define K_GRID_LINE K_OTHER
 #define K_FONT      K_OTHER
+#define K_IMAGE     K_OTHER
 
 typedef struct prop {
   uint16_t offset, size;
@@ -49,6 +50,7 @@ static const uint8_t GROUP[P_COUNT] = {
     [P_border_width] = RD_TRANSITION_SPACING,  [P_row_gap] = RD_TRANSITION_SPACING,
     [P_column_gap] = RD_TRANSITION_SPACING,    [P_inset] = RD_TRANSITION_INSET,
     [P_font_size] = RD_TRANSITION_TEXT,        [P_line_height] = RD_TRANSITION_TEXT,
+    [P_letter_spacing] = RD_TRANSITION_TEXT,
 };
 
 static void*       field(rd_style* s, int p) { return (char*)s + PROPS[p].offset; }

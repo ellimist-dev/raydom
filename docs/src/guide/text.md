@@ -27,6 +27,13 @@ stored text, or `NULL` for a node that isn't a text leaf.
 
 `line_height` accepts `rd_num` (a multiple of `font_size`), `rd_px`, or `rd_pct` (of `font_size`).
 
+`letter_spacing` adds space after every character, spaces included, or removes it when negative. It takes the same
+units, is inherited, and counts for wrapping, carets and selection:
+
+```c
+{{#include ../../examples/text.c:spacing}}
+```
+
 ## Wrapping and overflow
 
 ```c

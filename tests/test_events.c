@@ -1,7 +1,10 @@
+#include <math.h>
 #include <raydom/raydom.h>
 #include <stdint.h>
 
 #include "check.h"
+
+static bool near(float a, float b) { return fabsf(a - b) < 0.01f; }
 
 typedef struct entry {
   int            tag;
@@ -489,6 +492,54 @@ static void test_history_buttons_over_disabled(void) {
   rd_ctx_destroy(f.ctx);
 }
 
+
+static const char* const* drop_paths;
+static uint32_t           drop_count;
+static float              drop_x, drop_local_x;
+static void               on_drop(rd_ctx* ctx, rd_event* ev, void* data) {
+  (void)ctx;
+  (*(int*)data)++;
+  drop_paths   = ev->paths;
+  drop_count   = ev->path_count;
+  drop_x       = ev->x;
+  drop_local_x = ev->local_x;
+}
+
+static void test_file_drop(void) {
+  rd_ctx* ctx  = rd_ctx_create();
+  rd_node root = rd_ctx_root(ctx);
+  rd_node zone = rd_node_create(ctx), off = rd_node_create(ctx);
+  rd_node_set_style(ctx, zone, &(rd_style){.width = rd_px(100), .height = rd_px(50), .margin.left = rd_px(20)});
+  rd_node_set_style(ctx, off, &(rd_style){.width = rd_px(100), .height = rd_px(50)});
+  rd_node_append(ctx, root, zone);
+  rd_node_append(ctx, root, off);
+  int  hits = 0, bubbled = 0;
+  rd_node_on(ctx, zone, RD_EVENT_FILE_DROP, on_drop, &hits, NULL, 0);
+  rd_node_on(ctx, root, RD_EVENT_FILE_DROP, on_drop, &bubbled, NULL, 0);
+  rd_ctx_layout(ctx, 800, 600);
+
+  const char* paths[] = {"/tmp/a.png", "/tmp/b.png"};
+  rd_ctx_drop_files(ctx, 30, 10, paths, 2);
+  CHECK(hits == 1 && bubbled == 1);  // to the node under it, and bubbling
+  CHECK(drop_count == 2 && drop_paths == paths && near(drop_x, 30) && near(drop_local_x, 30));
+  rd_ctx_drop_files(ctx, 500, 500, paths, 1);  // over nothing: the root
+  CHECK(hits == 1 && bubbled == 2 && drop_count == 1);
+  rd_node_set_states(ctx, zone, RD_STATE_DISABLED, true);
+  rd_ctx_drop_files(ctx, 30, 10, paths, 2);  // a disabled node gets no pointer events: the root
+  CHECK(hits == 1 && bubbled == 3);
+  rd_node_set_states(ctx, zone, RD_STATE_DISABLED, false);
+  rd_ctx_drop_files(ctx, 30, 10, paths, 0);  // nothing dropped
+  rd_ctx_drop_files(ctx, 30, 10, NULL, 2);
+  rd_ctx_drop_files(NULL, 30, 10, paths, 2);
+  CHECK(hits == 1 && bubbled == 3);
+  // A hit is by the point given, and leaves the pointer where it was.
+  rd_ctx_pointer(ctx, 400, 400, 0, 0, 0);
+  rd_ctx_drop_files(ctx, 30, 10, paths, 2);
+  CHECK(hits == 2);
+  CHECK(rd_node_is_null(rd_ctx_hovered(ctx)) || rd_node_eq(rd_ctx_hovered(ctx), root));
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   test_dispatch_and_release();
   test_propagation_order();
@@ -505,5 +556,6 @@ int main(void) {
   test_handler_drives_layout();
   test_click_after_press_target_removed();
   test_history_buttons_over_disabled();
+  test_file_drop();
   return TEST_RESULT();
 }

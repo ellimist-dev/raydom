@@ -34,6 +34,9 @@ typedef struct rd_anchor {
   bool     no_flip RD_DEFAULT({});   // keep side even when the node only fits on the opposite one
   bool     no_shift RD_DEFAULT({});  // don't slide the node along the side to keep it inside the root
   bool     match_width RD_DEFAULT({});  // lay the node out at the anchor's width, for dropdowns
+  // Lay it out at least at the anchor's width, and wider for its content, up to the root's width: a list
+  // of options that shouldn't be clipped. match_width wins if both are set.
+  bool     min_width_anchor RD_DEFAULT({});
 } rd_anchor;
 
 // Null anchor clears it. Anchored nodes are positioned in tree order, whatever order they were

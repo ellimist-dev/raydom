@@ -54,5 +54,16 @@ int main() {
   ctx.pointer(r.x + 300, r.y + 5, RD_BUTTON_PRIMARY);
   ctx.pointer(r.x + 300, r.y + 5, 0);
   CHECK(dx == 300);
+
+  rd::Node zone = ctx.create(rd::Style().width(50_px).height(50_px));
+  ctx.root().append(zone);
+  ctx.layout(400, 300);
+  std::vector<std::string> dropped;
+  zone.on(RD_EVENT_FILE_DROP, [&](rd::Event& e) {
+    for (std::string_view p : e.paths()) dropped.emplace_back(p);
+  });
+  rd_rect zb = zone.bounds();
+  ctx.drop_files(zb.x + 5, zb.y + 5, {"/a b/c.png", "d.txt"});
+  CHECK(dropped == (std::vector<std::string>{"/a b/c.png", "d.txt"}));
   return TEST_RESULT();
 }

@@ -77,6 +77,13 @@ int main(void) {
   // ANCHOR_END: scroll
   assert(rd_node_scroll(ctx, list).y == 300 && rd_node_content_size(ctx, list).height == 1200);
 
+  // ANCHOR: reveal
+  rd_node row = add(ctx, list, (rd_style){.height = rd_px(24)});  // not laid out yet
+  rd_node_scroll_into_view(ctx, row, 8);                          // waits for the layout
+  rd_ctx_layout(ctx, 800, 600);
+  // ANCHOR_END: reveal
+  assert(rd_node_scroll(ctx, list).y == 51 * 24 - 200);  // the margin gives way at the end of the content
+
   rd_ctx_destroy(ctx);
   return 0;
 }

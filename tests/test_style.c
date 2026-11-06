@@ -212,6 +212,38 @@ static void test_style_merge(void) {
   CHECK(dst.width.value == 10 && dst.background.set);
 }
 
+
+static void test_background_style(void) {
+  rd_ctx* ctx = rd_ctx_create();
+  rd_node n   = rd_node_create(ctx);
+  rd_node_append(ctx, rd_ctx_root(ctx), n);
+  const rd_style* c = rd_node_computed_style(ctx, n);
+  CHECK(c->background_image.image.id == 0 && c->background_image.set);
+  CHECK(c->background_repeat == RD_BACKGROUND_REPEAT && c->background_width.unit == RD_UNIT_AUTO);
+  CHECK(c->letter_spacing.unit == RD_UNIT_PX && c->letter_spacing.value == 0);
+
+  // A variant replaces just the image, and {0, true} clears it; a zeroed field doesn't.
+  rd_class cls = rd_class_create(ctx, &(rd_style){.background_image = rd_bg_image((rd_image){7}), .background_repeat = RD_BACKGROUND_NO_REPEAT});
+  rd_class_set_state(ctx, cls, RD_STATE_HOVER, &(rd_style){.background_image = rd_bg_none()});
+  rd_node_add_class(ctx, n, cls);
+  c = rd_node_computed_style(ctx, n);
+  CHECK(c->background_image.image.id == 7 && c->background_repeat == RD_BACKGROUND_NO_REPEAT);
+  rd_node_set_states(ctx, n, RD_STATE_HOVER, true);
+  c = rd_node_computed_style(ctx, n);
+  CHECK(c->background_image.image.id == 0 && c->background_repeat == RD_BACKGROUND_NO_REPEAT);
+  rd_node_set_states(ctx, n, RD_STATE_HOVER, false);
+
+  // It doesn't inherit, and changing it doesn't touch layout.
+  rd_node kid = rd_node_create(ctx);
+  rd_node_append(ctx, n, kid);
+  CHECK(rd_node_computed_style(ctx, kid)->background_image.image.id == 0);
+  rd_ctx_layout(ctx, 100, 100);
+  rd_node_set_style(ctx, n, &(rd_style){.background_image = rd_bg_image((rd_image){9})});
+  rd_ctx_compute_styles(ctx);
+  CHECK(!layout_dirty(ctx, n));
+  rd_ctx_destroy(ctx);
+}
+
 int main(void) {
   test_style_merge();
   test_class_merge();
@@ -221,5 +253,6 @@ int main(void) {
   test_class_order_and_inline();
   test_states();
   test_dirty_tracking();
+  test_background_style();
   return TEST_RESULT();
 }

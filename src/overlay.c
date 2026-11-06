@@ -81,7 +81,7 @@ static void place(rd_ctx* ctx, uint32_t i, rd__anchor* an, rd_rect view) {
   rd_node_layout* L = &ctx->layouts[i];
   uint32_t        p = ctx->slots[i].parent;
 
-  if (d->match_width) {
+  if (d->match_width || d->min_width_anchor) {
     // Resolve the node's own height and bounds the way absolute layout does, with the width fixed.
     const rd_node_layout* P     = &ctx->layouts[p];
     const rd_style*       st    = &ctx->styles[i].computed;
@@ -90,7 +90,17 @@ static void place(rd_ctx* ctx, uint32_t i, rd__anchor* an, rd_rect view) {
     float                 pb[2], mn[2], mx[2];
     style_pb(st, cb[0], pb);
     size_bounds(st, pb, cb[0], cb[1], mn, mx);
-    float w = clampf(a.width, mn[0], mx[0]);
+    float w = a.width;
+    if (!d->match_width) {
+      // Its width without the anchor, measured: its rect may hold the anchor's width of an earlier layout.
+      float own = resolve(st->width, cb[0]);
+      if (isnan(own))
+        own = rd__layout_node(ctx, i, (rd_layout_key){view.width, view.height, cb[0], cb[1], RD_MEASURE_AT_MOST, RD_MEASURE_AT_MOST},
+                              false)
+                  .width;
+      w = fmaxf(a.width, own);
+    }
+    w = clampf(w, mn[0], mx[0]);
     if (fabsf(L->rect.width - w) > 0.01f) {
       float h = resolve(st->height, cb[1]);
       if (isnan(h))

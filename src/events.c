@@ -380,7 +380,7 @@ bool rd_ctx_focus_next(rd_ctx* ctx, bool backward) {
   free(list.nodes);
   ctx->keyboard_modality = true;
   set_focus(ctx, next, true);
-  rd__scroll_into_view(ctx, next.index);
+  rd__request_scroll(ctx, next, RD__WHOLE_NODE, 0);
   return true;
 }
 
@@ -437,6 +437,20 @@ void rd_ctx_text(rd_ctx* ctx, uint32_t codepoint) {
   rd_node focused = focus_valid(ctx);
   if (!ev.default_prevented && !rd_node_is_null(focused) && rd_node_is_input(ctx, focused))
     rd__input_text(ctx, focused.index, codepoint);
+}
+
+// Dropped files.
+
+void rd_ctx_drop_files(rd_ctx* ctx, float x, float y, const char* const* paths, uint32_t count) {
+  if (!ctx || !paths || !count) return;
+  rd_node t = rd__handle(ctx, rd__hit(ctx, x, y));
+  if (rd_node_is_null(t) || disabled(ctx, t)) t = rd_ctx_root(ctx);
+  rd_event ev   = make_event(ctx, RD_EVENT_FILE_DROP, t, 0);
+  ev.x          = x;
+  ev.y          = y;
+  ev.paths      = paths;
+  ev.path_count = count;
+  dispatch(ctx, &ev, true);
 }
 
 // Clipboard.

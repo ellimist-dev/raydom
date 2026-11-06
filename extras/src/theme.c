@@ -248,6 +248,8 @@ static NOINLINE void define_popups(rd_ctx* ctx, rdx_classes* c, const rdx_palett
   cls(ctx, &c->menu_shortcut, (rd_style){.font_size = rd_px(12), .color = p->muted, .white_space = RD_WHITE_SPACE_NOWRAP});
   cls(ctx, &c->menu_separator, (rd_style){.height = rd_px(1), .margin = rd_edges_vh(rd_px(4), rd_px(6)),
                                           .background = p->surface_line});
+  cls(ctx, &c->menu_heading, (rd_style){.padding = rd_edges_vh(rd_px(6), rd_px(10)), .font_size = rd_px(12), .color = p->muted,
+                                        .white_space = RD_WHITE_SPACE_NOWRAP});
 
   cls(ctx, &c->select, quick((rd_style){.flex_direction = RD_FLEX_ROW,
                                   .align_items    = RD_ALIGN_CENTER,

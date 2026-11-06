@@ -2,6 +2,8 @@
 #include <raydom/raydom.hh>
 
 #include <cassert>
+#include <cmath>
+#include <optional>
 #include <string>
 
 using namespace rd::literals;
@@ -48,6 +50,20 @@ int main() {
 
   ctx.press(RD_KEY_TAB);
   assert(badge.focused());
+
+  // ANCHOR: lines
+  rd::Node pane   = ctx.create(rd::Style().height(120_px).overflow_y(RD_OVERFLOW_SCROLL));
+  rd::Node editor = ctx.create_input(/*multiline=*/true, rd::Style().flex_shrink(rd::num(0)));
+  ctx.root().append(pane.append(editor));
+  std::string source;
+  for (int i = 0; i < 100; i++) source += "line\n";
+  editor.text(source);
+  editor.scroll_to_line(40);  // waits for the layout, since the value just changed
+  ctx.layout(800, 600);
+  // Where to put line 40's number or marker, in the same coordinates however the pane scrolls:
+  std::optional<rd_rect> marker = editor.line_rect(40);
+  // ANCHOR_END: lines
+  assert(marker && std::fabs(pane.scroll().y - (marker->y + marker->height - 120)) < 0.01f);
   ctx.press(RD_KEY_ESCAPE);
   assert(!ctx.focused());
   return 0;

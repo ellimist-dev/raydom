@@ -74,6 +74,24 @@ Text from `TEXT` events is code points. A UTF-16 high surrogate followed by a lo
 point; lone halves are dropped. Pasted text drops control characters other than tab and, in a multi-line input,
 newline (a single-line input turns newlines into spaces), and invalid UTF-8 becomes U+FFFD.
 
+### Lines of a multi-line input
+
+```cpp
+{{#include ../../examples/input.cc:lines}}
+```
+
+For line numbers, markers and going to a line. A line here is a line of the value, counted from 0 between newlines,
+however many rows it wraps to; a value ending in a newline has an empty last line.
+
+`rd_input_line_rect` gives the box the line's text fills, across its rows, relative to the input's border box, so it
+doesn't change as the input scrolls with its container. An empty line has a width of 0. It reflects the last layout's
+width and the current value, and is false before the input's first layout, and for a line past the last. It's a binary
+search after the first call on a value, so asking for every visible line each frame is fine.
+
+A multi-line input grows with its value rather than scrolling itself, so `rd_input_scroll_to_line` scrolls its
+enclosing containers, as [`rd_node_scroll_into_view`](layout.md#scrolling) does for a node, and can be called right after
+setting the value. Both are false for a node that isn't a multi-line input.
+
 ## Clipboard
 
 Inputs use an in-memory clipboard by default. `rd_update` installs raylib's system clipboard. Without raylib, provide
